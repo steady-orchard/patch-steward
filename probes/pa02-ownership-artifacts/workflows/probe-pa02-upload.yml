@@ -1,0 +1,315 @@
+# PA02 probe (ownership artifacts): uploads artifacts in one of four modes and records ids, creation times, and
+# repository-wide listing visibility.
+#   single        upload artifact <name> (retention <retention_days>), time its first appearance in the
+#                 repository-wide listing, then optionally hold the run open for <hold_seconds>
+#   names         upload the design's name forms plus prefix decoys and list each by exact name
+#   immutability  second upload of the same name (without and with overwrite) and artifact deletion by two tokens
+#   retention     upload with retention-days 0, 1, 90, 400 and record each expires_at
+# Canonical source: probes/pa02-ownership-artifacts/workflows/probe-pa02-upload.yml
+# Deployed copy:    .github/workflows/probe-pa02-upload.yml on master (byte-identical).
+# Every fact is a log line starting "PROBE-PA02 ".
+name: probe-pa02-upload
+run-name: probe-pa02-upload ${{ inputs.mode }} ${{ inputs.name }} ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatcher find this run
+        required: true
+        type: string
+      mode:
+        description: single | names | immutability | retention
+        required: true
+        type: string
+      name:
+        description: Artifact name (mode single)
+        required: false
+        type: string
+        default: probe-pa02-single
+      retention_days:
+        description: retention-days for mode single
+        required: false
+        type: string
+        default: '1'
+      hold_seconds:
+        description: Seconds to keep the run in progress after the upload (mode single, at most 600)
+        required: false
+        type: string
+        default: '0'
+
+permissions: {}
+
+jobs:
+  upload:
+    name: upload
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+    steps:
+      - name: Write the payload file
+        env:
+          NONCE: ${{ inputs.nonce }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/p"
+          printf 'repository=%s\nrun_id=%s\nrun_attempt=%s\nmode=%s\nnonce=%s\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$MODE" "$NONCE" > "$RUNNER_TEMP/p/payload.txt"
+          printf 'second upload of run %s attempt %s\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/p/second.txt"
+          echo "PROBE-PA02 start mode=$MODE run_id=$GITHUB_RUN_ID run_attempt=$GITHUB_RUN_ATTEMPT sha=$GITHUB_SHA utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      # ---- mode single ----------------------------------------------------------------------------------------
+      - name: Upload (single)
+        id: single
+        if: ${{ inputs.mode == 'single' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.name }}
+          path: ${{ runner.temp }}/p/payload.txt
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+
+      - name: Time the first appearance in the repository-wide listing (single)
+        if: ${{ inputs.mode == 'single' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ inputs.name }}
+          ID: ${{ steps.single.outputs.artifact-id }}
+        run: |
+          set -euo pipefail
+          R="$GITHUB_REPOSITORY"
+          t0=$(date +%s)
+          echo "PROBE-PA02 single name=$NAME artifact_id=$ID upload_done_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ) run_id=$GITHUB_RUN_ID run_attempt=$GITHUB_RUN_ATTEMPT"
+          seen=no
+          for i in $(seq 1 16); do
+            n="$(gh api "repos/$R/actions/artifacts?name=$NAME&per_page=100" --jq "[.artifacts[] | select(.id == $ID)] | length")"
+            if [ "$n" = 1 ]; then
+              echo "PROBE-PA02 single artifact_id=$ID first_visible_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ) delay_s=$(($(date +%s) - t0)) checks=$i"
+              seen=yes
+              break
+            fi
+            sleep 20
+          done
+          if [ "$seen" != yes ]; then echo "PROBE-PA02 single artifact_id=$ID not_visible_after_checks=16"; fi
+          gh api "repos/$R/actions/artifacts/$ID" \
+            --jq '"PROBE-PA02 artifact id=\(.id) name=\(.name) created_at=\(.created_at) expires_at=\(.expires_at) digest=\(.digest) workflow_run=\(.workflow_run.id)"'
+
+      - name: Hold the run in progress (single)
+        if: ${{ inputs.mode == 'single' && inputs.hold_seconds != '0' }}
+        env:
+          HOLD: ${{ inputs.hold_seconds }}
+        run: |
+          case "$HOLD" in '' | *[!0-9]*) echo "PROBE-PA02 error=hold-not-a-number"; exit 1 ;; esac
+          if [ "$HOLD" -gt 600 ]; then HOLD=600; fi
+          echo "PROBE-PA02 hold_start_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ) hold_s=$HOLD"
+          sleep "$HOLD"
+          echo "PROBE-PA02 hold_end_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      # ---- mode names (PA02.1) ----------------------------------------------------------------------------------
+      - name: Upload steward-ownership-pr-90
+        id: n1
+        if: ${{ inputs.mode == 'names' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: steward-ownership-pr-90
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 1
+      - name: Upload steward-ownership-pr-901 (prefix decoy)
+        id: n2
+        if: ${{ inputs.mode == 'names' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: steward-ownership-pr-901
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 1
+      - name: Upload steward-ownership-issue-90
+        id: n3
+        if: ${{ inputs.mode == 'names' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: steward-ownership-issue-90
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 1
+      - name: Upload steward-ownership-group-<40-hex commit>
+        id: n4
+        if: ${{ inputs.mode == 'names' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: steward-ownership-group-${{ github.sha }}
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 1
+      - name: List each name repository-wide by exact name
+        if: ${{ inputs.mode == 'names' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ID1: ${{ steps.n1.outputs.artifact-id }}
+          ID2: ${{ steps.n2.outputs.artifact-id }}
+          ID3: ${{ steps.n3.outputs.artifact-id }}
+          ID4: ${{ steps.n4.outputs.artifact-id }}
+        run: |
+          set -euo pipefail
+          R="$GITHUB_REPOSITORY"
+          echo "PROBE-PA02 names uploaded pr-90=$ID1 pr-901=$ID2 issue-90=$ID3 group=$ID4 group_name=steward-ownership-group-$GITHUB_SHA"
+          for q in steward-ownership-pr-90 steward-ownership-pr-901 steward-ownership-issue-90 "steward-ownership-group-$GITHUB_SHA" steward-ownership-pr-9; do
+            gh api "repos/$R/actions/artifacts?name=$q&per_page=100" \
+              --jq "\"PROBE-PA02 names query=$q total_count=\(.total_count) returned_names=\([.artifacts[].name] | unique | join(\",\")) this_run_ids=\([.artifacts[] | select(.workflow_run.id == $GITHUB_RUN_ID) | .id] | join(\",\"))\""
+          done
+
+      # ---- mode immutability (PA02.2) ---------------------------------------------------------------------------
+      - name: Mint an App installation token (immutability)
+        id: app
+        if: ${{ inputs.mode == 'immutability' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.STEWARD_APP_ID }}
+          private-key: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}
+          permission-actions: write
+      - name: First upload of probe-pa02-immut
+        id: u1
+        if: ${{ inputs.mode == 'immutability' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa02-immut
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 1
+      - name: Record the first upload
+        if: ${{ inputs.mode == 'immutability' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ID: ${{ steps.u1.outputs.artifact-id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ID" \
+            --jq '"PROBE-PA02 immut u1 id=\(.id) name=\(.name) created_at=\(.created_at) digest=\(.digest) size=\(.size_in_bytes)"'
+          sleep 2
+      - name: Second upload of the same name without overwrite
+        id: u2
+        if: ${{ inputs.mode == 'immutability' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa02-immut
+          path: ${{ runner.temp }}/p/second.txt
+          retention-days: 1
+      - name: Record the second upload
+        if: ${{ inputs.mode == 'immutability' }}
+        env:
+          OUTCOME: ${{ steps.u2.outcome }}
+          ID: ${{ steps.u2.outputs.artifact-id }}
+        run: |
+          echo "PROBE-PA02 immut u2 outcome=$OUTCOME id=${ID:-none}"
+          sleep 2
+      - name: Third upload of the same name with overwrite
+        id: u3
+        if: ${{ inputs.mode == 'immutability' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa02-immut
+          path: ${{ runner.temp }}/p/second.txt
+          retention-days: 1
+          overwrite: true
+      - name: Record the overwrite and what became of the first id
+        if: ${{ inputs.mode == 'immutability' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ steps.u3.outcome }}
+          ID1: ${{ steps.u1.outputs.artifact-id }}
+          ID3: ${{ steps.u3.outputs.artifact-id }}
+        run: |
+          set +e
+          R="$GITHUB_REPOSITORY"
+          echo "PROBE-PA02 immut u3 outcome=$OUTCOME id=${ID3:-none}"
+          echo "PROBE-PA02 immut get-first-id id=$ID1 response=$(gh api "repos/$R/actions/artifacts/$ID1" --jq '"\(.id) \(.created_at) \(.digest)"' 2>&1 | tr '\n' ' ')"
+          if [ -n "$ID3" ]; then
+            gh api "repos/$R/actions/artifacts/$ID3" --jq '"PROBE-PA02 immut u3 id=\(.id) created_at=\(.created_at) digest=\(.digest) size=\(.size_in_bytes)"'
+          fi
+          gh api "repos/$R/actions/artifacts?name=probe-pa02-immut&per_page=100" \
+            --jq "\"PROBE-PA02 immut listing this_run=\([.artifacts[] | select(.workflow_run.id == $GITHUB_RUN_ID) | \"\(.id)@\(.created_at)\"] | join(\",\"))\""
+      - name: Upload a throwaway artifact for the deletion test
+        id: u4
+        if: ${{ inputs.mode == 'immutability' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa02-delete
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 1
+      - name: Try to delete it with the job token (actions read), then with the App token (actions write)
+        if: ${{ inputs.mode == 'immutability' }}
+        env:
+          JOB_TOKEN: ${{ github.token }}
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          ID: ${{ steps.u4.outputs.artifact-id }}
+        run: |
+          set +e
+          R="$GITHUB_REPOSITORY"
+          out="$(GH_TOKEN="$JOB_TOKEN" gh api -X DELETE "repos/$R/actions/artifacts/$ID" 2>&1)"; rc=$?
+          echo "PROBE-PA02 delete token=job permission=actions:read id=$ID exit=$rc response=$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"
+          out="$(GH_TOKEN="$APP_TOKEN" gh api -X DELETE "repos/$R/actions/artifacts/$ID" 2>&1)"; rc=$?
+          echo "PROBE-PA02 delete token=app permission=actions:write id=$ID exit=$rc response=$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"
+          out="$(GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/actions/artifacts/$ID" --jq .id 2>&1)"; rc=$?
+          echo "PROBE-PA02 delete get-after id=$ID exit=$rc response=$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"
+
+      # ---- mode retention (PA02.6) ------------------------------------------------------------------------------
+      - name: Upload with retention-days 0 (repository default)
+        id: r0
+        if: ${{ inputs.mode == 'retention' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa02-retention-0
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 0
+      - name: Upload with retention-days 1
+        id: r1
+        if: ${{ inputs.mode == 'retention' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa02-retention-1
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 1
+      - name: Upload with retention-days 90
+        id: r90
+        if: ${{ inputs.mode == 'retention' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa02-retention-90
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 90
+      - name: Upload with retention-days 400
+        id: r400
+        if: ${{ inputs.mode == 'retention' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa02-retention-400
+          path: ${{ runner.temp }}/p/payload.txt
+          retention-days: 400
+      - name: Record each retention outcome
+        if: ${{ inputs.mode == 'retention' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          O0: ${{ steps.r0.outcome }}
+          O1: ${{ steps.r1.outcome }}
+          O90: ${{ steps.r90.outcome }}
+          O400: ${{ steps.r400.outcome }}
+          I0: ${{ steps.r0.outputs.artifact-id }}
+          I1: ${{ steps.r1.outputs.artifact-id }}
+          I90: ${{ steps.r90.outputs.artifact-id }}
+          I400: ${{ steps.r400.outputs.artifact-id }}
+        run: |
+          set +e
+          R="$GITHUB_REPOSITORY"
+          for pair in "0 $O0 $I0" "1 $O1 $I1" "90 $O90 $I90" "400 $O400 $I400"; do
+            set -- $pair
+            if [ -n "${3:-}" ]; then
+              gh api "repos/$R/actions/artifacts/$3" \
+                --jq "\"PROBE-PA02 retention requested=$1 outcome=$2 id=\(.id) created_at=\(.created_at) expires_at=\(.expires_at)\""
+            else
+              echo "PROBE-PA02 retention requested=$1 outcome=$2 id=none"
+            fi
+          done
+          echo "PROBE-PA02 retention settings_read_with_job_token=$(gh api "repos/$R/actions/permissions/artifact-and-log-retention" 2>&1 | tr '\n' ' ' | cut -c1-300)"

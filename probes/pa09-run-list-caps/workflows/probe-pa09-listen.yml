@@ -1,0 +1,39 @@
+# PA09 probe (run-list caps): a write-free listener on "[probe PA09]" PRs and issues. Its run-name carries the
+# submission number and the submission AUTHOR's user id (not the actor), so the runs list returns them as
+# display_title. The job records actor, triggering actor, and sender, then stays in progress for 45 s so in-progress
+# counts can see it. It performs no writes, so it may react to events sent by the test App's bot.
+# Canonical source: probes/pa09-run-list-caps/workflows/probe-pa09-listen.yml
+# Deployed copy:    .github/workflows/probe-pa09-listen.yml on master (byte-identical).
+name: probe-pa09-listen
+run-name: >-
+  probe-pa09 ${{ github.event_name }} sub=${{ github.event.pull_request.number || github.event.issue.number }}
+  author=${{ github.event.pull_request.user.id || github.event.issue.user.id }}
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened]
+  issues:
+    types: [opened, reopened]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  record:
+    name: record
+    if: >-
+      ${{ github.repository != 'jambolo/patch-steward-testbed-public' && (
+      startsWith(github.event.pull_request.title, '[probe PA09]') || startsWith(github.event.issue.title, '[probe PA09]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Record who triggered this run (no writes)
+        run: |
+          echo "PROBE-PA09 context event_name=$GITHUB_EVENT_NAME actor=$GITHUB_ACTOR actor_id=$GITHUB_ACTOR_ID triggering_actor=$GITHUB_TRIGGERING_ACTOR run_id=$GITHUB_RUN_ID run_attempt=$GITHUB_RUN_ATTEMPT utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          jq -c '{action, sender: .sender.login, sender_id: .sender.id,
+            pr: (if .pull_request then {number: .pull_request.number, author: .pull_request.user.login, author_id: .pull_request.user.id, head_repo: .pull_request.head.repo.full_name} else null end),
+            issue: (if .issue then {number: .issue.number, author: .issue.user.login, author_id: .issue.user.id, is_pr: (.issue.pull_request != null)} else null end),
+            comment_author: .comment.user.login}' "$GITHUB_EVENT_PATH" | sed 's/^/PROBE-PA09 event=/'
+          sleep 45

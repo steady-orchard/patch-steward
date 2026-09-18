@@ -527,10 +527,10 @@ creates a check when needed, then commits an immutable ownership artifact.
 `execute-N`/`assess-N` pairs handle challenge rounds on separate fresh
 runners. Only execution jobs run submitted code; they hold a contents-read
 token and no model credential. `publish` runs after successful commitment
-even if downstream jobs fail or are skipped, persists evidence, checks
-freshness/ownership, and applies the outcome/waiting-state mapping. Failed
-`gate`/`publish` jobs or cancellation may leave pending checks for
-reconciliation.
+even if downstream jobs fail, are skipped, or are cancelled, persists
+evidence, checks freshness/ownership, and applies the outcome/waiting-state
+mapping. Failed `gate`/`publish` jobs, or a cancellation that reaches them,
+may leave pending checks for reconciliation.
 
 Only `gate`/`publish` hold App credentials through a default-branch-only
 Environment. An `env` provider key reaches only model jobs through a separate
@@ -646,8 +646,11 @@ on PR-controlled CI. Containers and CI share the risk that submitted code
 manipulates tests, reporters, exits, and result files. Sensitive execution-path
 triage, baseline comparisons, and independent challenge reduce that risk but
 do not eliminate it. Pin steward workflows/actions by immutable commit SHA.
-Artifact identity checks establish provenance, not truth. Evidence writes are
-restricted to the App and maintainers, with local uploads kept non-authoritative.
+Artifact identity checks establish provenance, not truth. Where the plan and
+visibility of the evidence store's repository offer rulesets, evidence writes
+are restricted to the App and maintainers; where GitHub refuses rulesets, as
+on a Free-plan organization's private repository, that restriction is
+unavailable, like enforcement. Local uploads stay non-authoritative.
 
 Run inexpensive checks first: contract checks before any model call,
 deterministic reference checks before claim validation, execution before
@@ -753,14 +756,14 @@ effectiveness.
 
 The repository starts with pnpm, strict TypeScript, ESLint, Prettier, Vitest,
 coverage support, an MIT license, and GitHub CI/CD templates. Authored
-documentation is tracked in docs. The monorepo layout in §9 is implemented
-(M01); the packages contain only toolchain smoke code.
+documentation is tracked in docs. The monorepo layout in §9 is implemented;
+the packages contain only toolchain smoke code.
 
 The sample sources are only toolchain smoke code. No working screening command,
 provider integration, workflow, or browser app is claimed.
 
 Decisions recorded on September 15, 2026 and revised on September 16, 2026
-(architecture §1.2) settle the browser code's role, the absence of browser
+(ADR-0001–ADR-0016 in `docs/adr`) settle the browser code's role, the absence of browser
 secrets and browser inference, the version-1 submission types, the handling of
 security reports, the deployment and trigger model, the sandbox model, the
 local CLI scope, the LLM provider and its authentication, preflight inference,
@@ -776,7 +779,9 @@ repair design; the context selection strategy and its token budget; test
 result parsing; the duplicate search method; platform coverage beyond Linux
 containers; numerical limits, retention, and audit sample sizes;
 enforcement thresholds derived from observation; local credential conventions
-and installation-time capability probing; whether read-only Copilot tools
+and installation-time capability probing (what an administrator token can
+read about the model provider's state without an inference request; the job
+token reads none of it); whether read-only Copilot tools
 consult the permission handler; and evidence retention mechanics. Additional
 open details are daily inference aggregation; efficient live PR-link
 reconciliation; ownership artifact naming, retention, and listing consistency;

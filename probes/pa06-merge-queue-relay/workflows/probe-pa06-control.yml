@@ -1,0 +1,108 @@
+# PA06 probe (merge-queue relay): test-driver actions that the local token cannot perform itself.
+#   check    create a completed App check run "probe-pa06/gate" (conclusion <conclusion>) on each commit in <shas>
+#   enqueue  add PR <pr> to its merge queue (GraphQL enqueuePullRequest) with the token chosen by <token>
+#   dequeue  remove PR <pr> from its merge queue (GraphQL dequeuePullRequest) with the token chosen by <token>
+# <token>: github = the job GITHUB_TOKEN (contents, pull-requests write); app = the test App installation token.
+# Every response is logged verbatim in lines starting "PROBE-PA06 ".
+# Canonical source: probes/pa06-merge-queue-relay/workflows/probe-pa06-control.yml
+# Deployed copy:    .github/workflows/probe-pa06-control.yml on master (byte-identical).
+name: probe-pa06-control
+run-name: probe-pa06-control ${{ inputs.action }} ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      action:
+        description: check | enqueue | dequeue
+        required: true
+        type: string
+      shas:
+        description: check - space-separated 40-hex commit SHAs
+        required: false
+        type: string
+        default: ''
+      conclusion:
+        description: check - success | failure | neutral
+        required: false
+        type: string
+        default: success
+      pr:
+        description: enqueue/dequeue - PR number
+        required: false
+        type: string
+        default: ''
+      token:
+        description: enqueue/dequeue - github | app
+        required: false
+        type: string
+        default: github
+
+permissions: {}
+
+jobs:
+  control:
+    name: control
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Mint an App installation token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.STEWARD_APP_ID }}
+          private-key: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}
+          permission-checks: write
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Perform the action
+        env:
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          JOB_TOKEN: ${{ github.token }}
+          ACTION: ${{ inputs.action }}
+          SHAS: ${{ inputs.shas }}
+          CONCLUSION: ${{ inputs.conclusion }}
+          PR: ${{ inputs.pr }}
+          TOKEN_KIND: ${{ inputs.token }}
+        run: |
+          set +e
+          R="$GITHUB_REPOSITORY"
+          utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+          case "$ACTION" in
+            check)
+              case "$CONCLUSION" in success | failure | neutral) ;; *) echo "PROBE-PA06 error=bad-conclusion"; exit 1 ;; esac
+              for s in $SHAS; do
+                case "$s" in *[!0-9a-f]*) echo "PROBE-PA06 error=bad-sha"; exit 1 ;; esac
+                if [ "${#s}" != 40 ]; then echo "PROBE-PA06 error=bad-sha-length"; exit 1; fi
+                out="$(GH_TOKEN="$APP_TOKEN" gh api -X POST "repos/$R/check-runs" -f name=probe-pa06/gate -f head_sha="$s" \
+                  -f status=completed -f conclusion="$CONCLUSION" -f 'output[title]=probe PA06' -f "output[summary]=control $CONCLUSION" \
+                  --jq '"id=\(.id) app=\(.app.slug) conclusion=\(.conclusion) completed_at=\(.completed_at)"' 2>&1)"
+                echo "PROBE-PA06 control action=check sha=$s exit=$? result=$(printf '%s' "$out" | tr '\n' ' ') utc=$(utc)"
+              done
+              ;;
+            enqueue | dequeue)
+              case "$PR" in '' | *[!0-9]*) echo "PROBE-PA06 error=pr-not-a-number"; exit 1 ;; esac
+              if [ "$TOKEN_KIND" = app ]; then tok="$APP_TOKEN"; else tok="$JOB_TOKEN"; TOKEN_KIND=github; fi
+              node="$(GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/pulls/$PR" --jq .node_id)"
+              if [ "$ACTION" = enqueue ]; then
+                q='mutation($id: ID!) { enqueuePullRequest(input: {pullRequestId: $id}) { mergeQueueEntry { position state enqueuedAt headCommit { oid } } } }'
+              else
+                q='mutation($id: ID!) { dequeuePullRequest(input: {id: $id}) { mergeQueueEntry { position state } } }'
+              fi
+              out="$(GH_TOKEN="$tok" gh api graphql -f query="$q" -f id="$node" 2>&1)"
+              rc=$?
+              echo "PROBE-PA06 control action=$ACTION pr=$PR token=$TOKEN_KIND exit=$rc response=$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-600) utc=$(utc)"
+              ;;
+            *)
+              echo "PROBE-PA06 error=unknown-action"
+              exit 1
+              ;;
+          esac

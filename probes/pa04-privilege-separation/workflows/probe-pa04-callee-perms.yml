@@ -1,0 +1,43 @@
+# PA04 probe (job privilege separation), PA04.2: reusable workflow whose jobs REQUEST token permissions. The
+# "Set up job" section of each job's log lists the GITHUB_TOKEN permissions actually granted. No job sends a Copilot
+# request or writes anything.
+# Canonical source: probes/pa04-privilege-separation/workflows/probe-pa04-callee-perms.yml
+# Deployed copy:    .github/workflows/probe-pa04-callee-perms.yml on master (byte-identical).
+name: probe-pa04-callee-perms
+
+on:
+  workflow_call:
+    inputs:
+      leg:
+        description: Which caller this is (omit-issues, omit-copilot, grant)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  wants-issues:
+    name: wants-issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Record that this job ran
+        env:
+          LEG: ${{ inputs.leg }}
+        run: echo "PROBE-PA04 leg=$LEG job=callee-perms/wants-issues ran=yes requested=contents:read,issues:write"
+
+  wants-copilot:
+    name: wants-copilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      copilot-requests: write
+    steps:
+      - name: Record that this job ran (no Copilot request is sent)
+        env:
+          LEG: ${{ inputs.leg }}
+        run: echo "PROBE-PA04 leg=$LEG job=callee-perms/wants-copilot ran=yes requested=contents:read,copilot-requests:write"

@@ -1,0 +1,258 @@
+# PA08 cap probe (owner decision 8): ONE SDK session per run on the personally owned test-bed, created with
+# sessionLimits.maxAiCredits = <max_ai_credits>, sending synthetic burn prompts (<prompt_kchars> thousand characters of
+# generated filler behind a unique nonce, asking for a one-word answer) until the runtime reports the session limit,
+# a send fails twice (5 minutes apart), <max_sends> sends were made, or the in-job deadline (40 min) passes.
+# It consumes the repository owner's Copilot allowance: owner approval is required for every run, and it is NOT
+# part of the routine drift re-run.
+# Isolation (design): empty working directory outside any checkout, fresh COPILOT_HOME, no MCP servers, no tool
+# allowed, deny-all permission handler, no custom instructions; prompts carry no repository content and no secrets.
+# Every Copilot request is logged "PROBE-PA08 copilot_request_utc=<UTC> cap_session=<label> ..." BEFORE it is sent.
+# SDK auth: the job token reaches the runtime only as COPILOT_GITHUB_TOKEN in the runtime's environment, with the
+# SDK's default auto-login (sdk-setup block identical to probe-pa08-infer.yml, fixed in step 2.26).
+# Canonical source: probes/pa08-copilot-inference/workflows/probe-pa08-cap.yml
+# Deployed copy:    .github/workflows/probe-pa08-cap.yml on master of jambolo/patch-steward-testbed-personal only.
+name: probe-pa08-cap
+run-name: probe-pa08-cap ${{ inputs.session_label }} ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      session_label:
+        description: probe (the maxAiCredits 1 session) or cap-01 ... cap-10
+        required: true
+        type: string
+      max_ai_credits:
+        description: sessionLimits.maxAiCredits (1 for the probe session, 30 for cap sessions)
+        required: true
+        type: string
+      max_sends:
+        description: at most 5 for the probe session, at most 40 for a cap session
+        required: true
+        type: string
+      prompt_kchars:
+        description: burn prompt filler size in thousands of characters
+        required: false
+        type: string
+        default: '160'
+
+permissions: {}
+
+jobs:
+  cap:
+    name: cap
+    if: >-
+      ${{ github.repository == 'jambolo/patch-steward-testbed-personal' && github.event.sender.login == 'jambolo' &&
+      (inputs.session_label == 'probe' || startsWith(inputs.session_label, 'cap-')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      copilot-requests: write
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the Copilot SDK outside any checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/pa08-sdk"
+          cd "$RUNNER_TEMP/pa08-sdk"
+          npm init -y > /dev/null
+          npm install @github/copilot-sdk@1.0.14 > /dev/null
+          echo "PROBE-PA08 job=cap sdk_version=$(node -p "require('./node_modules/@github/copilot-sdk/package.json').version")"
+
+      - name: Write the cap script
+        run: |
+          cat > "$RUNNER_TEMP/pa08-sdk/cap.mjs" << 'PROBE_EOF'
+            // BEGIN sdk-setup (keep identical in probe-pa08-infer.yml and probe-pa08-cap.yml)
+            import { CopilotClient } from '@github/copilot-sdk';
+            const log = (s) => console.log(`PROBE-PA08 ${s}`);
+            const clip = (v, n = 800) => {
+              let t;
+              try {
+                t = typeof v === 'string' ? v : JSON.stringify(v);
+              } catch {
+                t = String(v);
+              }
+              return (t ?? '').replace(/\s+/g, ' ').slice(0, n);
+            };
+            const nowUtc = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+            const errText = (e) => clip(e && (e.stack || e.message) ? `${e.message} | ${e.stack}` : e, 1200);
+            const token = process.env.GITHUB_TOKEN || '';
+            const makeClient = () =>
+              new CopilotClient({
+                baseDirectory: process.env.PROBE_COPILOT_HOME,
+                workingDirectory: process.env.PROBE_EMPTY_DIR,
+                env: { ...process.env, COPILOT_GITHUB_TOKEN: token },
+                // useLoggedInUser keeps its default (true). false makes the SDK start the runtime with --no-auto-login, and the
+                // runtime then ignores COPILOT_GITHUB_TOKEN (step 2.8). Nothing else can log in: fresh COPILOT_HOME, no gh login.
+                logLevel: 'error',
+              });
+            const authStatus = async (c) => {
+              try {
+                return clip(await c.getAuthStatus());
+              } catch (e) {
+                return `error ${errText(e)}`;
+              }
+            };
+            const baseSessionConfig = () => ({
+              onPermissionRequest: () => ({ kind: 'reject', feedback: 'tools are disabled in this probe' }),
+              availableTools: [],
+              excludedTools: ['builtin:*', 'mcp:*', 'custom:*'],
+              mcpServers: {},
+              skipCustomInstructions: true,
+              workingDirectory: process.env.PROBE_EMPTY_DIR,
+            });
+            // END sdk-setup
+
+            import { randomUUID, randomInt } from 'node:crypto';
+
+            const label = process.env.PROBE_SESSION_LABEL || 'unlabeled';
+            const maxCredits = Number(process.env.PROBE_MAX_AI_CREDITS);
+            const maxSends = Math.min(Math.max(Number(process.env.PROBE_MAX_SENDS) || 1, 1), 40);
+            const kchars = Math.min(Math.max(Number(process.env.PROBE_PROMPT_KCHARS) || 160, 1), 400);
+            const deadline = Date.now() + 40 * 60 * 1000;
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const WORDS = (
+              'amber basalt cedar delta ember fjord granite harbor island juniper kestrel lagoon meadow nectar orchard ' +
+              'pebble quartz ravine saffron timber umber valley willow xenon yarrow zephyr anchor bramble canyon dune ' +
+              'estuary falcon glacier heron ivory jasper kelp lantern marble nimbus oasis prairie quiver reef sierra ' +
+              'tundra upland vapor walnut'
+            ).split(' ');
+            const filler = (chars) => {
+              const parts = [];
+              let n = 0;
+              while (n < chars) {
+                const w = WORDS[randomInt(WORDS.length)];
+                parts.push(w);
+                n += w.length + 1;
+              }
+              return parts.join(' ');
+            };
+            const classify = (text) => {
+              if (/allowance|quota|credit|plan limit|exceeded your|usage limit/i.test(text)) return 'names-allowance-or-quota';
+              if (/rate.?limit|429|too many requests/i.test(text)) return 'names-rate-limit';
+              return 'other';
+            };
+
+            let limitEvent = null;
+            let stop = 'max-sends';
+            let sends = 0;
+            let lastError = 'none';
+            let lastNano = 0;
+            log(`cap session=${label} max_ai_credits=${maxCredits} max_sends=${maxSends} prompt_kchars=${kchars} token_present=${token.length > 0} start_utc=${nowUtc()}`);
+            const client = makeClient();
+            try {
+              await client.start();
+              log(`cap session=${label} auth_status=${await authStatus(client)}`);
+              try {
+                log(`cap session=${label} quota_before=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`cap session=${label} quota_before_error=${errText(e)}`);
+              }
+              let session;
+              try {
+                session = await client.createSession({ ...baseSessionConfig(), sessionLimits: { maxAiCredits: maxCredits } });
+                log(`cap session=${label} session_created=yes session_id=${session.sessionId}`);
+              } catch (e) {
+                log(`cap session=${label} session_created=no error=${errText(e)}`);
+                stop = 'session-create-failed';
+              }
+              if (session) {
+                session.on((ev) => {
+                  if (ev.type === 'user.message' || ev.type.endsWith('_delta')) return;
+                  if (ev.type === 'session_limits_exhausted.requested') limitEvent = ev.data;
+                  log(`cap session=${label} event type=${ev.type} data=${clip(ev.data, 600)}`);
+                });
+                outer: for (let i = 1; i <= maxSends; i++) {
+                  if (limitEvent) {
+                    stop = 'session-limit';
+                    break;
+                  }
+                  if (Date.now() > deadline) {
+                    stop = 'deadline';
+                    break;
+                  }
+                  const prompt =
+                    `Nonce ${randomUUID()} session ${label} send ${i}. The text after this sentence is filler for a capacity test; ` +
+                    `ignore it. ${filler(kchars * 1000)} Reply with exactly one word: done`;
+                  for (let attempt = 1; attempt <= 2; attempt++) {
+                    log(`copilot_request_utc=${nowUtc()} cap_session=${label} send=${i} attempt=${attempt} prompt_chars=${prompt.length}`);
+                    sends++;
+                    try {
+                      const reply = await session.sendAndWait({ prompt }, 180000);
+                      log(`cap session=${label} send=${i} reply=${clip(reply && reply.data ? reply.data.content : reply, 60)} done_utc=${nowUtc()}`);
+                      break;
+                    } catch (e) {
+                      const text = errText(e);
+                      log(`cap session=${label} send=${i} attempt=${attempt} error=${text} looks_like=${classify(text)}`);
+                      if (limitEvent) {
+                        stop = 'session-limit';
+                        break outer;
+                      }
+                      if (attempt === 2) {
+                        stop = 'send-failed-twice';
+                        lastError = text;
+                        break outer;
+                      }
+                      log(`cap session=${label} send=${i} waiting_s=300 before the single retry`);
+                      await sleep(300000);
+                    }
+                  }
+                  try {
+                    const m = await session.rpc.usage.getMetrics();
+                    const nano = Number(m && m.totalNanoAiu) || 0;
+                    log(`cap session=${label} send=${i} total_nano_aiu=${nano} delta_nano_aiu=${nano - lastNano} metrics=${clip(m, 500)}`);
+                    lastNano = nano;
+                  } catch (e) {
+                    log(`cap session=${label} send=${i} metrics_error=${errText(e)}`);
+                  }
+                }
+                if (limitEvent && stop === 'max-sends') stop = 'session-limit';
+                try {
+                  await session.disconnect();
+                } catch (e) {
+                  log(`cap session=${label} disconnect_error=${errText(e)}`);
+                }
+              }
+              try {
+                log(`cap session=${label} quota_after=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`cap session=${label} quota_after_error=${errText(e)}`);
+              }
+            } catch (e) {
+              log(`cap session=${label} fatal_error=${errText(e)}`);
+              stop = 'fatal';
+            } finally {
+              try {
+                await client.forceStop();
+              } catch (e) {
+                log(`cap session=${label} stop_error=${errText(e)}`);
+              }
+            }
+            log(
+              `cap_session_end session=${label} stop=${stop} sends=${sends} total_nano_aiu=${lastNano} ai_credits=${(lastNano / 1e9).toFixed(3)} ` +
+                `limit_event=${limitEvent ? clip(limitEvent, 300) : 'none'} last_error=${lastError} end_utc=${nowUtc()}`,
+            );
+          PROBE_EOF
+
+      - name: Run one cap session from an empty directory with a fresh COPILOT_HOME
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PROBE_SESSION_LABEL: ${{ inputs.session_label }}
+          PROBE_MAX_AI_CREDITS: ${{ inputs.max_ai_credits }}
+          PROBE_MAX_SENDS: ${{ inputs.max_sends }}
+          PROBE_PROMPT_KCHARS: ${{ inputs.prompt_kchars }}
+        run: |
+          case "$PROBE_MAX_AI_CREDITS" in 1 | 30) ;; *) echo "PROBE-PA08 error=max_ai_credits must be 1 or 30"; exit 1 ;; esac
+          case "$PROBE_MAX_SENDS" in '' | *[!0-9]*) echo "PROBE-PA08 error=bad max_sends"; exit 1 ;; esac
+          if [ "$PROBE_MAX_AI_CREDITS" = 1 ] && [ "$PROBE_MAX_SENDS" -gt 5 ]; then echo "PROBE-PA08 error=probe session max 5 sends"; exit 1; fi
+          export PROBE_COPILOT_HOME="$RUNNER_TEMP/pa08-copilot-home"
+          export PROBE_EMPTY_DIR="$RUNNER_TEMP/pa08-empty"
+          mkdir -p "$PROBE_COPILOT_HOME" "$PROBE_EMPTY_DIR"
+          cd "$PROBE_EMPTY_DIR"
+          timeout 2520 node "$RUNNER_TEMP/pa08-sdk/cap.mjs" || echo "PROBE-PA08 job=cap node_exit=$?"

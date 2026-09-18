@@ -1,0 +1,79 @@
+# PA04 probe (job privilege separation), PA04.1: which jobs of one run receive the Environment secret. Caller jobs
+# with and without the Environment, plus three calls of probe-pa04-callee.yml: same repository, and pinned by commit
+# SHA to the copies on steady-orchard/patch-steward-testbed-public and jambolo/patch-steward-testbed-personal (on each
+# test-bed at least one of the two is another repository). No secrets are passed to the calls.
+# The two pins 1111... and 2222... are placeholders: the probe step replaces them with the commit SHAs that contain
+# the deployed callee on each host before this file is deployed.
+# Canonical source: probes/pa04-privilege-separation/workflows/probe-pa04-envs.yml
+# Deployed copy:    .github/workflows/probe-pa04-envs.yml on master (byte-identical).
+name: probe-pa04-envs
+run-name: probe-pa04-envs ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  caller-env:
+    name: caller-env
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: probe-pa04-env
+    permissions: {}
+    steps:
+      - name: Report the Environment secret digest in the caller
+        env:
+          MARKER: ${{ secrets.PROBE_PA04_ENV_MARKER }}
+        run: |
+          d="$(printf '%s' "$MARKER" | sha256sum | cut -d ' ' -f 1)"
+          case "$d" in
+            16e562bad4a54896263f6875672440fae0271c1b37cdd746a48eb00b06089501) origin=org-public ;;
+            244acb019505f578c648954cfddca5b20400928738528b1be5170206991d74fa) origin=org-private ;;
+            52080ed5b0043db8cdf2d84a739b72662260353b093332fcf472471e04712901) origin=personal ;;
+            e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855) origin=empty ;;
+            *) origin=other ;;
+          esac
+          echo "PROBE-PA04 leg=caller job=caller/with-env repository=$GITHUB_REPOSITORY secret_length=${#MARKER} secret_origin=$origin"
+
+  caller-sibling:
+    name: caller-sibling
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Report the secret as seen by a sibling job without the Environment
+        env:
+          MARKER: ${{ secrets.PROBE_PA04_ENV_MARKER }}
+        run: echo "PROBE-PA04 leg=caller job=caller/sibling repository=$GITHUB_REPOSITORY secret_length=${#MARKER}"
+
+  local:
+    name: local
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    permissions: {}
+    uses: ./.github/workflows/probe-pa04-callee.yml
+    with:
+      leg: local
+
+  xrepo-org-public:
+    name: xrepo-org-public
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    permissions: {}
+    uses: steady-orchard/patch-steward-testbed-public/.github/workflows/probe-pa04-callee.yml@3f20e849eeacc02ecde6465401871c4e8da8efa9
+    with:
+      leg: xrepo-org-public
+
+  xrepo-personal:
+    name: xrepo-personal
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    permissions: {}
+    uses: jambolo/patch-steward-testbed-personal/.github/workflows/probe-pa04-callee.yml@fbe1cdac3812bf69540d6c4a494911bc0b3bb4b8
+    with:
+      leg: xrepo-personal

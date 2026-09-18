@@ -1,0 +1,154 @@
+# PA01 probe (required checks): drives one fixed sequence of check-run writes on a fresh head commit of the probe
+# PR and records the PR's merge state (REST mergeable_state) after every write.
+# Canonical source: probes/pa01-required-checks/workflows/probe-pa01-sequence.yml
+# Deployed copy:    .github/workflows/probe-pa01-sequence.yml on master (byte-identical).
+# Preconditions, created by the probe step: branch probe-pa01-base; ruleset probe-pa01-required on exactly
+# refs/heads/probe-pa01-base requiring the status check "probe-pa01/required" from integration 4993303 (the test
+# App); branch probe-pa01-head-1 holding probe-pa01/head.txt; an open PR probe-pa01-head-1 -> probe-pa01-base.
+# The job never checks out or runs PR content. Every fact is a log line starting "PROBE-PA01 ".
+name: probe-pa01-sequence
+run-name: probe-pa01-sequence ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      pr:
+        description: Number of the open probe PR (head probe-pa01-head-1, base probe-pa01-base)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  sequence:
+    name: sequence
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Mint an App installation token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.STEWARD_APP_ID }}
+          private-key: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}
+          permission-checks: write
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Run the check-run sequence and record the merge state after each write
+        env:
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          JOB_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr }}
+          NONCE: ${{ inputs.nonce }}
+          CHECK_NAME: probe-pa01/required
+          HEAD_BRANCH: probe-pa01-head-1
+          HEAD_FILE: probe-pa01/head.txt
+        run: |
+          set -euo pipefail
+          R="$GITHUB_REPOSITORY"
+          RUN_URL="$GITHUB_SERVER_URL/$R/actions/runs/$GITHUB_RUN_ID"
+          case "$PR" in '' | *[!0-9]*) echo "PROBE-PA01 error=pr-not-a-number"; exit 1 ;; esac
+          utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+          log() { echo "PROBE-PA01 $*"; }
+          state() { GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/pulls/$PR" --jq .mergeable_state; }
+
+          # observe <step>: poll every 20 s, at most 5 times; stop at the first known state that differs from PREV.
+          observe() {
+            local label="$1" t0 now st i
+            t0=$(date +%s)
+            SETTLED=unknown
+            CHANGED=no
+            LATENCY=none
+            for i in 1 2 3 4 5; do
+              sleep 20
+              st="$(state)"
+              now=$(date +%s)
+              log "step=$label poll=$i t_s=$((now - t0)) mergeable_state=$st"
+              if [ "$st" != unknown ]; then SETTLED="$st"; fi
+              if [ "$st" != unknown ] && [ "$st" != "$PREV" ]; then
+                CHANGED=yes
+                LATENCY=$((now - t0))
+                break
+              fi
+            done
+            log "step=$label settled=$SETTLED changed=$CHANGED latency_s=$LATENCY prev=$PREV utc=$(utc)"
+            PREV="$SETTLED"
+          }
+
+          # create <app|job> <status-or-empty> <conclusion-or-empty>: create a check run on HEAD_SHA; prints "id app status conclusion"
+          create() {
+            local tok="$APP_TOKEN"
+            if [ "$1" = job ]; then tok="$JOB_TOKEN"; fi
+            local args=(-X POST "repos/$R/check-runs" -f name="$CHECK_NAME" -f head_sha="$HEAD_SHA" -f details_url="$RUN_URL" -f external_id="$NONCE")
+            if [ -n "$3" ]; then
+              args+=(-f status=completed -f conclusion="$3" -f "output[title]=probe PA01" -f "output[summary]=conclusion $3")
+            else
+              args+=(-f status="$2")
+            fi
+            GH_TOKEN="$tok" gh api "${args[@]}" --jq '"\(.id) \(.app.slug) \(.status) \(.conclusion)"'
+          }
+
+          # complete <id> <conclusion>: complete an existing check run with the App token
+          complete() {
+            GH_TOKEN="$APP_TOKEN" gh api -X PATCH "repos/$R/check-runs/$1" -f status=completed -f conclusion="$2" \
+              -f details_url="$RUN_URL" -f "output[title]=probe PA01" -f "output[summary]=conclusion $2" \
+              --jq '"\(.id) \(.app.slug) \(.status) \(.conclusion)"'
+          }
+
+          w() { log "step=$1 write=\"$2\" result=\"$3\" utc=$(utc)"; }
+
+          log "start repository=$R pr=$PR check_name=$CHECK_NAME run_url=$RUN_URL utc=$(utc)"
+
+          # S0: a fresh head commit, so that no check run of an earlier attempt exists on it.
+          cur="$(GH_TOKEN="$APP_TOKEN" gh api "repos/$R/contents/$HEAD_FILE?ref=$HEAD_BRANCH" --jq .sha 2> /dev/null || true)"
+          put=(-X PUT "repos/$R/contents/$HEAD_FILE" -f message="probe(PA01): fresh head $NONCE" -f branch="$HEAD_BRANCH"
+            -f content="$(printf 'probe PA01 head %s\n' "$NONCE" | base64 -w0)")
+          if [ -n "$cur" ]; then put+=(-f sha="$cur"); fi
+          HEAD_SHA="$(GH_TOKEN="$APP_TOKEN" gh api "${put[@]}" --jq .commit.sha)"
+          log "step=S0 write=\"app token commit to $HEAD_BRANCH\" head_sha=$HEAD_SHA utc=$(utc)"
+          synced=no
+          for i in 1 2 3 4 5 6 7 8 9; do
+            sleep 20
+            h="$(GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/pulls/$PR" --jq .head.sha)"
+            if [ "$h" = "$HEAD_SHA" ]; then synced=yes; break; fi
+          done
+          log "step=S0 pr_head_synced=$synced"
+          if [ "$synced" != yes ]; then exit 1; fi
+          PREV=start
+          observe S0
+
+          r="$(create app in_progress '')"; A="${r%% *}"; w S1a "app create in_progress (run A)" "$r"; observe S1a
+          r="$(complete "$A" success)"; w S1b "app complete run A success" "$r"; observe S1b
+          r="$(create app in_progress '')"; B="${r%% *}"; w S2 "app create in_progress (run B, same name, same commit)" "$r"; observe S2
+          r="$(complete "$B" failure)"; w S3 "app complete run B failure (A is an older success)" "$r"; observe S3
+          r="$(create app '' neutral)"; w S4 "app create completed neutral" "$r"; observe S4
+          r="$(create app '' action_required)"; w S5 "app create completed action_required" "$r"; observe S5
+          r="$(create app '' success)"; w S6 "app create completed success" "$r"; observe S6
+          r="$(create app '' cancelled)"; w S7 "app create completed cancelled" "$r"; observe S7
+          r="$(create app in_progress '')"; H1="${r%% *}"; w S8a "app create in_progress (older run H1)" "$r"; observe S8a
+          r="$(create app '' success)"; w S8b "app create completed success (newer run H2)" "$r"; observe S8b
+          r="$(complete "$H1" cancelled)"; w S8c "app complete OLDER run H1 cancelled after newer H2 exists" "$r"; observe S8c
+          r="$(create app '' failure)"; w S9a "app create completed failure" "$r"; observe S9a
+          r="$(create job '' success)"; w S9b "job GITHUB_TOKEN (app github-actions) create completed success" "$r"; observe S9b
+          r="$(create app '' success)"; w S10a "app create completed success (reset)" "$r"; observe S10a
+          r="$(create app '' skipped)"; w S10b "app create completed skipped" "$r"; observe S10b
+          r="$(create app '' success)"; w S11a "app create completed success (reset)" "$r"; observe S11a
+          r="$(create app '' timed_out)"; w S11b "app create completed timed_out" "$r"; observe S11b
+
+          log "check-runs filter=all (oldest first):"
+          GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/commits/$HEAD_SHA/check-runs?check_name=$CHECK_NAME&filter=all&per_page=100" \
+            --jq '.check_runs | sort_by(.id) | .[] | "PROBE-PA01 check_run id=\(.id) app=\(.app.slug) status=\(.status) conclusion=\(.conclusion) started_at=\(.started_at) completed_at=\(.completed_at)"'
+          log "check-runs filter=latest:"
+          GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/commits/$HEAD_SHA/check-runs?check_name=$CHECK_NAME&filter=latest&per_page=100" \
+            --jq '.check_runs[] | "PROBE-PA01 latest id=\(.id) app=\(.app.slug) status=\(.status) conclusion=\(.conclusion)"'
+          log "done head_sha=$HEAD_SHA utc=$(utc)"

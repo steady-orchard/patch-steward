@@ -5,7 +5,7 @@ governs no behavior. [architecture.md](architecture.md) governs components and
 boundaries, [processes.md](processes.md) governs steps and behavior, and the
 [whitepaper](whitepaper.md) defers to both. Where this plan disagrees with
 them, they govern; correct the plan. The plan cites their stable identifiers
-(P01–P11, O01–O03, decisions 1–16, invariants 1–8, § references, SP01–SP20)
+(P01–P11, O01–O03, ADR-0001–ADR-0016, invariants 1–8, § references, SP01–SP20)
 instead of restating behavior. Unqualified § references point to the
 architecture.
 
@@ -15,7 +15,7 @@ settle before work starts, its outputs, and its exit criteria. Implementation
 detail (libraries, module structure, schema fields, prompt text, numerical
 values) belongs to each milestone's own planning, not to this document. The
 project owner's decisions about the plan itself are recorded in section 9 as
-PD01–PD08; "decision" with a bare number always means architecture §1.2.
+PD01–PD08; architecture decisions are cited by ADR id (ADR-0001–ADR-0016 in `docs/adr`).
 
 ## 0. Conventions
 
@@ -171,11 +171,11 @@ Goal: replace the single-package scaffold with the pnpm monorepo of §6.1 while
 keeping the CI and CD contracts intact, so later milestones add product code
 rather than infrastructure.
 
-| Field        | Value                     |
-| ------------ | ------------------------- |
-| Design scope | §6.1; decisions 11 and 12 |
-| Addresses    | Prerequisite for all      |
-| Depends on   | —                         |
+| Field        | Value                       |
+| ------------ | --------------------------- |
+| Design scope | §6.1; ADR-0011 and ADR-0012 |
+| Addresses    | Prerequisite for all        |
+| Depends on   | —                           |
 
 Inputs:
 
@@ -224,10 +224,15 @@ governing documents where the platform differs.
 Inputs:
 
 - Administrator access to dedicated, disposable test-bed repositories (PD02):
-  public and private, personally owned. No organization with Copilot is
-  currently available, so M02 verifies the personal billing path of §6.3 and
-  records the organization path as undetermined (PD03). The probes are
-  repeated on an organization-owned repository when one becomes available.
+  an organization-owned pair, public and private, and a personally owned
+  public repository. The private repository is on the organization's Free
+  plan, so behaviors that plan does not offer on private repositories are
+  recorded undetermined. The organization has no Copilot seats, so M02
+  verifies the personal billing path of §6.3 on the personally owned test-bed
+  and assumes that inference on the organization-owned test-beds does not
+  require Copilot billing to the organization (PD03). That assumption is a
+  recorded risk (section 8). The organization billing path stays undetermined
+  until the probes run in an organization with Copilot.
 - A test GitHub App registration with the permissions in §6.4.
 - A Copilot seat; optionally a key for an OpenAI-compatible endpoint.
 
@@ -256,9 +261,11 @@ Assumptions to verify:
 7. App-token writes (§6.4): which events they trigger and which identity
    fields let a run verify its own installation's echoes.
 8. Copilot inference in Actions (§6.3): `GITHUB_TOKEN` authentication on the
-   personal billing path, the failure shape without a usable Copilot
-   entitlement, usage and credit reporting, soft credit-cap behavior. The
-   organization policy and its failure shape stay undetermined under PD03.
+   personal billing path (personally owned test-bed) and on the
+   organization-owned test-beds without organization billing (PD03), the
+   failure shape without a usable Copilot entitlement, usage and credit
+   reporting, soft credit-cap behavior. The organization policy and its
+   failure shape stay undetermined under PD03.
 9. Run-list caps (§12): whether today's runs and in-progress runs can be
    attributed to the submission author, not the workflow actor, within
    bounded queries.
@@ -280,8 +287,11 @@ Exit criteria:
   or an accepted, documented limitation before the dependent milestone
   starts: items 1–7 and 9 before M06; item 8 before M09.
 - The organization billing path is an accepted limitation under PD03: it is
-  documented as unverified wherever it is described, until the probes run on
-  an organization-owned repository.
+  documented as unverified wherever it is described, until the probes run in
+  an organization with Copilot.
+- PD03's assumption that the organization-owned test-beds need no
+  organization billing has a recorded result under item 8; if refuted, it is
+  handled as a refuted assumption above.
 
 ### M03. Policy and data contracts
 
@@ -461,11 +471,11 @@ Goal: prove single-run orchestration on GitHub with the cheapest pipeline:
 events to `gate` to `publish` in observe mode, with ownership, freshness,
 caps, and durable evidence, before any stage depends on it.
 
-| Field        | Value                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Design scope | §6.4 `gate`, `publish`, ownership and freshness rules without checks; the submission events of `steward-pr.yml` and `steward-issues.yml`; §6.3 Evidence store, evidence commits, Clock and ids; §11; §12 caps and concurrency; SP06 steps 1 and 8; SP13 steps 3–4; SP18 steps 1 and 6; SP19 steps 1 and 3 (own-input rescreens); SP03 step 2 closures; decisions 5, 9, 13; invariants 2 and 8 |
-| Addresses    | P01, P10, P11, O01, O02, O03                                                                                                                                                                                                                                                                                                                                                                  |
-| Depends on   | M02, M05                                                                                                                                                                                                                                                                                                                                                                                      |
+| Field        | Value                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design scope | §6.4 `gate`, `publish`, ownership and freshness rules without checks; the submission events of `steward-pr.yml` and `steward-issues.yml`; §6.3 Evidence store, evidence commits, Clock and ids; §11; §12 caps and concurrency; SP06 steps 1 and 8; SP13 steps 3–4; SP18 steps 1 and 6; SP19 steps 1 and 3 (own-input rescreens); SP03 step 2 closures; ADR-0005, ADR-0009, ADR-0013; invariants 2 and 8 |
+| Addresses    | P01, P10, P11, O01, O02, O03                                                                                                                                                                                                                                                                                                                                                                            |
+| Depends on   | M02, M05                                                                                                                                                                                                                                                                                                                                                                                                |
 
 Inputs:
 
@@ -481,7 +491,7 @@ Decisions to settle first:
 - Computation of the approximate caps from the run list (§12, §15).
 - The event identity used for deduplication (§6.4).
 - How the action and reusable workflows are built, pinned, and consumed by
-  wrappers during development (decision 11).
+  wrappers during development (ADR-0011).
 
 Outputs:
 
@@ -636,11 +646,11 @@ Goal: bounded, provider-independent, schema-validated request-and-response
 inference under one cumulative budget, where every failure becomes a typed
 failure that the decision rules turn into `inconclusive`.
 
-| Field        | Value                                                                                                                                                                        |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Design scope | §6.3 LLM adapter contract and both adapters; §6.2 Budget; §12 budgets, caching, rate limits; SP19 steps 2, 4, 5, 7; SP05 CLI step 4; decisions 8, 14, 15; invariants 4, 5, 7 |
-| Addresses    | P01, P06, P10, O01                                                                                                                                                           |
-| Depends on   | M05; M02 item 8                                                                                                                                                              |
+| Field        | Value                                                                                                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design scope | §6.3 LLM adapter contract and both adapters; §6.2 Budget; §12 budgets, caching, rate limits; SP19 steps 2, 4, 5, 7; SP05 CLI step 4; ADR-0008, ADR-0014, ADR-0015; invariants 4, 5, 7 |
+| Addresses    | P01, P06, P10, O01                                                                                                                                                                    |
+| Depends on   | M05; M02 item 8                                                                                                                                                                       |
 
 Inputs:
 
@@ -697,11 +707,11 @@ Exit criteria:
 Goal: establish whether cited material exists at the claimed revision and
 what the claim is, with evidence pointers that the core confirms.
 
-| Field        | Value                                                                        |
-| ------------ | ---------------------------------------------------------------------------- |
-| Design scope | SP07; SP08; §6.2 Context retrieval and References; §7 Search API; decision 4 |
-| Addresses    | P01, P02, P03, P04, P10, P11                                                 |
-| Depends on   | M09                                                                          |
+| Field        | Value                                                                      |
+| ------------ | -------------------------------------------------------------------------- |
+| Design scope | SP07; SP08; §6.2 Context retrieval and References; §7 Search API; ADR-0004 |
+| Addresses    | P01, P02, P03, P04, P10, P11                                               |
+| Depends on   | M09                                                                        |
 
 Inputs:
 
@@ -972,11 +982,11 @@ Exit criteria, as a test-bed scenario matrix of mode, outcome, and exception:
 Goal: give maintainers and authors the recorded, scoped controls of SP15, and
 the optional inference-admission hold.
 
-| Field        | Value                                                                                                                                                                                                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Design scope | SP15; SP19 step 10 and the partial-rerun rule of step 3; SP13 step 1 waivers and `overridden`; SP08 step 6 acceptance paths; SP06 step 7 action-scope transfer; SP03 steps 2 (`resolve`), 4, and 6; §9 Maintainer action and claim-scope hashing; decision 16 |
-| Addresses    | P01, P10, P11, O01, O02                                                                                                                                                                                                                                       |
-| Depends on   | M14                                                                                                                                                                                                                                                           |
+| Field        | Value                                                                                                                                                                                                                                                      |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design scope | SP15; SP19 step 10 and the partial-rerun rule of step 3; SP13 step 1 waivers and `overridden`; SP08 step 6 acceptance paths; SP06 step 7 action-scope transfer; SP03 steps 2 (`resolve`), 4, and 6; §9 Maintainer action and claim-scope hashing; ADR-0016 |
+| Addresses    | P01, P10, P11, O01, O02                                                                                                                                                                                                                                    |
+| Depends on   | M14                                                                                                                                                                                                                                                        |
 
 Inputs:
 
@@ -987,7 +997,7 @@ Decisions to settle first:
 
 - Accepted values for `stage`, `REQUIREMENT`, `RUN`, and `KIND`.
 - The procedure for revoking an inference admission.
-- The definition of "prior merged work" (decision 16).
+- The definition of "prior merged work" (ADR-0016).
 - Command rate limits (SP15 controls).
 
 Outputs:
@@ -1134,11 +1144,11 @@ Goal: one static application with two faces: the contributor submission
 assistant and the maintainer dashboard, with no secrets, inference, or
 writes.
 
-| Field        | Value                                                                                            |
-| ------------ | ------------------------------------------------------------------------------------------------ |
-| Design scope | §6.6; zone Z6; decisions 1 and 2; SP05 browser steps; SP15 step 1 views; SP03 step 4 audit queue |
-| Addresses    | P02, P04, P06, P07, P09, P10, P11, O01                                                           |
-| Depends on   | M17; the assistant needs only M03 and M04                                                        |
+| Field        | Value                                                                                                |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| Design scope | §6.6; zone Z6; ADR-0001 and ADR-0002; SP05 browser steps; SP15 step 1 views; SP03 step 4 audit queue |
+| Addresses    | P02, P04, P06, P07, P09, P10, P11, O01                                                               |
+| Depends on   | M17; the assistant needs only M03 and M04                                                            |
 
 Inputs:
 
@@ -1213,11 +1223,11 @@ Exit criteria:
 Goal: a project can adopt Patch Steward from a published release candidate by
 following the documentation, without help from its developers.
 
-| Field        | Value                                                                                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Design scope | SP02; §6.5 `steward init`; §6.7; decision 11; §13 compromised-release row; every remaining §15 item except the enforcement thresholds, which M21 closes |
-| Addresses    | O01, O03                                                                                                                                                |
-| Depends on   | M01–M19                                                                                                                                                 |
+| Field        | Value                                                                                                                                                |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design scope | SP02; §6.5 `steward init`; §6.7; ADR-0011; §13 compromised-release row; every remaining §15 item except the enforcement thresholds, which M21 closes |
+| Addresses    | O01, O03                                                                                                                                             |
+| Depends on   | M01–M19                                                                                                                                              |
 
 Inputs:
 
@@ -1422,19 +1432,20 @@ Exit criteria:
 
 ## 8. Risks
 
-| Risk                                                                                                                                     | Response                                                                                                                                                                                                                               |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Platform behavior differs from the design (checks, artifacts, triggers, Copilot)                                                         | M02 before reliance; governing-document change before dependent work; probe workflows kept for drift                                                                                                                                   |
-| Provider or runtime churn; the first provider choice was retired before any code                                                         | One adapter contract suite, a second adapter always passing it, pinned runtime, the M17 availability probe                                                                                                                             |
-| T1 behavior cannot be verified in ordinary CI                                                                                            | Test-bed scenario suites per milestone; the self-test grows from M13; M06 precedes the stages                                                                                                                                          |
-| Phase boundaries that do not fit job boundaries                                                                                          | Principle 5; the M05 and M06 skeletons precede every stage                                                                                                                                                                             |
-| Breadth of language-independent result parsing and anti-gaming analysis                                                                  | TypeScript and one compiled ecosystem first (PD04); unrecognized ecosystems degrade to triage, never to `pass`                                                                                                                         |
-| Cost and nondeterminism of live-model tests                                                                                              | Recorded responses in CI; the result cache; live calls only in probes, replay, and test-bed runs                                                                                                                                       |
-| Scarce evaluation data, especially labeled valid contributions                                                                           | M11 seeds early from fixtures and accessible cases; M17 exports add resolved history                                                                                                                                                   |
-| Too little traffic, labeling, or recorded time to reach M21's sample size, likely while only the owner's repositories participate (PD08) | Observation accrues from M13; recruitment continues through and after M21 and blocks nothing; the acceptance record reports insufficiency instead of stretching a claim; enforcement stays withheld; version 1.0 still proceeds (PD07) |
-| The organization billing path for Copilot is unverified at release (PD03)                                                                | Documented as unverified; the design in §6.3 is unchanged; the M02 probes are repeated when an organization with Copilot is available                                                                                                  |
-| Delivery mistaken for success                                                                                                            | Principle 10; M20 ships a release candidate with no effectiveness claim; M21 alone accepts version 1                                                                                                                                   |
-| Plan drift as decisions close                                                                                                            | Definition of done records decisions governing document first; this plan is corrected in the same change                                                                                                                               |
+| Risk                                                                                                                                                                                                                        | Response                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform behavior differs from the design (checks, artifacts, triggers, Copilot)                                                                                                                                            | M02 before reliance; governing-document change before dependent work; probe workflows kept for drift                                                                                                                                   |
+| Provider or runtime churn; the first provider choice was retired before any code                                                                                                                                            | One adapter contract suite, a second adapter always passing it, pinned runtime, the M17 availability probe                                                                                                                             |
+| T1 behavior cannot be verified in ordinary CI                                                                                                                                                                               | Test-bed scenario suites per milestone; the self-test grows from M13; M06 precedes the stages                                                                                                                                          |
+| Phase boundaries that do not fit job boundaries                                                                                                                                                                             | Principle 5; the M05 and M06 skeletons precede every stage                                                                                                                                                                             |
+| Breadth of language-independent result parsing and anti-gaming analysis                                                                                                                                                     | TypeScript and one compiled ecosystem first (PD04); unrecognized ecosystems degrade to triage, never to `pass`                                                                                                                         |
+| Cost and nondeterminism of live-model tests                                                                                                                                                                                 | Recorded responses in CI; the result cache; live calls only in probes, replay, and test-bed runs                                                                                                                                       |
+| Scarce evaluation data, especially labeled valid contributions                                                                                                                                                              | M11 seeds early from fixtures and accessible cases; M17 exports add resolved history                                                                                                                                                   |
+| Too little traffic, labeling, or recorded time to reach M21's sample size, likely while only the owner's repositories participate (PD08)                                                                                    | Observation accrues from M13; recruitment continues through and after M21 and blocks nothing; the acceptance record reports insufficiency instead of stretching a claim; enforcement stays withheld; version 1.0 still proceeds (PD07) |
+| The organization billing path for Copilot is unverified at release (PD03)                                                                                                                                                   | Documented as unverified; the design in §6.3 is unchanged; the M02 probes are repeated when an organization with Copilot is available                                                                                                  |
+| Copilot inference on an organization-owned repository requires billing to the organization, contrary to PD03's assumption; the test-bed organization has no Copilot seats, and this repository (PD05) is organization-owned | M02 item 8 records the failure shape; inference probes and test-bed runs fall back to the personally owned test-bed; before M09 the owner enables organization Copilot, selects `openai-compatible`, or accepts the limitation         |
+| Delivery mistaken for success                                                                                                                                                                                               | Principle 10; M20 ships a release candidate with no effectiveness claim; M21 alone accepts version 1                                                                                                                                   |
+| Plan drift as decisions close                                                                                                                                                                                               | Definition of done records decisions governing document first; this plan is corrected in the same change                                                                                                                               |
 
 ## 9. Plan decisions
 
@@ -1442,13 +1453,13 @@ The project owner decided these plan-shaping questions on September 17, 2026.
 The plan cites them as PD01–PD08. Reopening one means correcting every place
 that cites it.
 
-| ID   | Question                                                     | Decision                                                                                                                                                                                                                                                                      |
-| ---- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PD01 | Timing of the GitHub-hosted skeleton                         | M06, before the stages: ownership, freshness, and job boundaries are validated while changing them is cheap. Not chosen: after M12, as one larger T1 integration.                                                                                                             |
-| PD02 | Test-bed                                                     | Dedicated disposable repositories and a test App. Not chosen: this repository.                                                                                                                                                                                                |
-| PD03 | Organization billing path for Copilot                        | No organization with Copilot is currently available. M02 verifies the personal path only; the organization path is documented as unverified until the probes can run on an organization-owned repository.                                                                     |
-| PD04 | First ecosystems for result parsing and anti-gaming fixtures | TypeScript and one compiled ecosystem, Rust or C++, chosen in M08: SP10 step 3 distinguishes compile failures from assertion failures, which a compiled ecosystem exercises. Not chosen: TypeScript and Python.                                                               |
-| PD05 | Self-screening of this repository                            | Yes, in observe mode from M13, as continuous real traffic for calibration.                                                                                                                                                                                                    |
-| PD06 | Releases before 1.0                                          | One 0.x release per plan section (section 0.5 of this plan). Not chosen: one per milestone; none before 1.0.                                                                                                                                                                  |
-| PD07 | What version 1.0 requires at M21                             | Verified delivered capabilities plus an acceptance record that reports measured effectiveness as found, even when it is insufficient or negative; enforcement stays withheld without evidence. Not chosen: waiting for a category to meet its thresholds; version 1.0 at M20. |
-| PD08 | Participants in the M21 measurement                          | Participants may be difficult to acquire, so the plan assumes the project owner's repositories only until others are recruited. The acceptance record states that limit; later participants enter by protocol amendment.                                                      |
+| ID   | Question                                                     | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PD01 | Timing of the GitHub-hosted skeleton                         | M06, before the stages: ownership, freshness, and job boundaries are validated while changing them is cheap. Not chosen: after M12, as one larger T1 integration.                                                                                                                                                                                                                                                                                  |
+| PD02 | Test-bed                                                     | Dedicated disposable repositories and a test App. Not chosen: this repository.                                                                                                                                                                                                                                                                                                                                                                     |
+| PD03 | Organization billing path for Copilot                        | Revised September 18, 2026, when this repository and its test-bed moved to an organization without Copilot seats. M02 verifies the personal path on a personally owned test-bed and assumes that the organization-owned test-beds need no Copilot billing to the organization; that assumption is a recorded risk (section 8). The organization billing path is documented as unverified until the probes can run in an organization with Copilot. |
+| PD04 | First ecosystems for result parsing and anti-gaming fixtures | TypeScript and one compiled ecosystem, Rust or C++, chosen in M08: SP10 step 3 distinguishes compile failures from assertion failures, which a compiled ecosystem exercises. Not chosen: TypeScript and Python.                                                                                                                                                                                                                                    |
+| PD05 | Self-screening of this repository                            | Yes, in observe mode from M13, as continuous real traffic for calibration.                                                                                                                                                                                                                                                                                                                                                                         |
+| PD06 | Releases before 1.0                                          | One 0.x release per plan section (section 0.5 of this plan). Not chosen: one per milestone; none before 1.0.                                                                                                                                                                                                                                                                                                                                       |
+| PD07 | What version 1.0 requires at M21                             | Verified delivered capabilities plus an acceptance record that reports measured effectiveness as found, even when it is insufficient or negative; enforcement stays withheld without evidence. Not chosen: waiting for a category to meet its thresholds; version 1.0 at M20.                                                                                                                                                                      |
+| PD08 | Participants in the M21 measurement                          | Participants may be difficult to acquire, so the plan assumes the project owner's repositories only until others are recruited. The acceptance record states that limit; later participants enter by protocol amendment.                                                                                                                                                                                                                           |

@@ -1,0 +1,158 @@
+# Probe smoke: proves the machinery every probe depends on (dispatch, App installation token,
+# App check run, artifact upload and repository-wide listing). Optional legs: a retention canary
+# artifact and one Copilot prompt authenticated by the job GITHUB_TOKEN.
+# Canonical source: probes/smoke/workflows/probe-smoke-machinery.yml
+# Deployed copy:    .github/workflows/probe-smoke-machinery.yml on each test-bed (byte-identical).
+name: probe-smoke-machinery
+run-name: probe-smoke-machinery ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      retention_canary:
+        description: Also upload the artifact probe-canary-retention with retention-days 1
+        required: false
+        type: boolean
+        default: false
+      copilot:
+        description: Also send one Copilot prompt authenticated by the job GITHUB_TOKEN
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  machinery:
+    name: machinery
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+    steps:
+      - name: Mint an App installation token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.STEWARD_APP_ID }}
+          private-key: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}
+          permission-checks: write
+
+      - name: Create and complete a check run with the App token
+        id: check
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          check_id="$(gh api -X POST "repos/$GITHUB_REPOSITORY/check-runs" \
+            -f name='probe-smoke/machinery' -f head_sha="$GITHUB_SHA" -f status=in_progress --jq .id)"
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/check-runs/$check_id" \
+            -f status=completed -f conclusion=neutral \
+            -f 'output[title]=probe smoke' \
+            -f 'output[summary]=Created and completed by the probe-smoke-machinery workflow.' \
+            --jq '"PROBE-SMOKE check_run_id=\(.id) status=\(.status) conclusion=\(.conclusion) app_id=\(.app.id) head_sha=\(.head_sha)"'
+          echo "check_id=$check_id" >> "$GITHUB_OUTPUT"
+
+      - name: Write the run summary file
+        env:
+          INSTALLATION_ID: ${{ steps.app.outputs.installation-id }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          CHECK_RUN_ID: ${{ steps.check.outputs.check_id }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/probe-smoke"
+          {
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "event_name=$GITHUB_EVENT_NAME"
+            echo "ref=$GITHUB_REF"
+            echo "sha=$GITHUB_SHA"
+            echo "installation_id=$INSTALLATION_ID"
+            echo "app_slug=$APP_SLUG"
+            echo "check_run_id=$CHECK_RUN_ID"
+            echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > "$RUNNER_TEMP/probe-smoke/summary.txt"
+          sed 's/^/PROBE-SMOKE /' "$RUNNER_TEMP/probe-smoke/summary.txt"
+
+      - name: Upload the summary as an artifact
+        id: upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/probe-smoke/summary.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Find the artifact in the repository-wide listing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_NAME: probe-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          UPLOADED_ID: ${{ steps.upload.outputs.artifact-id }}
+        run: |
+          echo "PROBE-SMOKE artifact_name=$ARTIFACT_NAME uploaded_artifact_id=$UPLOADED_ID"
+          listed=''
+          for attempt in 1 2 3 4 5 6; do
+            listed="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$ARTIFACT_NAME" --jq '.artifacts[0].id // empty')"
+            if [ -n "$listed" ]; then break; fi
+            sleep 10
+          done
+          echo "PROBE-SMOKE listed_artifact_id=$listed listing_attempts=$attempt"
+          test "$listed" = "$UPLOADED_ID"
+
+      - name: Upload the retention canary artifact
+        id: canary
+        if: ${{ inputs.retention_canary }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-canary-retention
+          path: ${{ runner.temp }}/probe-smoke/summary.txt
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Report the retention canary artifact
+        if: ${{ inputs.retention_canary }}
+        env:
+          CANARY_ID: ${{ steps.canary.outputs.artifact-id }}
+        run: echo "PROBE-SMOKE retention_canary_artifact_name=probe-canary-retention retention_canary_artifact_id=$CANARY_ID"
+
+  copilot:
+    name: copilot
+    if: ${{ inputs.copilot && github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      copilot-requests: write
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the Copilot CLI
+        run: |
+          npm install -g @github/copilot
+          echo "PROBE-SMOKE copilot_cli_version=$(copilot --version | head -n 1)"
+
+      - name: Send one prompt from an empty directory with a fresh COPILOT_HOME
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COPILOT_AUTO_UPDATE: 'false'
+        run: |
+          export COPILOT_HOME="$RUNNER_TEMP/probe-smoke-copilot-home"
+          mkdir -p "$COPILOT_HOME" "$RUNNER_TEMP/probe-smoke-empty"
+          cd "$RUNNER_TEMP/probe-smoke-empty"
+          echo "PROBE-SMOKE copilot_request_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          set +e
+          timeout 180 copilot -p 'Reply with exactly one word: ready' --no-color --no-custom-instructions --disable-builtin-mcps --no-ask-user < /dev/null > ../probe-smoke-copilot.out 2> ../probe-smoke-copilot.err
+          code=$?
+          set -e
+          echo "PROBE-SMOKE copilot_exit=$code"
+          head -c 4000 ../probe-smoke-copilot.out | sed 's/^/PROBE-SMOKE copilot_stdout: /'
+          echo
+          head -c 4000 ../probe-smoke-copilot.err | sed 's/^/PROBE-SMOKE copilot_stderr: /'
+          echo
+          echo "PROBE-SMOKE copilot_done_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

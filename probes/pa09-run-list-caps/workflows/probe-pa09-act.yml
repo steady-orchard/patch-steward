@@ -1,0 +1,64 @@
+# PA09 probe (run-list caps): acts on a submission as a DIFFERENT identity than its author - the test App's bot.
+#   edit-pr  edit the body of PR <target>            (pull_request_target edited, sent by the bot)
+#   comment  comment on issue or PR <target>         (issue_comment created, sent by the bot)
+#   rerun    re-run all jobs of workflow run <target> (a re-run triggered by the bot)
+# Dispatch-only: it never reacts to an event.
+# Canonical source: probes/pa09-run-list-caps/workflows/probe-pa09-act.yml
+# Deployed copy:    .github/workflows/probe-pa09-act.yml on master (byte-identical).
+name: probe-pa09-act
+run-name: probe-pa09-act ${{ inputs.action }} ${{ inputs.target }} ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      action:
+        description: edit-pr | comment | rerun
+        required: true
+        type: string
+      target:
+        description: PR/issue number, or workflow run id for rerun
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  act:
+    name: act
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Mint an App installation token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.STEWARD_APP_ID }}
+          private-key: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}
+          permission-actions: write
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Act as the App's bot
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ACTION: ${{ inputs.action }}
+          TARGET: ${{ inputs.target }}
+          NONCE: ${{ inputs.nonce }}
+        run: |
+          set -euo pipefail
+          R="$GITHUB_REPOSITORY"
+          case "$TARGET" in '' | *[!0-9]*) echo "PROBE-PA09 error=target-not-a-number"; exit 1 ;; esac
+          case "$NONCE" in *[!A-Za-z0-9._-]*) echo "PROBE-PA09 error=bad-nonce"; exit 1 ;; esac
+          case "$ACTION" in
+            edit-pr) gh api -X PATCH "repos/$R/pulls/$TARGET" -f body="probe PA09 body edited by the App $NONCE" --jq '"number=\(.number)"' ;;
+            comment) gh api -X POST "repos/$R/issues/$TARGET/comments" -f body="probe PA09 comment by the App $NONCE" --jq '"comment_id=\(.id)"' ;;
+            rerun) gh api -X POST "repos/$R/actions/runs/$TARGET/rerun" ;;
+            *) echo "PROBE-PA09 error=unknown-action"; exit 1 ;;
+          esac
+          echo "PROBE-PA09 act action=$ACTION target=$TARGET utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

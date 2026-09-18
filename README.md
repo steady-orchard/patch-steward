@@ -38,7 +38,9 @@ This is a **WORK IN PROGRESS**
 Project scaffold and design documentation. The screening core, CLI, GitHub
 action and workflows, browser app, LLM and GitHub adapters, and sandboxed runner
 are not implemented. The sample source and test only verify the development
-toolchain.
+toolchain. The probes/ directory holds the platform-assumption probe suite and
+its findings for disposable test-bed repositories; it is not product code and
+never runs in CI.
 
 The [user manual](docs/user-manual/README.md) covers scaffold setup, proposed
 workflows, configuration, and troubleshooting, with explicit documentation gaps.
@@ -85,12 +87,17 @@ pnpm coverage
 - fixtures/: shared corpus for fixture-tier tests.
 - templates/: files that later milestones will install into target
   repositories via steward init; nothing is installed today.
+- probes/: platform-assumption probes PA01–PA09 (sub-claims PA0N.M) against
+  disposable test-bed repositories, with findings in probes/findings.md; not a
+  workspace package and never run in CI.
 - docs/problem-statement.md: review problems, evidence, and scope boundaries.
 - docs/whitepaper.md: methodology, goals, and a summary of the design.
 - docs/architecture.md: components, trust zones, topologies, GitHub features,
   policy, data model, states, security, and open implementation decisions.
 - docs/processes.md: the processes SP01–SP20 with triggers, steps, controls,
   failure handling, and measures.
+- docs/adr/: architecture decision records ADR-NNNN, one per design decision,
+  recording why it was made; the design documents govern.
 - docs/deferred.md: designs of features excluded from version 1 (DF01–DF09);
   the other documents assume they will not be implemented.
 - .github/workflows/: scaffold CI and release automation.

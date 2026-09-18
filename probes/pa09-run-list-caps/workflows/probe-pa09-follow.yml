@@ -1,0 +1,30 @@
+# PA09 probe (run-list caps): a workflow_run follower of probe-pa09-listen. Its run-name copies the upstream run's
+# display_title (which carries the submission author's id), to test whether attribution survives a workflow_run hop.
+# Write-free.
+# Canonical source: probes/pa09-run-list-caps/workflows/probe-pa09-follow.yml
+# Deployed copy:    .github/workflows/probe-pa09-follow.yml on master (byte-identical).
+name: probe-pa09-follow
+run-name: probe-pa09-follow from=${{ github.event.workflow_run.id }} upstream=${{ github.event.workflow_run.display_title }}
+
+on:
+  workflow_run:
+    workflows: [probe-pa09-listen]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  record:
+    name: record
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Record who triggered this run (no writes)
+        env:
+          UP_ID: ${{ github.event.workflow_run.id }}
+          UP_EVENT: ${{ github.event.workflow_run.event }}
+          UP_ACTOR: ${{ github.event.workflow_run.actor.login }}
+          UP_TRIGGERING: ${{ github.event.workflow_run.triggering_actor.login }}
+        run: echo "PROBE-PA09 follow actor=$GITHUB_ACTOR triggering_actor=$GITHUB_TRIGGERING_ACTOR upstream_id=$UP_ID upstream_event=$UP_EVENT upstream_actor=$UP_ACTOR upstream_triggering_actor=$UP_TRIGGERING utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

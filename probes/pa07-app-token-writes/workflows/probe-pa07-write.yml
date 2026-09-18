@@ -1,0 +1,119 @@
+# PA07 probe (App-token writes): performs a fixed sequence of writes with ONE token, chosen by input token:
+#   app     the test App installation token (the design's publish token)
+#   github  the job GITHUB_TOKEN (control: its writes are expected to trigger no workflow)
+# Issue writes go to a new issue "[probe PA07] writes <token> <nonce>"; PR writes go to the open probe PR <pr>.
+# Each write is logged "PROBE-PA07 token=<t> write=<kind> target=<n> utc=<time>" and followed by an 8 s pause so the
+# listener's runs can be matched to writes. Dispatch-only: it never reacts to an event.
+# Both tokens get contents: write besides issues and pull-requests: the GraphQL draft mutations
+# (convertPullRequestToDraft, markPullRequestReadyForReview) answer "Resource not accessible by integration" without it
+# (step 2.7). A draft mutation the platform still refuses is logged "PROBE-PA07 token=<t> write-refused=<kind> ...
+# response=<verbatim>" and the sequence continues.
+# Canonical source: probes/pa07-app-token-writes/workflows/probe-pa07-write.yml
+# Deployed copy:    .github/workflows/probe-pa07-write.yml on master (byte-identical).
+name: probe-pa07-write
+run-name: probe-pa07-write ${{ inputs.token }} ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      token:
+        description: app | github
+        required: true
+        type: string
+      pr:
+        description: Number of the open probe PR "[probe PA07] ..." this pass writes to (draft or ready)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  write:
+    name: write
+    if: ${{ github.event.sender.login == 'jambolo' && (inputs.token == 'app' || inputs.token == 'github') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Mint an App installation token
+        id: app
+        if: ${{ inputs.token == 'app' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.STEWARD_APP_ID }}
+          private-key: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Write
+        env:
+          GH_TOKEN: ${{ inputs.token == 'app' && steps.app.outputs.token || github.token }}
+          TOKEN_KIND: ${{ inputs.token }}
+          NONCE: ${{ inputs.nonce }}
+          PR: ${{ inputs.pr }}
+        run: |
+          set -euo pipefail
+          R="$GITHUB_REPOSITORY"
+          case "$PR" in '' | *[!0-9]*) echo "PROBE-PA07 error=pr-not-a-number"; exit 1 ;; esac
+          case "$NONCE" in *[!A-Za-z0-9._-]*) echo "PROBE-PA07 error=bad-nonce"; exit 1 ;; esac
+          utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+          w() {
+            echo "PROBE-PA07 token=$TOKEN_KIND write=$1 target=$2 utc=$(utc)"
+            sleep 8
+          }
+          echo "PROBE-PA07 token=$TOKEN_KIND start run_id=$GITHUB_RUN_ID pr=$PR utc=$(utc)"
+          if ! gh api "repos/$R/labels/probe-pa07:x" --jq .name > /dev/null 2>&1; then
+            gh api -X POST "repos/$R/labels" -f name='probe-pa07:x' -f color=cccccc --jq .name > /dev/null
+          fi
+          I="$(gh api -X POST "repos/$R/issues" -f title="[probe PA07] writes $TOKEN_KIND $NONCE" -f body="probe PA07 write sequence" --jq .number)"
+          w issue-create "$I"
+          gh api -X PATCH "repos/$R/issues/$I" -f body="probe PA07 write sequence (edited)" --jq .number > /dev/null
+          w issue-edit "$I"
+          C="$(gh api -X POST "repos/$R/issues/$I/comments" -f body="probe PA07 comment" --jq .id)"
+          w comment-create "$I/$C"
+          gh api -X PATCH "repos/$R/issues/comments/$C" -f body="probe PA07 comment (edited)" --jq .id > /dev/null
+          w comment-edit "$I/$C"
+          gh api -X DELETE "repos/$R/issues/comments/$C"
+          w comment-delete "$I/$C"
+          gh api -X POST "repos/$R/issues/$I/labels" -f 'labels[]=probe-pa07:x' --jq length > /dev/null
+          w issue-label-add "$I"
+          gh api -X DELETE "repos/$R/issues/$I/labels/probe-pa07:x" --jq length > /dev/null
+          w issue-label-remove "$I"
+          gh api -X POST "repos/$R/issues/$I/reactions" -f content=+1 --jq .id > /dev/null
+          w issue-reaction-add "$I"
+          gh api -X PATCH "repos/$R/issues/$I" -f state=closed --jq .state > /dev/null
+          w issue-close "$I"
+          gh api -X PATCH "repos/$R/issues/$I" -f state=open --jq .state > /dev/null
+          w issue-reopen "$I"
+          node="$(gh api "repos/$R/pulls/$PR" --jq .node_id)"
+          draft="$(gh api "repos/$R/pulls/$PR" --jq .draft)"
+          gql() {
+            # $1 = write kind, $2 = mutation text; a refusal is logged verbatim and the sequence continues
+            local out
+            if out="$(gh api graphql -f query="$2" -f id="$node" 2>&1)"; then
+              w "$1" "$PR"
+            else
+              echo "PROBE-PA07 token=$TOKEN_KIND write-refused=$1 target=$PR utc=$(utc) response=$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-600)"
+            fi
+          }
+          if [ "$draft" != true ]; then
+            gql pr-convert-to-draft 'mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { pullRequest { isDraft } } }'
+          fi
+          gql pr-ready-for-review 'mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }'
+          gh api -X PATCH "repos/$R/pulls/$PR" -f body="probe PA07 PR body edited by $TOKEN_KIND $NONCE" --jq .number > /dev/null
+          w pr-body-edit "$PR"
+          gh api -X POST "repos/$R/issues/$PR/labels" -f 'labels[]=probe-pa07:x' --jq length > /dev/null
+          w pr-label-add "$PR"
+          gh api -X POST "repos/$R/issues/$PR/reactions" -f content=eyes --jq .id > /dev/null
+          w pr-reaction-add "$PR"
+          gh api -X PATCH "repos/$R/issues/$I" -f state=closed --jq .state > /dev/null
+          w issue-close-final "$I"
+          echo "PROBE-PA07 token=$TOKEN_KIND done issue=$I pr=$PR utc=$(utc)"

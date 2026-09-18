@@ -1,0 +1,76 @@
+# PA04 probe, Q4 re-probe of PA04.1, wiring W2 (`secrets: inherit`), callee hosted on
+# jambolo/patch-steward-testbed-personal (pinned by commit SHA). Deployed on the test-beds for which that host is
+# ANOTHER repository: org-public and org-private.
+# Jobs: caller-env declares Environment probe-pa04-env (control: the caller's own DUMMY marker); caller-sibling has no
+# Environment (must read empty); call uses the callee with `secrets: inherit` — the same callee as wiring W1. The
+# caller's other repository secrets become available to the callee, which references none of them. Whether the
+# platform honors `secrets: inherit` toward another repository (another owner for some callers) is recorded. Only digests
+# and lengths are printed, never a value.
+# The pin 2222... is a PLACEHOLDER: the probe step replaces it with the host's commit SHA that contains the callee.
+# Canonical source: probes/pa04-privilege-separation/workflows/probe-pa04-w2-host-personal.yml
+# Deployed copy:    .github/workflows/probe-pa04-w2-host-personal.yml on master (byte-identical).
+name: probe-pa04-w2-host-personal
+run-name: probe-pa04-w2-host-personal ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  caller-env:
+    name: caller-env
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: probe-pa04-env
+    permissions: {}
+    steps:
+      - name: Report the origin of the Environment secret in the caller
+        env:
+          MARKER: ${{ secrets.PROBE_PA04_ENV_MARKER }}
+        run: |
+          d="$(printf '%s' "$MARKER" | sha256sum | cut -d ' ' -f 1)"
+          case "$d" in
+            16e562bad4a54896263f6875672440fae0271c1b37cdd746a48eb00b06089501) origin=org-public ;;
+            244acb019505f578c648954cfddca5b20400928738528b1be5170206991d74fa) origin=org-private ;;
+            52080ed5b0043db8cdf2d84a739b72662260353b093332fcf472471e04712901) origin=personal ;;
+            e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855) origin=empty ;;
+            *) origin=other ;;
+          esac
+          echo "PROBE-PA04 leg=w2-host-personal job=caller/with-env repository=$GITHUB_REPOSITORY secret_length=${#MARKER} secret_origin=$origin"
+
+  caller-sibling:
+    name: caller-sibling
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Report the secret as seen by a sibling job without the Environment
+        env:
+          MARKER: ${{ secrets.PROBE_PA04_ENV_MARKER }}
+        run: |
+          d="$(printf '%s' "$MARKER" | sha256sum | cut -d ' ' -f 1)"
+          case "$d" in
+            16e562bad4a54896263f6875672440fae0271c1b37cdd746a48eb00b06089501) origin=org-public ;;
+            244acb019505f578c648954cfddca5b20400928738528b1be5170206991d74fa) origin=org-private ;;
+            52080ed5b0043db8cdf2d84a739b72662260353b093332fcf472471e04712901) origin=personal ;;
+            e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855) origin=empty ;;
+            *) origin=other ;;
+          esac
+          echo "PROBE-PA04 leg=w2-host-personal job=caller/sibling repository=$GITHUB_REPOSITORY secret_length=${#MARKER} secret_origin=$origin"
+
+  call:
+    name: call
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    permissions: {}
+    uses: jambolo/patch-steward-testbed-personal/.github/workflows/probe-pa04-callee-secrets.yml@822fd3ef8b345ebce0e862e71ce8e294cb089575
+    with:
+      leg: w2-host-personal
+    secrets: inherit

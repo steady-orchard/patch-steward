@@ -60,7 +60,7 @@ entry here.
 
 DF01 was deferred on September 17, 2026. DF02–DF09 were excluded by the
 decisions recorded on September 15, 2026 and revised on September 16, 2026
-(architecture §1.2); their scope lines and reserved hooks were moved here on
+(ADR-0001–ADR-0016); their scope lines and reserved hooks were moved here on
 September 17, 2026.
 
 ## DF01. Follow-through timers
@@ -210,11 +210,11 @@ directly.
 Screening of private vulnerability reports (GitHub private vulnerability
 reporting) as a third submission type beside issues and pull requests.
 
-| Field     | Value                                                                                                                                                   |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Addresses | Not recorded. The problem statement's scope includes security reports, and they inform the requirements and evaluation cases (whitepaper §1, SP04)      |
-| Deferred  | Architecture decision 4, recorded September 15, 2026. Reasons: no Actions trigger for advisory events; confidentiality of report content in model calls |
-| Design    | Scope line and reserved hooks; no process was specified                                                                                                 |
+| Field     | Value                                                                                                                                              |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Addresses | Not recorded. The problem statement's scope includes security reports, and they inform the requirements and evaluation cases (whitepaper §1, SP04) |
+| Deferred  | ADR-0004, recorded September 15, 2026. Reasons: no Actions trigger for advisory events; confidentiality of report content in model calls           |
+| Design    | Scope line and reserved hooks; no process was specified                                                                                            |
 
 ### Design
 
@@ -252,7 +252,7 @@ that carries `security.llm` fails validation.
 | Location                                  | Removed                                                                                                                                                   | Now                                                                                                                                    |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Architecture §1.1, Submission types       | Deferred column: "Private vulnerability reports (GitHub PVR); non-GitHub channels (HackerOne, email)"                                                     | Column removed                                                                                                                         |
-| Architecture §1.2, decision 4             | "Deferred. The policy reserves a `security.llm` setting with values `off`, `redacted`, and `full`, default `off`, for the future private-report process." | "Not a submission type. A security-claimed issue follows the policy's escalation rule and never receives a severity statement (SP08)." |
+| ADR-0004, Decision Outcome                | "Deferred. The policy reserves a `security.llm` setting with values `off`, `redacted`, and `full`, default `off`, for the future private-report process." | "Not a submission type. A security-claimed issue follows the policy's escalation rule and never receives a severity statement (SP08)." |
 | Architecture §7, GitHub App row           | "future advisory access"                                                                                                                                  | Removed                                                                                                                                |
 | Architecture §8, content areas            | Row "Security: Reserved: `security.llm` with `off`, `redacted`, `full`; default `off`."                                                                   | Removed                                                                                                                                |
 | Architecture §13, provider-disclosure row | "Private vulnerability report intake remains deferred with `security.llm: off`."                                                                          | Removed                                                                                                                                |
@@ -274,11 +274,11 @@ and the feedback channel to the reporter.
 Minimizing or hiding comments, locking threads, and setting interaction limits
 in response to low-value automated activity.
 
-| Field     | Value                                                                                                                                                           |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Addresses | P08                                                                                                                                                             |
-| Deferred  | Architecture decision 10 (passive handling only), recorded September 15, 2026. Reason: moderation is a governance act with side effects; passive flagging first |
-| Design    | Scope line and reserved hooks; no process was specified                                                                                                         |
+| Field     | Value                                                                                                                                           |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Addresses | P08                                                                                                                                             |
+| Deferred  | ADR-0010 (passive handling only), recorded September 15, 2026. Reason: moderation is a governance act with side effects; passive flagging first |
+| Design    | Scope line and reserved hooks; no process was specified                                                                                         |
 
 ### Design
 
@@ -362,7 +362,7 @@ requested-action buttons for maintainer control, which need such a receiver.
 | Field     | Value                                                                                                                                |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Addresses | Not recorded                                                                                                                         |
-| Deferred  | Architecture §1.1 (Hosting) and decision 5 (no webhook server), recorded September 15, 2026                                          |
+| Deferred  | Architecture §1.1 (Hosting) and ADR-0005 (no webhook server), recorded September 15, 2026                                            |
 | Design    | Scope line. Consequence recorded in whitepaper §11: no webhook receiver exists, "which is why check-run action buttons are deferred" |
 
 ### Version 1 without it
@@ -412,24 +412,24 @@ adapter code.
 
 LLM-assisted self-review inside the browser submission assistant.
 
-| Field     | Value                                                                                                                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Addresses | Not recorded                                                                                                                                                                                |
-| Deferred  | Architecture decision 2, as revised September 16, 2026: "version 1 removes browser inference". Reasons: the page holds no secrets; provider-specific browser authentication and CORS (§6.6) |
-| Design    | Scope line and reason                                                                                                                                                                       |
+| Field     | Value                                                                                                                                                                        |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Addresses | Not recorded                                                                                                                                                                 |
+| Deferred  | ADR-0002, as revised September 16, 2026: "version 1 removes browser inference". Reasons: the page holds no secrets; provider-specific browser authentication and CORS (§6.6) |
+| Design    | Scope line and reason                                                                                                                                                        |
 
 ### Version 1 without it
 
 The assistant is a form and checklist with deterministic validation; the page
 holds no tokens and sends nothing to a provider. LLM-assisted self-review runs
-in the CLI with the contributor's own credential (SP05, decisions 2 and 15).
+in the CLI with the contributor's own credential (SP05, ADR-0002 and ADR-0015).
 
 ### Restoring
 
 | Location                        | Removed                                                                                                      | Now                                                                 |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
 | Architecture §1.1, LLM provider | Deferred column: "browser inference"                                                                         | Column removed                                                      |
-| Architecture §1.2, decision 2   | "It performs no inference: version 1 removes browser inference, and LLM-assisted preflight runs in the CLI." | "It performs no inference; LLM-assisted preflight runs in the CLI." |
+| ADR-0002, Decision Outcome      | "It performs no inference: version 1 removes browser inference, and LLM-assisted preflight runs in the CLI." | "It performs no inference; LLM-assisted preflight runs in the CLI." |
 
 ## DF08. Other sandbox isolation technologies
 

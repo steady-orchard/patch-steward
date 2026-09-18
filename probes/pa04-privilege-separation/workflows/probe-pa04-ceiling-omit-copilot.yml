@@ -1,0 +1,40 @@
+# PA04 probe (job privilege separation), PA04.2: permission ceiling of a reusable-workflow call. The calling job
+# grants contents:read + issues:write and OMITS copilot-requests.
+# probe-pa04-callee-perms.yml requests contents:read + issues:write (job wants-issues) and contents:read +
+# copilot-requests:write (job wants-copilot). Job control runs beside the call, so the run shows whether a violation
+# fails the whole run at startup, fails only the calling job, or silently downgrades the token. No Copilot request.
+# Canonical source: probes/pa04-privilege-separation/workflows/probe-pa04-ceiling-omit-copilot.yml
+# Deployed copy:    .github/workflows/probe-pa04-ceiling-omit-copilot.yml on master (byte-identical).
+name: probe-pa04-ceiling-omit-copilot
+run-name: probe-pa04-ceiling-omit-copilot ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  control:
+    name: control
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Record that the control job ran
+        run: echo "PROBE-PA04 leg=omit-copilot job=control ran=yes"
+
+  call:
+    name: call
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/probe-pa04-callee-perms.yml
+    with:
+      leg: omit-copilot

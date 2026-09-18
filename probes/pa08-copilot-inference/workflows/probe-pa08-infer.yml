@@ -1,0 +1,665 @@
+# PA08 probe (Copilot inference in Actions): one mode per dispatch.
+#   cli       one `copilot -p` prompt, job permissions copilot-requests: write, token = job GITHUB_TOKEN
+#   sdk       one SDK session with <sends> sends (1 or 2), job permissions copilot-requests: write
+#   omit-cli  as cli, but the job permissions OMIT copilot-requests (contents: read only)
+#   omit-sdk  as sdk, but the job permissions OMIT copilot-requests (contents: read only)
+#   detect    NO inference: SDK account.getQuota and GET /copilot_internal/user with the job token, once with and once
+#             without copilot-requests
+# Isolation (design): empty working directory outside any checkout, fresh COPILOT_HOME, no MCP servers, no tool
+# allowed, deny-all permission handler, no custom instructions; prompts carry no repository content and no secrets.
+# Every Copilot request is logged "PROBE-PA08 copilot_request_utc=<UTC>" immediately BEFORE it is sent.
+# SDK auth: the job token reaches the runtime only as COPILOT_GITHUB_TOKEN in the runtime's environment, with the
+# SDK's default auto-login (step 2.26 fix of step 2.8's sdk-setup block); every SDK job logs its auth status before
+# any request.
+# Canonical source: probes/pa08-copilot-inference/workflows/probe-pa08-infer.yml
+# Deployed copy:    .github/workflows/probe-pa08-infer.yml on master (byte-identical).
+name: probe-pa08-infer
+run-name: probe-pa08-infer ${{ inputs.mode }} ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      mode:
+        description: cli | sdk | omit-cli | omit-sdk | detect
+        required: true
+        type: string
+      sends:
+        description: sdk and omit-sdk - number of SDK sends (1 or 2)
+        required: false
+        type: string
+        default: '1'
+
+permissions: {}
+
+jobs:
+  cli:
+    name: cli
+    if: ${{ github.event.sender.login == 'jambolo' && inputs.mode == 'cli' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      copilot-requests: write
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the Copilot CLI
+        run: |
+          npm install -g @github/copilot
+          echo "PROBE-PA08 job=cli copilot_cli_version=$(copilot --version | head -n 1)"
+
+      - name: Send one prompt from an empty directory with a fresh COPILOT_HOME
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COPILOT_AUTO_UPDATE: 'false'
+        run: |
+          export COPILOT_HOME="$RUNNER_TEMP/pa08-copilot-home"
+          mkdir -p "$COPILOT_HOME" "$RUNNER_TEMP/pa08-empty"
+          cd "$RUNNER_TEMP/pa08-empty"
+          echo "PROBE-PA08 job=cli copilot_request_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ) client=cli"
+          set +e
+          timeout 180 copilot -p 'Reply with exactly one word: ready' --no-color --no-custom-instructions --disable-builtin-mcps --no-ask-user < /dev/null > ../pa08.out 2> ../pa08.err
+          code=$?
+          set -e
+          echo "PROBE-PA08 job=cli copilot_exit=$code"
+          head -c 4000 ../pa08.out | sed 's/^/PROBE-PA08 copilot_stdout: /'
+          echo
+          head -c 4000 ../pa08.err | sed 's/^/PROBE-PA08 copilot_stderr: /'
+          echo
+          echo "PROBE-PA08 job=cli copilot_done_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  cli-omit:
+    name: cli-omit
+    if: ${{ github.event.sender.login == 'jambolo' && inputs.mode == 'omit-cli' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the Copilot CLI
+        run: |
+          npm install -g @github/copilot
+          echo "PROBE-PA08 job=cli-omit copilot_cli_version=$(copilot --version | head -n 1)"
+
+      - name: Send one prompt from an empty directory with a fresh COPILOT_HOME
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COPILOT_AUTO_UPDATE: 'false'
+        run: |
+          export COPILOT_HOME="$RUNNER_TEMP/pa08-copilot-home"
+          mkdir -p "$COPILOT_HOME" "$RUNNER_TEMP/pa08-empty"
+          cd "$RUNNER_TEMP/pa08-empty"
+          echo "PROBE-PA08 job=cli-omit copilot_request_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ) client=cli"
+          set +e
+          timeout 180 copilot -p 'Reply with exactly one word: ready' --no-color --no-custom-instructions --disable-builtin-mcps --no-ask-user < /dev/null > ../pa08.out 2> ../pa08.err
+          code=$?
+          set -e
+          echo "PROBE-PA08 job=cli-omit copilot_exit=$code"
+          head -c 4000 ../pa08.out | sed 's/^/PROBE-PA08 copilot_stdout: /'
+          echo
+          head -c 4000 ../pa08.err | sed 's/^/PROBE-PA08 copilot_stderr: /'
+          echo
+          echo "PROBE-PA08 job=cli-omit copilot_done_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  sdk:
+    name: sdk
+    if: ${{ github.event.sender.login == 'jambolo' && inputs.mode == 'sdk' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      copilot-requests: write
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the Copilot SDK outside any checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/pa08-sdk"
+          cd "$RUNNER_TEMP/pa08-sdk"
+          npm init -y > /dev/null
+          npm install @github/copilot-sdk@1.0.14 > /dev/null
+          echo "PROBE-PA08 job=sdk sdk_version=$(node -p "require('./node_modules/@github/copilot-sdk/package.json').version")"
+          npm ls --all 2> /dev/null | grep -i copilot | sed 's/^/PROBE-PA08 npm_ls: /' | head -n 10
+
+      - name: Write the SDK probe script
+        run: |
+          cat > "$RUNNER_TEMP/pa08-sdk/probe.mjs" << 'PROBE_EOF'
+            // BEGIN sdk-setup (keep identical in probe-pa08-infer.yml and probe-pa08-cap.yml)
+            import { CopilotClient } from '@github/copilot-sdk';
+            const log = (s) => console.log(`PROBE-PA08 ${s}`);
+            const clip = (v, n = 800) => {
+              let t;
+              try {
+                t = typeof v === 'string' ? v : JSON.stringify(v);
+              } catch {
+                t = String(v);
+              }
+              return (t ?? '').replace(/\s+/g, ' ').slice(0, n);
+            };
+            const nowUtc = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+            const errText = (e) => clip(e && (e.stack || e.message) ? `${e.message} | ${e.stack}` : e, 1200);
+            const token = process.env.GITHUB_TOKEN || '';
+            const makeClient = () =>
+              new CopilotClient({
+                baseDirectory: process.env.PROBE_COPILOT_HOME,
+                workingDirectory: process.env.PROBE_EMPTY_DIR,
+                env: { ...process.env, COPILOT_GITHUB_TOKEN: token },
+                // useLoggedInUser keeps its default (true). false makes the SDK start the runtime with --no-auto-login, and the
+                // runtime then ignores COPILOT_GITHUB_TOKEN (step 2.8). Nothing else can log in: fresh COPILOT_HOME, no gh login.
+                logLevel: 'error',
+              });
+            const authStatus = async (c) => {
+              try {
+                return clip(await c.getAuthStatus());
+              } catch (e) {
+                return `error ${errText(e)}`;
+              }
+            };
+            const baseSessionConfig = () => ({
+              onPermissionRequest: () => ({ kind: 'reject', feedback: 'tools are disabled in this probe' }),
+              availableTools: [],
+              excludedTools: ['builtin:*', 'mcp:*', 'custom:*'],
+              mcpServers: {},
+              skipCustomInstructions: true,
+              workingDirectory: process.env.PROBE_EMPTY_DIR,
+            });
+            // END sdk-setup
+
+            const mode = process.env.PROBE_MODE || 'send';
+            const sends = Math.min(Math.max(Number(process.env.PROBE_SENDS || '1'), 1), 2);
+            log(`sdk mode=${mode} sends=${sends} token_present=${token.length > 0} node=${process.version}`);
+            const client = makeClient();
+            try {
+              await client.start();
+              log('client_started=yes');
+              log(`auth_status=${await authStatus(client)}`);
+              try {
+                log(`quota_before=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`quota_before_error=${errText(e)}`);
+              }
+              if (mode === 'send') {
+                const session = await client.createSession({ ...baseSessionConfig(), infiniteSessions: { enabled: false } });
+                log(`session_id=${session.sessionId}`);
+                session.on((ev) => {
+                  if (ev.type === 'user.message' || ev.type.endsWith('_delta')) return;
+                  log(`event type=${ev.type} data=${clip(ev.data)}`);
+                });
+                for (let i = 1; i <= sends; i++) {
+                  log(`copilot_request_utc=${nowUtc()} client=sdk send=${i}`);
+                  try {
+                    const reply = await session.sendAndWait({ prompt: `Reply with exactly one word: ready${i}` }, 120000);
+                    log(`send=${i} reply=${clip(reply && reply.data ? reply.data.content : reply, 80)}`);
+                  } catch (e) {
+                    log(`send=${i} error=${errText(e)}`);
+                    break;
+                  }
+                  try {
+                    log(`send=${i} metrics=${clip(await session.rpc.usage.getMetrics())}`);
+                  } catch (e) {
+                    log(`send=${i} metrics_error=${errText(e)}`);
+                  }
+                }
+                await session.disconnect();
+              }
+              try {
+                log(`quota_after=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`quota_after_error=${errText(e)}`);
+              }
+            } catch (e) {
+              log(`fatal_error=${errText(e)}`);
+            } finally {
+              try {
+                await client.stop();
+              } catch (e) {
+                log(`stop_error=${errText(e)}`);
+              }
+            }
+            log(`sdk done utc=${nowUtc()}`);
+          PROBE_EOF
+
+      - name: Run the SDK probe from an empty directory with a fresh COPILOT_HOME
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PROBE_MODE: send
+          PROBE_SENDS: ${{ inputs.sends }}
+        run: |
+          export PROBE_COPILOT_HOME="$RUNNER_TEMP/pa08-copilot-home"
+          export PROBE_EMPTY_DIR="$RUNNER_TEMP/pa08-empty"
+          mkdir -p "$PROBE_COPILOT_HOME" "$PROBE_EMPTY_DIR"
+          cd "$PROBE_EMPTY_DIR"
+          echo "PROBE-PA08 job=sdk start_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          timeout 300 node "$RUNNER_TEMP/pa08-sdk/probe.mjs" || echo "PROBE-PA08 job=sdk node_exit=$?"
+
+  sdk-omit:
+    name: sdk-omit
+    if: ${{ github.event.sender.login == 'jambolo' && inputs.mode == 'omit-sdk' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the Copilot SDK outside any checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/pa08-sdk"
+          cd "$RUNNER_TEMP/pa08-sdk"
+          npm init -y > /dev/null
+          npm install @github/copilot-sdk@1.0.14 > /dev/null
+          echo "PROBE-PA08 job=sdk-omit sdk_version=$(node -p "require('./node_modules/@github/copilot-sdk/package.json').version")"
+          npm ls --all 2> /dev/null | grep -i copilot | sed 's/^/PROBE-PA08 npm_ls: /' | head -n 10
+
+      - name: Write the SDK probe script
+        run: |
+          cat > "$RUNNER_TEMP/pa08-sdk/probe.mjs" << 'PROBE_EOF'
+            // BEGIN sdk-setup (keep identical in probe-pa08-infer.yml and probe-pa08-cap.yml)
+            import { CopilotClient } from '@github/copilot-sdk';
+            const log = (s) => console.log(`PROBE-PA08 ${s}`);
+            const clip = (v, n = 800) => {
+              let t;
+              try {
+                t = typeof v === 'string' ? v : JSON.stringify(v);
+              } catch {
+                t = String(v);
+              }
+              return (t ?? '').replace(/\s+/g, ' ').slice(0, n);
+            };
+            const nowUtc = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+            const errText = (e) => clip(e && (e.stack || e.message) ? `${e.message} | ${e.stack}` : e, 1200);
+            const token = process.env.GITHUB_TOKEN || '';
+            const makeClient = () =>
+              new CopilotClient({
+                baseDirectory: process.env.PROBE_COPILOT_HOME,
+                workingDirectory: process.env.PROBE_EMPTY_DIR,
+                env: { ...process.env, COPILOT_GITHUB_TOKEN: token },
+                // useLoggedInUser keeps its default (true). false makes the SDK start the runtime with --no-auto-login, and the
+                // runtime then ignores COPILOT_GITHUB_TOKEN (step 2.8). Nothing else can log in: fresh COPILOT_HOME, no gh login.
+                logLevel: 'error',
+              });
+            const authStatus = async (c) => {
+              try {
+                return clip(await c.getAuthStatus());
+              } catch (e) {
+                return `error ${errText(e)}`;
+              }
+            };
+            const baseSessionConfig = () => ({
+              onPermissionRequest: () => ({ kind: 'reject', feedback: 'tools are disabled in this probe' }),
+              availableTools: [],
+              excludedTools: ['builtin:*', 'mcp:*', 'custom:*'],
+              mcpServers: {},
+              skipCustomInstructions: true,
+              workingDirectory: process.env.PROBE_EMPTY_DIR,
+            });
+            // END sdk-setup
+
+            const mode = process.env.PROBE_MODE || 'send';
+            const sends = Math.min(Math.max(Number(process.env.PROBE_SENDS || '1'), 1), 2);
+            log(`sdk mode=${mode} sends=${sends} token_present=${token.length > 0} node=${process.version}`);
+            const client = makeClient();
+            try {
+              await client.start();
+              log('client_started=yes');
+              log(`auth_status=${await authStatus(client)}`);
+              try {
+                log(`quota_before=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`quota_before_error=${errText(e)}`);
+              }
+              if (mode === 'send') {
+                const session = await client.createSession({ ...baseSessionConfig(), infiniteSessions: { enabled: false } });
+                log(`session_id=${session.sessionId}`);
+                session.on((ev) => {
+                  if (ev.type === 'user.message' || ev.type.endsWith('_delta')) return;
+                  log(`event type=${ev.type} data=${clip(ev.data)}`);
+                });
+                for (let i = 1; i <= sends; i++) {
+                  log(`copilot_request_utc=${nowUtc()} client=sdk send=${i}`);
+                  try {
+                    const reply = await session.sendAndWait({ prompt: `Reply with exactly one word: ready${i}` }, 120000);
+                    log(`send=${i} reply=${clip(reply && reply.data ? reply.data.content : reply, 80)}`);
+                  } catch (e) {
+                    log(`send=${i} error=${errText(e)}`);
+                    break;
+                  }
+                  try {
+                    log(`send=${i} metrics=${clip(await session.rpc.usage.getMetrics())}`);
+                  } catch (e) {
+                    log(`send=${i} metrics_error=${errText(e)}`);
+                  }
+                }
+                await session.disconnect();
+              }
+              try {
+                log(`quota_after=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`quota_after_error=${errText(e)}`);
+              }
+            } catch (e) {
+              log(`fatal_error=${errText(e)}`);
+            } finally {
+              try {
+                await client.stop();
+              } catch (e) {
+                log(`stop_error=${errText(e)}`);
+              }
+            }
+            log(`sdk done utc=${nowUtc()}`);
+          PROBE_EOF
+
+      - name: Run the SDK probe from an empty directory with a fresh COPILOT_HOME
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PROBE_MODE: send
+          PROBE_SENDS: ${{ inputs.sends }}
+        run: |
+          export PROBE_COPILOT_HOME="$RUNNER_TEMP/pa08-copilot-home"
+          export PROBE_EMPTY_DIR="$RUNNER_TEMP/pa08-empty"
+          mkdir -p "$PROBE_COPILOT_HOME" "$PROBE_EMPTY_DIR"
+          cd "$PROBE_EMPTY_DIR"
+          echo "PROBE-PA08 job=sdk-omit start_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          timeout 300 node "$RUNNER_TEMP/pa08-sdk/probe.mjs" || echo "PROBE-PA08 job=sdk-omit node_exit=$?"
+
+  detect:
+    name: detect
+    if: ${{ github.event.sender.login == 'jambolo' && inputs.mode == 'detect' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      copilot-requests: write
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the Copilot SDK outside any checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/pa08-sdk"
+          cd "$RUNNER_TEMP/pa08-sdk"
+          npm init -y > /dev/null
+          npm install @github/copilot-sdk@1.0.14 > /dev/null
+          echo "PROBE-PA08 job=detect sdk_version=$(node -p "require('./node_modules/@github/copilot-sdk/package.json').version")"
+          npm ls --all 2> /dev/null | grep -i copilot | sed 's/^/PROBE-PA08 npm_ls: /' | head -n 10
+
+      - name: Write the SDK probe script
+        run: |
+          cat > "$RUNNER_TEMP/pa08-sdk/probe.mjs" << 'PROBE_EOF'
+            // BEGIN sdk-setup (keep identical in probe-pa08-infer.yml and probe-pa08-cap.yml)
+            import { CopilotClient } from '@github/copilot-sdk';
+            const log = (s) => console.log(`PROBE-PA08 ${s}`);
+            const clip = (v, n = 800) => {
+              let t;
+              try {
+                t = typeof v === 'string' ? v : JSON.stringify(v);
+              } catch {
+                t = String(v);
+              }
+              return (t ?? '').replace(/\s+/g, ' ').slice(0, n);
+            };
+            const nowUtc = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+            const errText = (e) => clip(e && (e.stack || e.message) ? `${e.message} | ${e.stack}` : e, 1200);
+            const token = process.env.GITHUB_TOKEN || '';
+            const makeClient = () =>
+              new CopilotClient({
+                baseDirectory: process.env.PROBE_COPILOT_HOME,
+                workingDirectory: process.env.PROBE_EMPTY_DIR,
+                env: { ...process.env, COPILOT_GITHUB_TOKEN: token },
+                // useLoggedInUser keeps its default (true). false makes the SDK start the runtime with --no-auto-login, and the
+                // runtime then ignores COPILOT_GITHUB_TOKEN (step 2.8). Nothing else can log in: fresh COPILOT_HOME, no gh login.
+                logLevel: 'error',
+              });
+            const authStatus = async (c) => {
+              try {
+                return clip(await c.getAuthStatus());
+              } catch (e) {
+                return `error ${errText(e)}`;
+              }
+            };
+            const baseSessionConfig = () => ({
+              onPermissionRequest: () => ({ kind: 'reject', feedback: 'tools are disabled in this probe' }),
+              availableTools: [],
+              excludedTools: ['builtin:*', 'mcp:*', 'custom:*'],
+              mcpServers: {},
+              skipCustomInstructions: true,
+              workingDirectory: process.env.PROBE_EMPTY_DIR,
+            });
+            // END sdk-setup
+
+            const mode = process.env.PROBE_MODE || 'send';
+            const sends = Math.min(Math.max(Number(process.env.PROBE_SENDS || '1'), 1), 2);
+            log(`sdk mode=${mode} sends=${sends} token_present=${token.length > 0} node=${process.version}`);
+            const client = makeClient();
+            try {
+              await client.start();
+              log('client_started=yes');
+              log(`auth_status=${await authStatus(client)}`);
+              try {
+                log(`quota_before=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`quota_before_error=${errText(e)}`);
+              }
+              if (mode === 'send') {
+                const session = await client.createSession({ ...baseSessionConfig(), infiniteSessions: { enabled: false } });
+                log(`session_id=${session.sessionId}`);
+                session.on((ev) => {
+                  if (ev.type === 'user.message' || ev.type.endsWith('_delta')) return;
+                  log(`event type=${ev.type} data=${clip(ev.data)}`);
+                });
+                for (let i = 1; i <= sends; i++) {
+                  log(`copilot_request_utc=${nowUtc()} client=sdk send=${i}`);
+                  try {
+                    const reply = await session.sendAndWait({ prompt: `Reply with exactly one word: ready${i}` }, 120000);
+                    log(`send=${i} reply=${clip(reply && reply.data ? reply.data.content : reply, 80)}`);
+                  } catch (e) {
+                    log(`send=${i} error=${errText(e)}`);
+                    break;
+                  }
+                  try {
+                    log(`send=${i} metrics=${clip(await session.rpc.usage.getMetrics())}`);
+                  } catch (e) {
+                    log(`send=${i} metrics_error=${errText(e)}`);
+                  }
+                }
+                await session.disconnect();
+              }
+              try {
+                log(`quota_after=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`quota_after_error=${errText(e)}`);
+              }
+            } catch (e) {
+              log(`fatal_error=${errText(e)}`);
+            } finally {
+              try {
+                await client.stop();
+              } catch (e) {
+                log(`stop_error=${errText(e)}`);
+              }
+            }
+            log(`sdk done utc=${nowUtc()}`);
+          PROBE_EOF
+
+      - name: Run the SDK probe from an empty directory with a fresh COPILOT_HOME
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PROBE_MODE: quota
+          PROBE_SENDS: ${{ inputs.sends }}
+        run: |
+          export PROBE_COPILOT_HOME="$RUNNER_TEMP/pa08-copilot-home"
+          export PROBE_EMPTY_DIR="$RUNNER_TEMP/pa08-empty"
+          mkdir -p "$PROBE_COPILOT_HOME" "$PROBE_EMPTY_DIR"
+          cd "$PROBE_EMPTY_DIR"
+          echo "PROBE-PA08 job=detect start_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          timeout 300 node "$RUNNER_TEMP/pa08-sdk/probe.mjs" || echo "PROBE-PA08 job=detect node_exit=$?"
+
+      - name: Read the Copilot user endpoint with the job token (no inference)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          out="$(gh api /copilot_internal/user --jq '{login, copilot_plan, access_type_sku, chat_enabled, quota_reset_date}' 2>&1)"
+          code=$?
+          set -e
+          echo "PROBE-PA08 job=detect copilot_internal_user exit=$code response=$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-400)"
+
+  detect-noperm:
+    name: detect-noperm
+    if: ${{ github.event.sender.login == 'jambolo' && inputs.mode == 'detect' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the Copilot SDK outside any checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/pa08-sdk"
+          cd "$RUNNER_TEMP/pa08-sdk"
+          npm init -y > /dev/null
+          npm install @github/copilot-sdk@1.0.14 > /dev/null
+          echo "PROBE-PA08 job=detect-noperm sdk_version=$(node -p "require('./node_modules/@github/copilot-sdk/package.json').version")"
+          npm ls --all 2> /dev/null | grep -i copilot | sed 's/^/PROBE-PA08 npm_ls: /' | head -n 10
+
+      - name: Write the SDK probe script
+        run: |
+          cat > "$RUNNER_TEMP/pa08-sdk/probe.mjs" << 'PROBE_EOF'
+            // BEGIN sdk-setup (keep identical in probe-pa08-infer.yml and probe-pa08-cap.yml)
+            import { CopilotClient } from '@github/copilot-sdk';
+            const log = (s) => console.log(`PROBE-PA08 ${s}`);
+            const clip = (v, n = 800) => {
+              let t;
+              try {
+                t = typeof v === 'string' ? v : JSON.stringify(v);
+              } catch {
+                t = String(v);
+              }
+              return (t ?? '').replace(/\s+/g, ' ').slice(0, n);
+            };
+            const nowUtc = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+            const errText = (e) => clip(e && (e.stack || e.message) ? `${e.message} | ${e.stack}` : e, 1200);
+            const token = process.env.GITHUB_TOKEN || '';
+            const makeClient = () =>
+              new CopilotClient({
+                baseDirectory: process.env.PROBE_COPILOT_HOME,
+                workingDirectory: process.env.PROBE_EMPTY_DIR,
+                env: { ...process.env, COPILOT_GITHUB_TOKEN: token },
+                // useLoggedInUser keeps its default (true). false makes the SDK start the runtime with --no-auto-login, and the
+                // runtime then ignores COPILOT_GITHUB_TOKEN (step 2.8). Nothing else can log in: fresh COPILOT_HOME, no gh login.
+                logLevel: 'error',
+              });
+            const authStatus = async (c) => {
+              try {
+                return clip(await c.getAuthStatus());
+              } catch (e) {
+                return `error ${errText(e)}`;
+              }
+            };
+            const baseSessionConfig = () => ({
+              onPermissionRequest: () => ({ kind: 'reject', feedback: 'tools are disabled in this probe' }),
+              availableTools: [],
+              excludedTools: ['builtin:*', 'mcp:*', 'custom:*'],
+              mcpServers: {},
+              skipCustomInstructions: true,
+              workingDirectory: process.env.PROBE_EMPTY_DIR,
+            });
+            // END sdk-setup
+
+            const mode = process.env.PROBE_MODE || 'send';
+            const sends = Math.min(Math.max(Number(process.env.PROBE_SENDS || '1'), 1), 2);
+            log(`sdk mode=${mode} sends=${sends} token_present=${token.length > 0} node=${process.version}`);
+            const client = makeClient();
+            try {
+              await client.start();
+              log('client_started=yes');
+              log(`auth_status=${await authStatus(client)}`);
+              try {
+                log(`quota_before=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`quota_before_error=${errText(e)}`);
+              }
+              if (mode === 'send') {
+                const session = await client.createSession({ ...baseSessionConfig(), infiniteSessions: { enabled: false } });
+                log(`session_id=${session.sessionId}`);
+                session.on((ev) => {
+                  if (ev.type === 'user.message' || ev.type.endsWith('_delta')) return;
+                  log(`event type=${ev.type} data=${clip(ev.data)}`);
+                });
+                for (let i = 1; i <= sends; i++) {
+                  log(`copilot_request_utc=${nowUtc()} client=sdk send=${i}`);
+                  try {
+                    const reply = await session.sendAndWait({ prompt: `Reply with exactly one word: ready${i}` }, 120000);
+                    log(`send=${i} reply=${clip(reply && reply.data ? reply.data.content : reply, 80)}`);
+                  } catch (e) {
+                    log(`send=${i} error=${errText(e)}`);
+                    break;
+                  }
+                  try {
+                    log(`send=${i} metrics=${clip(await session.rpc.usage.getMetrics())}`);
+                  } catch (e) {
+                    log(`send=${i} metrics_error=${errText(e)}`);
+                  }
+                }
+                await session.disconnect();
+              }
+              try {
+                log(`quota_after=${clip(await client.rpc.account.getQuota({}))}`);
+              } catch (e) {
+                log(`quota_after_error=${errText(e)}`);
+              }
+            } catch (e) {
+              log(`fatal_error=${errText(e)}`);
+            } finally {
+              try {
+                await client.stop();
+              } catch (e) {
+                log(`stop_error=${errText(e)}`);
+              }
+            }
+            log(`sdk done utc=${nowUtc()}`);
+          PROBE_EOF
+
+      - name: Run the SDK probe from an empty directory with a fresh COPILOT_HOME
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PROBE_MODE: quota
+          PROBE_SENDS: ${{ inputs.sends }}
+        run: |
+          export PROBE_COPILOT_HOME="$RUNNER_TEMP/pa08-copilot-home"
+          export PROBE_EMPTY_DIR="$RUNNER_TEMP/pa08-empty"
+          mkdir -p "$PROBE_COPILOT_HOME" "$PROBE_EMPTY_DIR"
+          cd "$PROBE_EMPTY_DIR"
+          echo "PROBE-PA08 job=detect-noperm start_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          timeout 300 node "$RUNNER_TEMP/pa08-sdk/probe.mjs" || echo "PROBE-PA08 job=detect-noperm node_exit=$?"
+
+      - name: Read the Copilot user endpoint with the job token (no inference)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          out="$(gh api /copilot_internal/user --jq '{login, copilot_plan, access_type_sku, chat_enabled, quota_reset_date}' 2>&1)"
+          code=$?
+          set -e
+          echo "PROBE-PA08 job=detect-noperm copilot_internal_user exit=$code response=$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-400)"

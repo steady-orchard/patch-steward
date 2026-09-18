@@ -1,0 +1,61 @@
+# PA04 probe (job privilege separation): reusable workflow called from the same repository and from other
+# repositories. Job with-env declares Environment probe-pa04-env; job without-env does not. Each prints the length and
+# the SHA-256 digest of secrets.PROBE_PA04_ENV_MARKER and names whose DUMMY marker the digest matches, so the log shows
+# which repository's Environment was resolved. Dummy markers (not credentials), one per test-bed:
+#   org-public  probe-pa04-marker-org-public
+#   org-private probe-pa04-marker-org-private
+#   personal    probe-pa04-marker-personal
+# Canonical source: probes/pa04-privilege-separation/workflows/probe-pa04-callee.yml
+# Deployed copy:    .github/workflows/probe-pa04-callee.yml on master (byte-identical).
+name: probe-pa04-callee
+
+on:
+  workflow_call:
+    inputs:
+      leg:
+        description: Which call leg this is (local, xrepo-org-public, xrepo-personal)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  with-env:
+    name: with-env
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: probe-pa04-env
+    permissions: {}
+    steps:
+      - name: Report the Environment secret digest and the repository context
+        env:
+          MARKER: ${{ secrets.PROBE_PA04_ENV_MARKER }}
+          LEG: ${{ inputs.leg }}
+        run: |
+          d="$(printf '%s' "$MARKER" | sha256sum | cut -d ' ' -f 1)"
+          case "$d" in
+            16e562bad4a54896263f6875672440fae0271c1b37cdd746a48eb00b06089501) origin=org-public ;;
+            244acb019505f578c648954cfddca5b20400928738528b1be5170206991d74fa) origin=org-private ;;
+            52080ed5b0043db8cdf2d84a739b72662260353b093332fcf472471e04712901) origin=personal ;;
+            e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855) origin=empty ;;
+            *) origin=other ;;
+          esac
+          echo "PROBE-PA04 leg=$LEG job=callee/with-env repository=$GITHUB_REPOSITORY workflow_ref=$GITHUB_WORKFLOW_REF secret_length=${#MARKER} secret_origin=$origin"
+
+  without-env:
+    name: without-env
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Report the secret as seen by a job without the Environment
+        env:
+          MARKER: ${{ secrets.PROBE_PA04_ENV_MARKER }}
+          LEG: ${{ inputs.leg }}
+        run: |
+          d="$(printf '%s' "$MARKER" | sha256sum | cut -d ' ' -f 1)"
+          case "$d" in
+            e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855) origin=empty ;;
+            *) origin=non-empty ;;
+          esac
+          echo "PROBE-PA04 leg=$LEG job=callee/without-env repository=$GITHUB_REPOSITORY secret_length=${#MARKER} secret_origin=$origin"

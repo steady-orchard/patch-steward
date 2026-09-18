@@ -1,0 +1,108 @@
+# PA06 probe (merge-queue relay), PA06.2 and PA06.3: the default-branch workflow_run that follows each relay run.
+#   record  every relay completion on a probe-pa06 queue ref, whoever sent the event: logs the workflow_run fields,
+#           the sender, and the member PR parsed from the queue branch. No token, no secret, no write.
+#   write   only when the event sender is jambolo: reads the PR title as data and completes the App check
+#           "probe-pa06/gate" on the group commit ("mode=success" -> success, "mode=failure" -> failure, else none).
+# Safety: the App token is minted only for an allowlisted sender, and no App write reacts to an event sent by the test
+# App's bot. When write is skipped (any other sender), the test driver writes the same check through
+# probe-pa06-control.yml, a dispatch-only default-branch workflow.
+# Canonical source: probes/pa06-merge-queue-relay/workflows/probe-pa06-steward.yml
+# Deployed copy:    .github/workflows/probe-pa06-steward.yml on master (byte-identical).
+name: probe-pa06-steward
+run-name: probe-pa06-steward ${{ github.event.workflow_run.head_sha }}
+
+on:
+  workflow_run:
+    workflows: [probe-pa06-relay]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  record:
+    name: record
+    if: >-
+      ${{ github.event.workflow_run.event == 'merge_group' &&
+      startsWith(github.event.workflow_run.head_branch, 'gh-readonly-queue/probe-pa06-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      pr: ${{ steps.parse.outputs.pr }}
+    steps:
+      - name: Record the workflow_run and parse the member PR (no token, no secret, no write)
+        id: parse
+        env:
+          SENDER: ${{ github.event.sender.login }}
+          SENDER_TYPE: ${{ github.event.sender.type }}
+          WR_ID: ${{ github.event.workflow_run.id }}
+          WR_EVENT: ${{ github.event.workflow_run.event }}
+          WR_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WR_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          WR_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WR_CREATED: ${{ github.event.workflow_run.created_at }}
+          WR_UPDATED: ${{ github.event.workflow_run.updated_at }}
+          WR_ACTOR: ${{ github.event.workflow_run.actor.login }}
+          WR_TRIGGERING_ACTOR: ${{ github.event.workflow_run.triggering_actor.login }}
+          WR_PRS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+        run: |
+          utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+          echo "PROBE-PA06 job=steward-record ref=$GITHUB_REF workflow_ref=$GITHUB_WORKFLOW_REF sender=$SENDER sender_type=$SENDER_TYPE actor=$GITHUB_ACTOR triggering_actor=$GITHUB_TRIGGERING_ACTOR start_utc=$(utc)"
+          echo "PROBE-PA06 job=steward-record workflow_run id=$WR_ID event=$WR_EVENT conclusion=$WR_CONCLUSION head_sha=$WR_HEAD_SHA head_branch=$WR_HEAD_BRANCH created_at=$WR_CREATED updated_at=$WR_UPDATED actor=$WR_ACTOR triggering_actor=$WR_TRIGGERING_ACTOR"
+          echo "PROBE-PA06 job=steward-record workflow_run.pull_requests=$(printf '%s' "$WR_PRS" | jq -c '[.[] | .number]')"
+          N="$(printf '%s' "$WR_HEAD_BRANCH" | sed -nE 's#^gh-readonly-queue/[^ ]+/pr-([0-9]+)-[0-9a-f]{40}$#\1#p')"
+          echo "PROBE-PA06 job=steward-record pr=${N:-unparsed} group_commit=$WR_HEAD_SHA"
+          echo "pr=$N" >> "$GITHUB_OUTPUT"
+
+  write:
+    name: write
+    needs: record
+    if: ${{ github.event.sender.login == 'jambolo' && needs.record.outputs.pr != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Resolve the group commit and the mode the PR title asks for (reads only)
+        id: resolve
+        env:
+          JOB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ needs.record.outputs.pr }}
+        run: |
+          set -euo pipefail
+          R="$GITHUB_REPOSITORY"
+          GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/commits/$HEAD_SHA" \
+            --jq '"PROBE-PA06 job=steward-write group_commit sha=\(.sha) parents=\([.parents[].sha] | join(","))"'
+          title="$(GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/pulls/$PR" --jq .title)"
+          case "$title" in
+            *"mode=success"*) mode=success ;;
+            *"mode=failure"*) mode=failure ;;
+            *) mode=none ;;
+          esac
+          echo "PROBE-PA06 job=steward-write pr=$PR mode=$mode utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+      - name: Mint an App installation token
+        id: app
+        if: ${{ steps.resolve.outputs.mode != 'none' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.STEWARD_APP_ID }}
+          private-key: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}
+          permission-checks: write
+
+      - name: Complete the App check on the group commit
+        if: ${{ steps.resolve.outputs.mode != 'none' }}
+        env:
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ needs.record.outputs.pr }}
+          MODE: ${{ steps.resolve.outputs.mode }}
+        run: |
+          set -euo pipefail
+          GH_TOKEN="$APP_TOKEN" gh api -X POST "repos/$GITHUB_REPOSITORY/check-runs" -f name=probe-pa06/gate -f head_sha="$HEAD_SHA" \
+            -f status=completed -f conclusion="$MODE" -f 'output[title]=probe PA06' -f "output[summary]=mode $MODE for PR $PR" \
+            --jq '"PROBE-PA06 job=steward-write check id=\(.id) app=\(.app.slug) conclusion=\(.conclusion) head_sha=\(.head_sha) completed_at=\(.completed_at)"'
+          echo "PROBE-PA06 job=steward-write done_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

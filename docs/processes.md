@@ -5,7 +5,7 @@ process below runs on the components defined in
 [architecture.md](architecture.md) and addresses numbered issues from the
 [problem statement](problem-statement.md). Methodology comes from the
 [whitepaper](whitepaper.md); where this document and the whitepaper differ,
-this document reflects the decisions recorded in the architecture (§1.2).
+this document reflects the decisions recorded in the architecture (ADR-0001–ADR-0016 in `docs/adr`).
 Where this document and the architecture disagree, the architecture governs
 components and boundaries and this document governs steps and behavior.
 
@@ -118,8 +118,11 @@ Steps:
 
 1. Maintainers author `.github/patch-steward/policy.yml` from the installed
    template and validate it locally with `steward policy`.
-2. Policy changes arrive as PRs. CODEOWNERS plus required code-owner review
-   in the branch ruleset requires maintainer review. The PR
+2. Policy changes arrive as PRs. Where the repository's plan and visibility
+   offer rulesets, CODEOWNERS plus required code-owner review in the branch
+   ruleset requires maintainer review. Where GitHub refuses rulesets, as on a
+   Free-plan organization's private repository, required code-owner review is
+   unavailable, an accepted limitation that SP02 step 8 reports. The PR
    is screened under the current trusted-branch policy; the report flags the
    proposed change and reports validation results for the proposed file as
    data, without applying it.
@@ -174,30 +177,48 @@ Steps:
    the four wrapper workflows pinned to that version, and CODEOWNERS entries,
    and it creates labels through the API. It asks for the LLM adapter, model,
    and authentication method, writes them into the policy skeleton, and prints
-   the credential setup that step 3 describes. Existing files are never
+   the credential setup that step 3 describes. In the wrappers it writes,
+   every call into a pinned reusable workflow whose jobs use the App or
+   provider secrets passes each of them by name in an explicit `secrets:`
+   mapping, never `secrets: inherit` (architecture §6.4); the credential-free
+   `steward-relay.yml` passes no secrets. Existing files are never
    overwritten without confirmation; a diff is shown.
 2. Register or install the GitHub App for the organization with the
    permissions the architecture lists (checks, issues, pull requests, contents,
    metadata, actions read). Store the App id and private key as secrets of a
    GitHub Environment whose deployment-branch rule allows only the default
-   branch. Every privileged job runs on a default-branch ref
+   branch. The wrappers pass both secrets by name, and only `gate` and
+   `publish` declare that publication Environment. Every privileged job runs
+   on a default-branch ref
    (`pull_request_target`, `workflow_run`, `issues`, `issue_comment`,
    `schedule`, and guarded `workflow_dispatch`), so no other pattern is needed.
 3. Configure inference. For `github-token` with the Copilot adapter, an
    organization owner enables the Copilot policy "Allow use of Copilot CLI
    billed to the organization" and, where wanted, a cost center or session
    limits; with `GITHUB_TOKEN`, a personal repository bills the repository
-   owner's Copilot seat instead (architecture §6.3). For
+   owner's Copilot seat instead (architecture §6.3). This organization billing
+   path is unverified: no probe has run in an organization with Copilot
+   (`probes/findings.md`, PA08.7). For
    `env`, store the provider key as the secret of a second GitHub Environment,
    distinct from the publication Environment, with the same default-branch
-   rule; only `intake` and `assess` reference it, and a spending limit is set
-   on the provider's side. The policy holds no secret values. For private
+   rule; the wrappers pass it by name in the same explicit `secrets:` mapping,
+   only `intake` and `assess` declare that model Environment, and a spending
+   limit is set on the provider's side. The policy holds no secret values;
+   the trusted wrapper workflow decides which secrets enter which job.
+   For private
    repositories, record administrator authorization to send the selected
    context to that provider; confidential context lacking authorization is
    withheld and required missing context routes to triage.
 4. Create the evidence store: the orphan branch (init can create it) or a
-   separate repository with the App installed there. Add a ruleset that
-   restricts pushes to the App identity and repository maintainers.
+   separate repository with the App installed there. Where the plan and
+   visibility of the repository that holds the store (the target repository
+   for the orphan branch, the separate repository otherwise) offer rulesets,
+   add a ruleset that restricts pushes to the App identity and repository
+   maintainers. Where GitHub refuses rulesets there, as on a Free-plan
+   organization's private repository, the push restriction is unavailable,
+   an accepted limitation like enforcement (step 8): `steward init` and this
+   precondition detect the refusal and report that the control is
+   unavailable.
 5. Set the mode to `observe` (SP03).
 6. For public repositories, enable GitHub Pages with Actions as deployment
    source. Private repositories leave public publication disabled unless an
@@ -212,7 +233,16 @@ Steps:
    synthetic inference request through the configured adapter and model,
    records the adapter's capability descriptor (structured output,
    system-prompt control, tool denial), and confirms that a run without a
-   usable model credential ends `inconclusive` visibly.
+   usable model credential ends `inconclusive` visibly. `steward init` writes
+   each wrapper's permissions equal to the job permissions of the pinned
+   reusable workflow it calls, and the self-test compares each installed
+   wrapper's grant with those job permissions and fails visibly when a grant
+   is short, because such a wrapper fails every run at startup, before any
+   job, check, or report exists (architecture §6.4). Wrapper edits stay on the
+   CODEOWNERS-reviewed path where the repository's plan and visibility offer
+   rulesets; where GitHub refuses them, as on a Free-plan organization's
+   private repository, required code-owner review of wrapper paths is
+   unavailable (step 8).
 8. Before enabling any category's `enforce` mode, require the stable steward
    check with the steward App's integration id as the expected source, never
    "any source". Enable strict up-to-date branch checks or a merge queue; the
@@ -222,19 +252,40 @@ Steps:
    enforced", including categories still in `observe`, except shared-head or
    waiting runs, which retain their blocking dispositions. Validate this
    mixed-mode behavior and same-commit rerun supersession in the self-test
-   before enabling the ruleset.
+   before enabling the ruleset. GitHub offers rulesets and merge queue only
+   for some plans and visibility settings; where it refuses them (a Free-plan
+   organization's private repository), this precondition detects the refusal
+   and keeps `enforce` off, and the repository runs `observe` and `advise`
+   without a required check (architecture §7, §10). The same refusal leaves
+   required code-owner review of policy and wrapper-workflow paths
+   unavailable, an accepted limitation like enforcement; this precondition
+   reports that control as unavailable as well (SP01 step 2).
 
 Controls: pinned versions for reusable workflows and the action; init prints
 every manual step it cannot perform, including the Copilot organization
 policy, Environment secrets, and provider-side spending limits; the policy
-holds credential references, never values.
+holds credential references, never values. This organization billing path is
+unverified: no probe has run in an organization with Copilot
+(`probes/findings.md`, PA08.7).
 
 Failure handling: missing App secrets make `gate` and `publish` fail visibly
 and runs cannot publish a new success. A missing or unusable model credential,
 a disabled Copilot policy, or an unsupported capability is detected in
 `intake` before any plan; `execute` is skipped, and `publish` completes the
 run with outcome `inconclusive` and the mode-appropriate check conclusion, so the
-failure stays visible while publication remains available. A missing or
+failure stays visible while publication remains available. A disabled Copilot
+policy is detected only through the failure of `intake`'s bounded synthetic
+request: the CLI reports "Access denied by policy settings", while through the
+SDK it is an HTTP 403 `authorization` error that reads like an expired
+credential, so without the CLI's text it is recorded with an unusable
+credential as one `inconclusive` cause (architecture §6.3;
+`probes/findings.md`, PA08.2). This organization billing path is unverified:
+no probe has run in an organization with Copilot (`probes/findings.md`,
+PA08.7). A wrapper whose permission grant is short of the pinned reusable
+workflow's job permissions, for example one without
+`copilot-requests: write`, is not detected in `intake`: the whole run fails
+at startup with no job, check, report, or evidence, and only the Actions run
+list and the self-test (step 7) show it. A missing or
 unwritable evidence store
 prevents admission; a missing Pages site only degrades the dashboard. Reports
 link the durable evidence revision independently of Pages availability.
@@ -303,7 +354,11 @@ Steps:
    evidence), per whitepaper §13. A rising error rate is grounds to return a
    category to `advise`. A mode change that first activates the repository
    gate queues runs for open PRs so each receives its check; until then a
-   all-observe repository without a required check has no checks.
+   all-observe repository without a required check has no checks. A category
+   can enter `enforce` only where GitHub offers rulesets for the repository's
+   plan and visibility (SP02 step 8); on a Free-plan organization's private
+   repository categories stay in `observe` or `advise`, and the repository
+   runs without a required check.
 
 Controls: sample sizes bounded; the pipeline never reads the maintainer
 resolution of the item it is screening; prior dismissals of other items remain
@@ -621,7 +676,8 @@ Steps:
 4. The core validates the schema and applies rules: pointers must resolve or
    the classification degrades to `uncertain`; `duplicate` requires a
    resolving link; `intended-behavior` requires a document, test, or decision
-   pointer. A security-claimed issue is one whose declared category is
+   pointer. Security reports are not a submission type (architecture §1.1).
+   A security-claimed issue is one whose declared category is
    `security`, whose form marks the security checkbox, or whose text matches
    policy-listed terms; detection errs toward treating a claim as security.
    Such an issue follows the policy's escalation rule (typically routed to
@@ -862,7 +918,12 @@ Steps:
 6. Integrated verification runs the mandatory suite on the merge commit at
    screening time. In the merge queue, the credential-free relay runs on the
    queue ref and its completion starts `steward-pr.yml` on the default branch,
-   which takes SP06's group-only branch for `workflow_run.head_sha`: `gate` creates a
+   which takes SP06's group-only branch for `workflow_run.head_sha`. It
+   resolves group membership from the queue ref and the group commit, because
+   `workflow_run.pull_requests` is empty for relay runs, and never treats a
+   relay completion as an echo: its sender is the enqueuer, which is the App
+   bot when the App enqueued the entry (architecture §6.4;
+   `probes/findings.md`, PA06.2). `gate` creates a
    check on the group commit and keys concurrency by it, `execute` runs the
    suite in containers, and `publish` completes the check after SP13's
    evidence and ownership gates. `publish` also verifies the group still
@@ -987,8 +1048,12 @@ drafts for feedback-enabled screening and explains manual promotion in observe m
 
 Failure handling: a failed evidence write, a changed snapshot, or a newer run
 cannot complete a check successfully. A downstream job failure is published as `inconclusive` when
-`publish` survives (architecture §6.4); only a failed `gate`/`publish` or
-cancellation preventing publication leaves a pending check. In that case the maintenance workflow marks checks older than the
+`publish` survives (architecture §6.4), and `publish` also survives a workflow
+cancellation: cancelled required work is published as `inconclusive`, while a
+run cancelled by a committed replacement finds the newer ownership artifact,
+records `superseded`, and cancels only its own pending check (architecture
+§10). Only a failed `gate`/`publish`, or a cancellation that reaches `gate` or
+`publish` itself, leaves a pending check. In that case the maintenance workflow marks checks older than the
 stale timeout `action_required`, and a newer run's fresh check supersedes them
 regardless. No success is emitted on missing evidence. GitHub's separate API
 operations and asynchronous events do not provide instantaneous supersession
@@ -1273,8 +1338,10 @@ Steps:
    default to no public export. Approval/queued states remain visible in
    private evidence and Actions summaries.
 
-Controls: per-run size caps; a ruleset allowing pushes only by the App and
-repository maintainers; redaction patterns reviewed with the policy.
+Controls: per-run size caps; where the plan and visibility of the store's
+repository offer rulesets, a ruleset allowing pushes only by the App and
+repository maintainers (SP02 step 4 reports it unavailable where GitHub
+refuses rulesets); redaction patterns reviewed with the policy.
 
 Failure handling: a failed evidence write fails the publish job visibly; the
 report is not posted without its evidence.
@@ -1304,7 +1371,7 @@ Steps:
    restarted by the maintenance workflow in arrival order while caps allow,
    refreshing obsolete inputs first. The repository-wide daily caps are the
    only controls that bound floods from many accounts; the per-author cap
-   bounds simultaneous work, not aggregate spend.
+   bounds simultaneous work, not aggregate spend. The Actions run list serves only the caps.
 2. The budget module enforces hard call/retry, timeout, resource, and byte
    limits, plus provider-specific inference bounds. Each stage checks
    consumption before starting; stage and outer timeouts bound execution.
@@ -1327,6 +1394,12 @@ Steps:
    changes on synchronize/closure/reopen refresh peers on the old and new
    heads. Runs obey caps and persist waiting states. Only a committed new
    owner cancels older screening; unchanged echoes do not cancel useful work.
+   Deduplication and ownership commitment stay outside the per-submission
+   concurrency group; jobs join it only after `gate` has committed a
+   replacement, because GitHub keeps one pending member per group and a newer
+   member replaces it even with `cancel-in-progress: false`. A job-level
+   cancellation marks the whole run `cancelled` (architecture §6.4;
+   `probes/findings.md`, PA05.3).
    A manual rerun creates the fresh check before committing the artifact.
    Partial-stage reruns reuse only records whose complete dependency hashes
    match; they cannot omit other required stages.
@@ -1356,6 +1429,7 @@ Steps:
     screening; labels never authorize inference. The admission persists for
     this submission until revoked or closed, not for other submissions by
     the author. Default `all` admits every contract-compliant submission.
+    Inference admission never changes an outcome.
     Track wait time, abandoned holds, and acceptance after admission to
     measure the O01 tradeoff.
 11. Model availability probe: on schedule, the maintenance workflow sends a
@@ -1378,16 +1452,33 @@ unavailable or retired, missing or unusable model credential, disabled Copilot
 policy, capability mismatch, model refusal, malformed output after repair,
 budget exhausted, environment unavailable) maps to `inconclusive` with a
 cause recorded; credential and capability failures are detected in `intake`
-before any execution. Missing
+before any execution. A disabled Copilot policy is detected only through the
+failure of `intake`'s bounded synthetic request; through the SDK it reads like
+an expired credential, so without the CLI's "Access denied by policy settings"
+text it is recorded with an unusable credential as one `inconclusive` cause
+(architecture §6.3). This organization billing path is unverified: no probe
+has run in an organization with Copilot (`probes/findings.md`, PA08.7). A
+wrapper whose permission grant is short of the pinned reusable workflow's job
+permissions is not a failure class of a run: the whole run fails at startup,
+before any job, so no outcome, check, report, or evidence exists; the
+installation self-test (SP02 step 7) catches it. Missing
 required evidence from the contributor (§0.1) is `needs-changes`. A defect in
 the steward itself fails the affected job; a surviving `publish` records
-`inconclusive`. A failed `gate`/`publish` or cancellation preventing
-publication leaves a pending check until stale reconciliation marks it
+`inconclusive`. `publish` also runs after a workflow cancellation: cancelled
+required work is recorded `inconclusive`, and a run cancelled by a committed
+replacement records `superseded` and cancels only its own pending check. A
+failed `gate`/`publish`, or a cancellation that reaches `gate` or `publish`
+itself, leaves a pending check until stale reconciliation marks it
 `action_required`. If
 `gate` cannot create a check that the active repository gate requires, the run
 stops before ownership commitment and reports that the previous certification still stands;
 nothing else runs until a later run succeeds in creating one. Owner ordering uses artifacts rather than check timestamps: the ownership artifact decides which run is newest, by
-creation time, including for Actions re-runs that keep their run id.
+creation time, including for Actions re-runs that keep their run id. Creation
+time is the artifact's `created_at`, never its id, which is not monotonic
+across a re-run attempt; `created_at` has 1-second resolution, so equal values
+make the listing ambiguous and cannot authorize publication; and a re-run
+attempt's upload of the same name replaces the earlier attempt's artifact in
+the listing (architecture §6.4; `probes/findings.md`, PA02.3).
 
 Measures: budget utilization and soft-cap overshoot; cancellations; queued
 and awaiting-approval ages, admission rates, and abandoned holds; `inconclusive`

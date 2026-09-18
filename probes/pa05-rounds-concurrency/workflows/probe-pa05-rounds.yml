@@ -1,0 +1,223 @@
+# PA05 probe (round expansion), PA05.1: a reusable workflow with a FIXED maximum of three execute-N/assess-N pairs.
+# Round N+1 runs only when assess-N outputs more=true; unused rounds are skipped by job-level if. Each round hands a
+# budget to the next through job outputs and a file through an artifact; publish uses the design's condition.
+# Canonical source: probes/pa05-rounds-concurrency/workflows/probe-pa05-rounds.yml
+# Deployed copy:    .github/workflows/probe-pa05-rounds.yml on master (byte-identical).
+name: probe-pa05-rounds
+
+on:
+  workflow_call:
+    inputs:
+      rounds_needed:
+        description: 1, 2 or 3
+        required: true
+        type: string
+      label:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      committed: ${{ steps.g.outputs.committed }}
+      budget: ${{ steps.g.outputs.budget }}
+    steps:
+      - name: Commit and set the starting budget
+        id: g
+        env:
+          LABEL: ${{ inputs.label }}
+          NEEDED: ${{ inputs.rounds_needed }}
+        run: |
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+          echo "budget=100" >> "$GITHUB_OUTPUT"
+          echo "PROBE-PA05 label=$LABEL job=gate rounds_needed=$NEEDED budget=100 utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  execute-1:
+    name: execute-1
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      spent: ${{ steps.x.outputs.spent }}
+    steps:
+      - name: Execute round 1
+        id: x
+        env:
+          LABEL: ${{ inputs.label }}
+          BUDGET: ${{ needs.gate.outputs.budget }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/r"
+          echo "round=1 budget_in=$BUDGET run_id=$GITHUB_RUN_ID" > "$RUNNER_TEMP/r/round.txt"
+          echo "spent=10" >> "$GITHUB_OUTPUT"
+          echo "PROBE-PA05 label=$LABEL job=execute-1 budget_in=$BUDGET spent=10"
+      - name: Upload the round-1 file
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa05-round-1
+          path: ${{ runner.temp }}/r/round.txt
+          retention-days: 1
+
+  assess-1:
+    name: assess-1
+    needs: [gate, execute-1]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      more: ${{ steps.a.outputs.more }}
+      budget: ${{ steps.a.outputs.budget }}
+    steps:
+      - name: Download the round-1 file
+        uses: actions/download-artifact@v8
+        with:
+          name: probe-pa05-round-1
+          path: ${{ runner.temp }}/in
+      - name: Assess round 1
+        id: a
+        env:
+          LABEL: ${{ inputs.label }}
+          NEEDED: ${{ inputs.rounds_needed }}
+          BUDGET: ${{ needs.gate.outputs.budget }}
+          SPENT: ${{ needs.execute-1.outputs.spent }}
+        run: |
+          left=$((BUDGET - SPENT))
+          more=false
+          if [ "$NEEDED" -gt 1 ]; then more=true; fi
+          echo "more=$more" >> "$GITHUB_OUTPUT"
+          echo "budget=$left" >> "$GITHUB_OUTPUT"
+          echo "PROBE-PA05 label=$LABEL job=assess-1 artifact_content=\"$(cat "$RUNNER_TEMP/in/round.txt")\" budget_left=$left more=$more"
+
+  execute-2:
+    name: execute-2
+    needs: assess-1
+    if: ${{ needs.assess-1.outputs.more == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      spent: ${{ steps.x.outputs.spent }}
+    steps:
+      - name: Execute round 2
+        id: x
+        env:
+          LABEL: ${{ inputs.label }}
+          BUDGET: ${{ needs.assess-1.outputs.budget }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/r"
+          echo "round=2 budget_in=$BUDGET run_id=$GITHUB_RUN_ID" > "$RUNNER_TEMP/r/round.txt"
+          echo "spent=10" >> "$GITHUB_OUTPUT"
+          echo "PROBE-PA05 label=$LABEL job=execute-2 budget_in=$BUDGET spent=10"
+      - name: Upload the round-2 file
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa05-round-2
+          path: ${{ runner.temp }}/r/round.txt
+          retention-days: 1
+
+  assess-2:
+    name: assess-2
+    needs: [assess-1, execute-2]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      more: ${{ steps.a.outputs.more }}
+      budget: ${{ steps.a.outputs.budget }}
+    steps:
+      - name: Download the round-2 file
+        uses: actions/download-artifact@v8
+        with:
+          name: probe-pa05-round-2
+          path: ${{ runner.temp }}/in
+      - name: Assess round 2
+        id: a
+        env:
+          LABEL: ${{ inputs.label }}
+          NEEDED: ${{ inputs.rounds_needed }}
+          BUDGET: ${{ needs.assess-1.outputs.budget }}
+          SPENT: ${{ needs.execute-2.outputs.spent }}
+        run: |
+          left=$((BUDGET - SPENT))
+          more=false
+          if [ "$NEEDED" -gt 2 ]; then more=true; fi
+          echo "more=$more" >> "$GITHUB_OUTPUT"
+          echo "budget=$left" >> "$GITHUB_OUTPUT"
+          echo "PROBE-PA05 label=$LABEL job=assess-2 artifact_content=\"$(cat "$RUNNER_TEMP/in/round.txt")\" budget_left=$left more=$more"
+
+  execute-3:
+    name: execute-3
+    needs: assess-2
+    if: ${{ needs.assess-2.outputs.more == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      spent: ${{ steps.x.outputs.spent }}
+    steps:
+      - name: Execute round 3
+        id: x
+        env:
+          LABEL: ${{ inputs.label }}
+          BUDGET: ${{ needs.assess-2.outputs.budget }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/r"
+          echo "round=3 budget_in=$BUDGET run_id=$GITHUB_RUN_ID" > "$RUNNER_TEMP/r/round.txt"
+          echo "spent=10" >> "$GITHUB_OUTPUT"
+          echo "PROBE-PA05 label=$LABEL job=execute-3 budget_in=$BUDGET spent=10"
+      - name: Upload the round-3 file
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-pa05-round-3
+          path: ${{ runner.temp }}/r/round.txt
+          retention-days: 1
+
+  assess-3:
+    name: assess-3
+    needs: [assess-2, execute-3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      budget: ${{ steps.a.outputs.budget }}
+    steps:
+      - name: Download the round-3 file
+        uses: actions/download-artifact@v8
+        with:
+          name: probe-pa05-round-3
+          path: ${{ runner.temp }}/in
+      - name: Assess round 3 (the fixed maximum; no further round exists)
+        id: a
+        env:
+          LABEL: ${{ inputs.label }}
+          BUDGET: ${{ needs.assess-2.outputs.budget }}
+          SPENT: ${{ needs.execute-3.outputs.spent }}
+        run: |
+          left=$((BUDGET - SPENT))
+          echo "budget=$left" >> "$GITHUB_OUTPUT"
+          echo "PROBE-PA05 label=$LABEL job=assess-3 artifact_content=\"$(cat "$RUNNER_TEMP/in/round.txt")\" budget_left=$left more=false"
+
+  publish:
+    name: publish
+    needs: [gate, execute-1, assess-1, execute-2, assess-2, execute-3, assess-3]
+    if: ${{ always() && needs.gate.result == 'success' && needs.gate.outputs.committed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Publish
+        env:
+          LABEL: ${{ inputs.label }}
+          RESULTS: >-
+            e1=${{ needs.execute-1.result }} a1=${{ needs.assess-1.result }} e2=${{ needs.execute-2.result }}
+            a2=${{ needs.assess-2.result }} e3=${{ needs.execute-3.result }} a3=${{ needs.assess-3.result }}
+          BUDGETS: >-
+            b1=${{ needs.assess-1.outputs.budget }} b2=${{ needs.assess-2.outputs.budget }}
+            b3=${{ needs.assess-3.outputs.budget }}
+        run: echo "PROBE-PA05 label=$LABEL job=publish ran=yes $RESULTS $BUDGETS utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

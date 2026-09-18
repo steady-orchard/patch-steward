@@ -1,0 +1,44 @@
+# PA07 probe (App-token writes): a write-free listener. It records every issues, issue_comment, and
+# pull_request_target event on a "[probe PA07]" issue or PR, including events sent by the test App's bot, with the
+# payload and context fields that identify the writer. It performs no writes (the only kind of workflow allowed to
+# react to App-bot events). Titles and bodies are never printed.
+# Canonical source: probes/pa07-app-token-writes/workflows/probe-pa07-listen.yml
+# Deployed copy:    .github/workflows/probe-pa07-listen.yml on master (byte-identical).
+name: probe-pa07-listen
+run-name: probe-pa07-listen ${{ github.event_name }} ${{ github.event.action }} ${{ github.event.issue.number || github.event.pull_request.number }}
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+  issue_comment:
+    types: [created, edited, deleted]
+  pull_request_target:
+    types: [edited, ready_for_review, converted_to_draft, labeled, unlabeled]
+
+permissions: {}
+
+jobs:
+  record:
+    name: record
+    if: >-
+      ${{ github.repository != 'jambolo/patch-steward-testbed-public' && (
+      startsWith(github.event.issue.title, '[probe PA07]') || startsWith(github.event.pull_request.title, '[probe PA07]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Record the writer identity fields (no writes)
+        run: |
+          echo "PROBE-PA07 context event_name=$GITHUB_EVENT_NAME actor=$GITHUB_ACTOR actor_id=$GITHUB_ACTOR_ID triggering_actor=$GITHUB_TRIGGERING_ACTOR run_id=$GITHUB_RUN_ID started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          jq -c '{
+            action,
+            sender: {login: .sender.login, id: .sender.id, type: .sender.type},
+            issue: (if .issue then {number: .issue.number, user: .issue.user.login, user_type: .issue.user.type,
+              performed_via_github_app: (if .issue.performed_via_github_app then {id: .issue.performed_via_github_app.id, slug: .issue.performed_via_github_app.slug, owner: .issue.performed_via_github_app.owner.login} else null end)} else null end),
+            comment: (if .comment then {id: .comment.id, user: .comment.user.login, user_type: .comment.user.type,
+              performed_via_github_app: (if .comment.performed_via_github_app then {id: .comment.performed_via_github_app.id, slug: .comment.performed_via_github_app.slug} else null end)} else null end),
+            pull_request: (if .pull_request then {number: .pull_request.number, user: .pull_request.user.login, draft: .pull_request.draft} else null end),
+            label: .label.name,
+            changes: (if .changes then (.changes | keys) else null end),
+            installation: .installation
+          }' "$GITHUB_EVENT_PATH" | sed 's/^/PROBE-PA07 event=/'

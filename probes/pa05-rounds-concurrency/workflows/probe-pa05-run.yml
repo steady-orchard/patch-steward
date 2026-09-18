@@ -1,0 +1,29 @@
+# PA05 probe (round expansion), PA05.1: dispatches probe-pa05-rounds.yml with a chosen number of needed rounds.
+# Canonical source: probes/pa05-rounds-concurrency/workflows/probe-pa05-run.yml
+# Deployed copy:    .github/workflows/probe-pa05-run.yml on master (byte-identical).
+name: probe-pa05-run
+run-name: probe-pa05-run rounds=${{ inputs.rounds_needed }} ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      rounds_needed:
+        description: 1, 2 or 3
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  screen:
+    name: screen
+    if: ${{ github.event.sender.login == 'jambolo' && contains(fromJSON('["1","2","3"]'), inputs.rounds_needed) }}
+    permissions: {}
+    uses: ./.github/workflows/probe-pa05-rounds.yml
+    with:
+      rounds_needed: ${{ inputs.rounds_needed }}
+      label: rounds-${{ inputs.rounds_needed }}

@@ -1,0 +1,110 @@
+# PA02 probe (ownership artifacts): lists artifacts repository-wide from ANOTHER run than the one that uploaded them.
+#   find    for each name in <names>: wait (checks every 20 s, at most <wait_seconds>) until the repository-wide
+#           listing shows it, then record every listed artifact and the state of the run that uploaded it
+#   bounds  listing bounds and costs: per_page limits, pagination, name filter, rate-limit headers, download,
+#           each with the job token (actions: read) and with the App installation token (actions: read)
+# Canonical source: probes/pa02-ownership-artifacts/workflows/probe-pa02-list.yml
+# Deployed copy:    .github/workflows/probe-pa02-list.yml on master (byte-identical).
+# Every fact is a log line starting "PROBE-PA02 ".
+name: probe-pa02-list
+run-name: probe-pa02-list ${{ inputs.mode }} ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatcher find this run
+        required: true
+        type: string
+      mode:
+        description: find | bounds
+        required: true
+        type: string
+      names:
+        description: Space-separated artifact names (find; bounds downloads the newest artifact of the first name)
+        required: true
+        type: string
+      wait_seconds:
+        description: find - how long to wait for each name to appear (at most 600)
+        required: false
+        type: string
+        default: '120'
+
+permissions: {}
+
+jobs:
+  list:
+    name: list
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+    steps:
+      - name: Mint an App installation token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.STEWARD_APP_ID }}
+          private-key: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}
+          permission-actions: read
+
+      - name: Find each name and record the uploading run's state (find)
+        if: ${{ inputs.mode == 'find' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAMES: ${{ inputs.names }}
+          WAIT: ${{ inputs.wait_seconds }}
+        run: |
+          set +e
+          R="$GITHUB_REPOSITORY"
+          case "$WAIT" in '' | *[!0-9]*) WAIT=120 ;; esac
+          if [ "$WAIT" -gt 600 ]; then WAIT=600; fi
+          echo "PROBE-PA02 find start run_id=$GITHUB_RUN_ID utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for name in $NAMES; do
+            case "$name" in *[!A-Za-z0-9._-]*) echo "PROBE-PA02 find error=bad-name"; continue ;; esac
+            t0=$(date +%s)
+            n=0
+            while :; do
+              n="$(gh api "repos/$R/actions/artifacts?name=$name&per_page=100" --jq .total_count)"
+              if [ "${n:-0}" != 0 ]; then break; fi
+              if [ $(($(date +%s) - t0)) -ge "$WAIT" ]; then break; fi
+              sleep 20
+            done
+            echo "PROBE-PA02 find name=$name total_count=${n:-0} waited_s=$(($(date +%s) - t0)) utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            gh api "repos/$R/actions/artifacts?name=$name&per_page=100" \
+              --jq '.artifacts | sort_by(.id) | .[] | "\(.id) \(.name) \(.created_at) \(.expires_at) \(.workflow_run.id)"' |
+              while read -r id aname created expires wrun; do
+                st="$(gh api "repos/$R/actions/runs/$wrun" --jq '"status=\(.status) conclusion=\(.conclusion) run_attempt=\(.run_attempt)"' 2>&1 | tr '\n' ' ')"
+                echo "PROBE-PA02 find artifact id=$id name=$aname created_at=$created expires_at=$expires workflow_run=$wrun uploader_now: $st observed_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              done
+          done
+
+      - name: Listing bounds and costs with both tokens (bounds)
+        if: ${{ inputs.mode == 'bounds' }}
+        env:
+          JOB_TOKEN: ${{ github.token }}
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          NAMES: ${{ inputs.names }}
+        run: |
+          set +e
+          R="$GITHUB_REPOSITORY"
+          first="${NAMES%% *}"
+          case "$first" in '' | *[!A-Za-z0-9._-]*) echo "PROBE-PA02 bounds error=bad-name"; exit 1 ;; esac
+          for kind in job app; do
+            if [ "$kind" = job ]; then tok="$JOB_TOKEN"; else tok="$APP_TOKEN"; fi
+            hdr="$(GH_TOKEN="$tok" gh api -i "repos/$R/actions/artifacts?per_page=1" 2>&1 | tr -d '\r' | grep -iE '^(x-ratelimit-|link:|HTTP/)' | tr '\n' ' ')"
+            echo "PROBE-PA02 bounds token=$kind headers: $hdr"
+            for pp in 100 101; do
+              echo "PROBE-PA02 bounds token=$kind per_page=$pp $(GH_TOKEN="$tok" gh api "repos/$R/actions/artifacts?per_page=$pp" --jq '"total_count=\(.total_count) returned=\(.artifacts | length)"' 2>&1 | tr '\n' ' ')"
+            done
+            echo "PROBE-PA02 bounds token=$kind page=2&per_page=1 $(GH_TOKEN="$tok" gh api "repos/$R/actions/artifacts?per_page=1&page=2" --jq '"returned=\(.artifacts | length) id=\(.artifacts[0].id)"' 2>&1 | tr '\n' ' ')"
+            echo "PROBE-PA02 bounds token=$kind name=$first $(GH_TOKEN="$tok" gh api "repos/$R/actions/artifacts?name=$first&per_page=100" --jq '"total_count=\(.total_count) returned=\(.artifacts | length)"' 2>&1 | tr '\n' ' ')"
+            id="$(GH_TOKEN="$tok" gh api "repos/$R/actions/artifacts?name=$first&per_page=100" --jq '.artifacts | sort_by(.id) | last | .id' 2>/dev/null)"
+            rm -f "$RUNNER_TEMP/a.zip"
+            GH_TOKEN="$tok" gh api "repos/$R/actions/artifacts/$id/zip" > "$RUNNER_TEMP/a.zip" 2> "$RUNNER_TEMP/a.err"
+            rc=$?
+            size=$(wc -c < "$RUNNER_TEMP/a.zip")
+            first_line="$(unzip -p "$RUNNER_TEMP/a.zip" 2>/dev/null | head -n 1)"
+            echo "PROBE-PA02 bounds token=$kind download id=$id exit=$rc bytes=$size first_line=$first_line error=$(tr '\n' ' ' < "$RUNNER_TEMP/a.err" | cut -c1-200)"
+          done

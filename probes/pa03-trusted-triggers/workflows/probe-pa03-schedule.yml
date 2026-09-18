@@ -1,0 +1,44 @@
+# PA03.4 fixture: records which workflow definition and which ref a scheduled run uses.
+# Canonical source: probes/pa03-trusted-triggers/workflows/probe-pa03-schedule.yml
+# Deployed copy:    .github/workflows/probe-pa03-schedule.yml on the default branch (byte-identical).
+# A copy that differs only in PROBE_DEFINITION lives on the non-default branch probe-pa03-base
+# (source: probes/pa03-trusted-triggers/fixtures/probe-pa03-base/probe-pa03-schedule.yml), so a
+# scheduled run shows by its PROBE-PA03 lines which definition the platform chose.
+# workflow_dispatch exists only to check that the fixture works; such runs are not PA03.4 evidence.
+name: probe-pa03-schedule
+run-name: probe-pa03-schedule ${{ github.event_name }} ${{ inputs.nonce }}
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: false
+        type: string
+        default: ''
+
+permissions: {}
+
+env:
+  PROBE_DEFINITION: default-branch
+
+jobs:
+  record:
+    name: record
+    if: ${{ github.repository != 'jambolo/patch-steward-testbed-public' && (github.event_name == 'schedule' || github.event.sender.login == 'jambolo') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record the definition and the ref of this run
+        run: |
+          echo "PROBE-PA03 definition=$PROBE_DEFINITION"
+          echo "PROBE-PA03 event_name=$GITHUB_EVENT_NAME"
+          echo "PROBE-PA03 repository=$GITHUB_REPOSITORY"
+          echo "PROBE-PA03 ref=$GITHUB_REF"
+          echo "PROBE-PA03 sha=$GITHUB_SHA"
+          echo "PROBE-PA03 workflow_ref=$GITHUB_WORKFLOW_REF"
+          echo "PROBE-PA03 workflow_sha=$GITHUB_WORKFLOW_SHA"
+          echo "PROBE-PA03 run_id=$GITHUB_RUN_ID run_attempt=$GITHUB_RUN_ATTEMPT"
+          echo "PROBE-PA03 utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

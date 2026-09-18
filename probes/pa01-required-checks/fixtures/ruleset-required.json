@@ -1,0 +1,15 @@
+{
+  "name": "probe-pa01-required",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["refs/heads/probe-pa01-base"], "exclude": [] } },
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "required_status_checks": [{ "context": "probe-pa01/required", "integration_id": 4993303 }]
+      }
+    }
+  ]
+}

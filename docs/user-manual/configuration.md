@@ -19,7 +19,10 @@ The revision is the content hash of `.github/patch-steward/`, including the
 optional runner directory. The default-branch commit is recorded separately;
 unrelated commits do not change the policy revision.
 
-Maintainers own the policy through CODEOWNERS and required code-owner review.
+Maintainers own the policy through CODEOWNERS and, where the repository's plan
+and visibility offer rulesets, required code-owner review. On a Free-plan
+organization's private repository GitHub refuses rulesets, so that review is
+unavailable.
 A PR proposing a policy change is screened under the existing trusted policy.
 An explicit local policy experiment is non-authoritative, and replay pins an
 explicit historical revision.
@@ -157,19 +160,21 @@ Sources: [architecture §8](../architecture.md#8-policy-the-quality-contract),
 
 ## Credentials and deployment (Proposed)
 
-| Credential                    | Actions screening                                                                                                                                                     | Local use                                                                             |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| GitHub App id and private key | Default-branch-only publication Environment; only `gate` and `publish` receive App credentials.                                                                       | CLI never holds the App private key.                                                  |
-| GitHub access                 | Job-specific `GITHUB_TOKEN`; scoped App tokens for writes and authorized separate-evidence-repository access.                                                         | User's own token through `gh` authentication or a fine-grained personal access token. |
-| Copilot inference             | Model jobs use `GITHUB_TOKEN` with `copilot-requests: write`. Organization use requires the documented policy, "Allow use of Copilot CLI billed to the organization." | User's Copilot login or token with Copilot Requests permission.                       |
-| OpenAI-compatible inference   | `STEWARD_LLM_API_KEY`, supplied from the separate model Environment only to `intake` and `assess` jobs.                                                               | The same fixed variable in the user's shell, according to architecture §6.3.          |
+| Credential                    | Actions screening                                                                                                                                                                                               | Local use                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| GitHub App id and private key | Default-branch-only publication Environment; only `gate` and `publish` receive App credentials.                                                                                                                 | CLI never holds the App private key.                                                  |
+| GitHub access                 | Job-specific `GITHUB_TOKEN`; scoped App tokens for writes and authorized separate-evidence-repository access.                                                                                                   | User's own token through `gh` authentication or a fine-grained personal access token. |
+| Copilot inference             | Model jobs use `GITHUB_TOKEN` with `copilot-requests: write`. Organization use requires the documented policy, "Allow use of Copilot CLI billed to the organization" (unverified; `probes/findings.md` PA08.7). | User's Copilot login or token with Copilot Requests permission.                       |
+| OpenAI-compatible inference   | `STEWARD_LLM_API_KEY`, supplied from the separate model Environment only to `intake` and `assess` jobs.                                                                                                         | The same fixed variable in the user's shell, according to architecture §6.3.          |
 
 No job holds both App and model credentials. Execution jobs run submitted code
 inside credential-free containers. Environment branch rules restrict privileged
 jobs to the default branch.
 
 The design assigns Copilot usage in organization-owned repositories to the
-organization and in personal repositories to the owner's seat. Local login/token
+organization and in personal repositories to the owner's seat. This organization
+billing path is unverified: no probe has run in an organization with Copilot
+(`probes/findings.md`, PA08.7). Local login/token
 usage bills the authenticated user's seat. Provider-side spending controls
 supplement per-run limits; Copilot credit limits are soft and may be exceeded by
 one response. Observe mode does not reduce inference work. Unavailable usage or
@@ -202,7 +207,9 @@ Sources: [architecture §6.3](../architecture.md#63-adapters),
 The evidence store is append-only except for retention pruning. It holds run
 records, findings, reports, redacted bounded logs, maintainer actions, and metrics.
 A separate repository requires an App installation there too. Both store types
-restrict pushes to the App and maintainers.
+restrict pushes to the App and maintainers where the plan and visibility of
+the repository that holds the store offer rulesets; where GitHub refuses
+rulesets, the restriction is unavailable.
 
 An evidence branch in a public repository is public. Excluding a record from the
 Pages subset does not make that branch record private. Private target
@@ -251,7 +258,7 @@ to its compiled `dist/` output at Node runtime.
 | `.github/workflows/cd.yml` | Runs when the root `package.json` changes on `master`; builds/tests, creates absent `v<version>` tag, then merges `master` into `develop` only when that new tag was created.                                   |
 | `vitest.config.ts`         | Test tiers by filename suffix: unit (`*.test.ts`) and fixture (`*.fixture.test.ts`) projects run under `pnpm test`; container and live suffixes are excluded. Coverage merges to the root `coverage/lcov.info`. |
 | `eslint.config.mjs`        | ESLint and TypeScript ESLint recommended configurations; ignores `**/dist/`, `docs/`, and `coverage/`.                                                                                                          |
-| `.prettierignore`          | Excludes `pnpm-lock.yaml`, `dist/`, `coverage/`, and `node_modules/`.                                                                                                                                           |
+| `.prettierignore`          | Excludes `pnpm-lock.yaml`, `dist/`, `coverage/`, `node_modules/`, and `development-artifacts/`.                                                                                                                 |
 
 The CD workflow requires both remote branches and permissions/rules allowing its
 tag and merge operations. Scaffold automation does not implement screening or

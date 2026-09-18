@@ -1,0 +1,128 @@
+# PA03 probe (trusted triggers): records which workflow definition (PROBE_DEFINITION) and which ref a run of each
+# trusted trigger uses, whether a default-branch-only Environment admits the job and delivers its secret, and
+# whether a ref guard stops a workflow_dispatch run on a non-default ref before any credential is used.
+# Canonical source: probes/pa03-trusted-triggers/workflows/probe-pa03-events.yml
+# Deployed copy:    .github/workflows/probe-pa03-events.yml on master (byte-identical).
+# Variants that differ only in PROBE_DEFINITION (and, for -noguard, in the environment job's `needs: guard`) live
+# under probes/pa03-trusted-triggers/fixtures/ and are deployed to probe-pa03-base, probe-pa03-base-noguard, and
+# PR head branches. Markers: PR or issue title starts "[probe PA03]"; comment body starts "/probe-pa03".
+# The Environment secret PROBE_PA03_ENV_MARKER holds the DUMMY value "probe-pa03-env-marker-v1"; only its length and
+# whether its SHA-256 digest matches are printed. No job checks out or runs PR content.
+name: probe-pa03-events
+run-name: >-
+  probe-pa03-events ${{ github.event_name }}
+  ${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.id || inputs.nonce }}
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+  issues:
+    types: [opened, reopened]
+  issue_comment:
+    types: [created]
+  workflow_run:
+    workflows: [probe-pa03-upstream]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: false
+        type: string
+        default: ''
+
+permissions: {}
+
+env:
+  PROBE_DEFINITION: default-branch
+
+jobs:
+  guard:
+    name: guard
+    if: >-
+      ${{ github.repository != 'jambolo/patch-steward-testbed-public' && (
+      (github.event_name == 'pull_request_target' && startsWith(github.event.pull_request.title, '[probe PA03]')) ||
+      (github.event_name == 'issues' && startsWith(github.event.issue.title, '[probe PA03]')) ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/probe-pa03')) ||
+      github.event_name == 'workflow_run' ||
+      (github.event_name == 'workflow_dispatch' && github.event.sender.login == 'jambolo')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Reject a workflow_dispatch run on any ref other than the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          echo "PROBE-PA03 job=guard definition=$PROBE_DEFINITION event_name=$GITHUB_EVENT_NAME ref=$GITHUB_REF default_branch=$DEFAULT_BRANCH"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo "PROBE-PA03 job=guard verdict=reject reason=non-default-ref"
+            exit 1
+          fi
+          echo "PROBE-PA03 job=guard verdict=pass"
+
+  record:
+    name: record
+    if: >-
+      ${{ github.repository != 'jambolo/patch-steward-testbed-public' && (
+      (github.event_name == 'pull_request_target' && startsWith(github.event.pull_request.title, '[probe PA03]')) ||
+      (github.event_name == 'issues' && startsWith(github.event.issue.title, '[probe PA03]')) ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/probe-pa03')) ||
+      github.event_name == 'workflow_run' ||
+      (github.event_name == 'workflow_dispatch' && github.event.sender.login == 'jambolo')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Record the definition and the ref of this run
+        env:
+          ACTION: ${{ github.event.action }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          WR_ID: ${{ github.event.workflow_run.id }}
+          WR_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WR_EVENT: ${{ github.event.workflow_run.event }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          echo "PROBE-PA03 job=record definition=$PROBE_DEFINITION"
+          echo "PROBE-PA03 job=record event_name=$GITHUB_EVENT_NAME action=$ACTION sender=$SENDER"
+          echo "PROBE-PA03 job=record ref=$GITHUB_REF sha=$GITHUB_SHA"
+          echo "PROBE-PA03 job=record workflow_ref=$GITHUB_WORKFLOW_REF workflow_sha=$GITHUB_WORKFLOW_SHA"
+          echo "PROBE-PA03 job=record base_ref=$GITHUB_BASE_REF head_ref=$GITHUB_HEAD_REF"
+          echo "PROBE-PA03 job=record pr=$PR_NUMBER pr_base=$PR_BASE pr_head_repo=$PR_HEAD_REPO pr_head_sha=$PR_HEAD_SHA issue=$ISSUE_NUMBER"
+          echo "PROBE-PA03 job=record workflow_run_id=$WR_ID workflow_run_head_branch=$WR_HEAD_BRANCH workflow_run_event=$WR_EVENT"
+          echo "PROBE-PA03 job=record run_id=$GITHUB_RUN_ID run_attempt=$GITHUB_RUN_ATTEMPT utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  environment:
+    name: environment
+    needs: guard
+    if: >-
+      ${{ github.repository != 'jambolo/patch-steward-testbed-public' &&
+      (github.event.sender.login == 'jambolo' || github.event.sender.login == 'patch-steward-testbed[bot]') && (
+      (github.event_name == 'pull_request_target' && startsWith(github.event.pull_request.title, '[probe PA03]')) ||
+      (github.event_name == 'issues' && startsWith(github.event.issue.title, '[probe PA03]')) ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/probe-pa03')) ||
+      github.event_name == 'workflow_run' ||
+      github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: probe-pa03-default-branch
+    permissions: {}
+    steps:
+      - name: Record whether the Environment admitted this job and delivered its secret
+        env:
+          MARKER: ${{ secrets.PROBE_PA03_ENV_MARKER }}
+          EXPECTED_SHA256: f996c284eb4344741cf5aeb9decd8015ba40c71b078608a50532c1b33e6a02b2
+        run: |
+          echo "PROBE-PA03 job=environment definition=$PROBE_DEFINITION event_name=$GITHUB_EVENT_NAME ref=$GITHUB_REF"
+          echo "PROBE-PA03 job=environment environment=probe-pa03-default-branch secret_length=${#MARKER}"
+          actual="$(printf '%s' "$MARKER" | sha256sum | cut -d ' ' -f 1)"
+          if [ "$actual" = "$EXPECTED_SHA256" ]; then
+            echo "PROBE-PA03 job=environment secret_digest=match"
+          else
+            echo "PROBE-PA03 job=environment secret_digest=mismatch"
+          fi
+          echo "PROBE-PA03 job=environment run_id=$GITHUB_RUN_ID utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

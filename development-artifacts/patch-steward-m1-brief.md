@@ -10,7 +10,7 @@ decisions governing-document-first, and update all scaffold documentation — im
 
 ### Repository facts (read at commit 8fbfdcd90eff58e30c94397fba3b9fc5b5aeece5 — line numbers below shift as files are edited; re-verify against live files before editing)
 
-- Repo root: `C:\Users\John\Projects\patch-steward`. Remote: `origin = git@github.com:jambolo/patch-steward.git`. Remote default
+- Repo root: `C:\Users\John\Projects\steady-orchard\patch-steward`. Remote: `origin = git@github.com:steady-orchard/patch-steward.git`. Remote default
   branch: `develop`. Release branch: `master`. Working branch for this plan: `milestone/1-monorepo-foundation` (local, checked out).
 - Environment: Windows 11. PowerShell is the user's primary shell; Git Bash is available. Verification commands below are written
   for bash. Ubuntu cannot be exercised from this environment: the Ubuntu leg of every exit criterion is verified by CI

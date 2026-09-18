@@ -114,7 +114,11 @@ components or templates exists yet.
    context to be sent to the provider.
 
 4. Create the evidence branch or repository. If separate, install the App there
-   too. Restrict evidence-store pushes to the App and repository maintainers.
+   too. Where the plan and visibility of the repository that holds the store
+   offer rulesets, restrict evidence-store pushes to the App and repository
+   maintainers. On a Free-plan organization's private repository GitHub
+   refuses rulesets, so this restriction is unavailable; `steward init` is
+   designed to report that.
 
 5. Configure the policy and begin in `observe` mode.
 
@@ -133,6 +137,12 @@ components or templates exists yet.
    from the designated App, enable strict up-to-date branches or a merge queue,
    and require code-owner review of policy and wrapper paths. Verify mixed-mode
    behavior and same-commit reruns with the self-test before enabling the ruleset.
+   GitHub offers rulesets and merge queue only for some plans and visibility
+   settings. On a Free-plan organization's private repository they are
+   refused, so `enforce` stays off and the repository runs `observe` or
+   `advise` without a required check. The same refusal makes required
+   code-owner review of policy and wrapper paths unavailable, and the
+   installation is designed to report that as well.
 
 > **[NEEDS INPUT]** Completing these steps requires the CLI distribution,
 > version/commit to pin, App registration or installation details, Environment and

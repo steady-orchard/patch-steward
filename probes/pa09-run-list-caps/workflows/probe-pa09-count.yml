@@ -1,0 +1,100 @@
+# PA09 probe (run-list caps): one cap evaluation as the design's gate would run it, with the job token and with the
+# App installation token: today's runs (created >= today UTC, paginated) and in-progress/queued runs of the listener,
+# the number of requests each needed, rate-limit headers, and every listed run's attribution fields. Then a
+# freshness test: the App comments on issue <trigger_issue> (the listener reacts) and the job measures how long the
+# new run takes to appear in the listing. The comment is the only write; the workflow is dispatch-only.
+# Canonical source: probes/pa09-run-list-caps/workflows/probe-pa09-count.yml
+# Deployed copy:    .github/workflows/probe-pa09-count.yml on master (byte-identical).
+name: probe-pa09-count
+run-name: probe-pa09-count ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      trigger_issue:
+        description: Number of the open "[probe PA09]" issue used for the freshness test
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  count:
+    name: count
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+    steps:
+      - name: Mint an App installation token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.STEWARD_APP_ID }}
+          private-key: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}
+          permission-actions: read
+          permission-issues: write
+
+      - name: Cap evaluation with both tokens
+        env:
+          JOB_TOKEN: ${{ github.token }}
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set +e
+          R="$GITHUB_REPOSITORY"
+          TODAY="$(date -u +%Y-%m-%d)"
+          for WF in probe-pa09-listen.yml probe-pa09-follow.yml; do
+            for kind in job app; do
+              if [ "$kind" = job ]; then tok="$JOB_TOKEN"; else tok="$APP_TOKEN"; fi
+              n=0; listed=0; page=1; tc=unknown
+              while [ "$page" -le 10 ]; do
+                body="$(GH_TOKEN="$tok" gh api "repos/$R/actions/workflows/$WF/runs?created=%3E%3D$TODAY&per_page=100&page=$page" 2>&1)"
+                n=$((n + 1))
+                cnt="$(printf '%s' "$body" | jq '.workflow_runs | length' 2>/dev/null || echo error)"
+                tc="$(printf '%s' "$body" | jq '.total_count' 2>/dev/null || echo error)"
+                if [ "$cnt" = error ]; then echo "PROBE-PA09 count wf=$WF token=$kind error=$(printf '%s' "$body" | tr '\n' ' ' | cut -c1-300)"; break; fi
+                listed=$((listed + cnt))
+                if [ "$cnt" -lt 100 ]; then break; fi
+                page=$((page + 1))
+              done
+              ip="$(GH_TOKEN="$tok" gh api "repos/$R/actions/workflows/$WF/runs?status=in_progress&per_page=100" --jq .total_count 2>&1)"; n=$((n + 1))
+              qd="$(GH_TOKEN="$tok" gh api "repos/$R/actions/workflows/$WF/runs?status=queued&per_page=100" --jq .total_count 2>&1)"; n=$((n + 1))
+              echo "PROBE-PA09 count wf=$WF token=$kind today=$TODAY today_total_count=$tc today_listed=$listed in_progress=$ip queued=$qd requests=$n utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              GH_TOKEN="$tok" gh api -i "repos/$R/actions/workflows/$WF/runs?per_page=1" 2>&1 | tr -d '\r' | grep -iE '^(HTTP/|x-ratelimit-)' | tr '\n' ' ' | sed "s/^/PROBE-PA09 headers wf=$WF token=$kind: /"
+              echo
+            done
+          done
+          for WF in probe-pa09-listen.yml probe-pa09-follow.yml probe-pa03-schedule.yml; do
+            GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/actions/workflows/$WF/runs?per_page=40" \
+              --jq ".workflow_runs[] | \"PROBE-PA09 run wf=$WF id=\(.id) attempt=\(.run_attempt) event=\(.event) status=\(.status) conclusion=\(.conclusion) actor=\(.actor.login) triggering_actor=\(.triggering_actor.login) prs=\([.pull_requests[].number] | join(\",\")) head_repo=\(.head_repository.full_name) created_at=\(.created_at) title=\(.display_title)\"" 2>&1 | head -n 40
+          done
+
+      - name: Freshness - how soon a just-triggered run appears in the listing
+        env:
+          JOB_TOKEN: ${{ github.token }}
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          ISSUE: ${{ inputs.trigger_issue }}
+          NONCE: ${{ inputs.nonce }}
+        run: |
+          set +e
+          R="$GITHUB_REPOSITORY"
+          case "$ISSUE" in '' | *[!0-9]*) echo "PROBE-PA09 error=issue-not-a-number"; exit 1 ;; esac
+          before="$(GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/actions/workflows/probe-pa09-listen.yml/runs?event=issue_comment&per_page=1" --jq '.workflow_runs[0].id // 0')"
+          t0=$(date +%s)
+          GH_TOKEN="$APP_TOKEN" gh api -X POST "repos/$R/issues/$ISSUE/comments" -f body="probe PA09 freshness comment $NONCE" --jq '"PROBE-PA09 fresh comment_id=\(.id) created_at=\(.created_at)"'
+          seen=no
+          for i in $(seq 1 10); do
+            line="$(GH_TOKEN="$JOB_TOKEN" gh api "repos/$R/actions/workflows/probe-pa09-listen.yml/runs?event=issue_comment&per_page=5" --jq ".workflow_runs[] | select(.id > $before) | \"id=\(.id) status=\(.status) created_at=\(.created_at)\"" | head -n 1)"
+            if [ -n "$line" ]; then
+              echo "PROBE-PA09 fresh first_seen $line after_s=$(($(date +%s) - t0)) checks=$i utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              seen=yes
+              break
+            fi
+            sleep 20
+          done
+          if [ "$seen" != yes ]; then echo "PROBE-PA09 fresh not_seen_after_checks=10"; fi

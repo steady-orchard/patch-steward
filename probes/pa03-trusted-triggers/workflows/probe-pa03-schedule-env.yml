@@ -1,0 +1,56 @@
+# PA03.5 fixture, schedule leg: records whether a scheduled run is admitted to an Environment whose
+# deployment-branch policy allows only the default branch, and whether the Environment secret arrives.
+# Canonical source: probes/pa03-trusted-triggers/workflows/probe-pa03-schedule-env.yml
+# Deployed copy:    .github/workflows/probe-pa03-schedule-env.yml on the default branch (byte-identical),
+#                   only on test-beds where the Environment probe-pa03-default-branch could be created.
+# The secret PROBE_PA03_ENV_MARKER holds the DUMMY value "probe-pa03-env-marker-v1" (not a credential);
+# the job prints only its length and whether its SHA-256 digest matches, never the value.
+# workflow_dispatch exists only to check that the fixture works; such runs are not schedule evidence.
+name: probe-pa03-schedule-env
+run-name: probe-pa03-schedule-env ${{ github.event_name }} ${{ inputs.nonce }}
+
+on:
+  schedule:
+    - cron: '12,27,42,57 * * * *'
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: false
+        type: string
+        default: ''
+
+permissions: {}
+
+env:
+  PROBE_DEFINITION: default-branch
+
+jobs:
+  environment:
+    name: environment
+    if: ${{ github.repository != 'jambolo/patch-steward-testbed-public' && (github.event_name == 'schedule' || github.event.sender.login == 'jambolo') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: probe-pa03-default-branch
+    steps:
+      - name: Record the ref of this run and whether the Environment secret arrived
+        env:
+          MARKER: ${{ secrets.PROBE_PA03_ENV_MARKER }}
+          EXPECTED_SHA256: f996c284eb4344741cf5aeb9decd8015ba40c71b078608a50532c1b33e6a02b2
+        run: |
+          echo "PROBE-PA03 definition=$PROBE_DEFINITION"
+          echo "PROBE-PA03 event_name=$GITHUB_EVENT_NAME"
+          echo "PROBE-PA03 repository=$GITHUB_REPOSITORY"
+          echo "PROBE-PA03 ref=$GITHUB_REF"
+          echo "PROBE-PA03 sha=$GITHUB_SHA"
+          echo "PROBE-PA03 workflow_ref=$GITHUB_WORKFLOW_REF"
+          echo "PROBE-PA03 environment=probe-pa03-default-branch"
+          echo "PROBE-PA03 secret_length=${#MARKER}"
+          actual="$(printf '%s' "$MARKER" | sha256sum | cut -d ' ' -f 1)"
+          if [ "$actual" = "$EXPECTED_SHA256" ]; then
+            echo "PROBE-PA03 secret_digest=match"
+          else
+            echo "PROBE-PA03 secret_digest=mismatch"
+          fi
+          echo "PROBE-PA03 run_id=$GITHUB_RUN_ID run_attempt=$GITHUB_RUN_ATTEMPT"
+          echo "PROBE-PA03 utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

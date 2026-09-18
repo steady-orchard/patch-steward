@@ -1,0 +1,80 @@
+# PA05 probe (concurrency), PA05.2 and PA05.3: one "shared" run screens several submissions (matrix over subs) with
+# job-level concurrency keyed per submission, beside an unrelated job ("other") that has no concurrency group.
+# Dispatched several times with overlapping submissions; the jobs API then shows which jobs waited, ran, or were
+# cancelled. Every job logs start/end lines "PROBE-PA05 label=<label> job=<job> ...".
+# Canonical source: probes/pa05-rounds-concurrency/workflows/probe-pa05-concurrency.yml
+# Deployed copy:    .github/workflows/probe-pa05-concurrency.yml on master (byte-identical).
+name: probe-pa05-concurrency
+run-name: probe-pa05-concurrency ${{ inputs.label }} ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatcher find this run
+        required: true
+        type: string
+      label:
+        description: Scenario label, e.g. s1-r1
+        required: true
+        type: string
+      subs:
+        description: JSON array of submission keys, e.g. ["A","B"]
+        required: true
+        type: string
+      sleep_seconds:
+        description: How long each job works (at most 600)
+        required: true
+        type: string
+      cancel_in_progress:
+        description: 'true | false'
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  work:
+    name: work-${{ matrix.sub }}
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {}
+    strategy:
+      fail-fast: false
+      matrix:
+        sub: ${{ fromJSON(inputs.subs) }}
+    concurrency:
+      group: probe-pa05-sub-${{ matrix.sub }}
+      cancel-in-progress: ${{ inputs.cancel_in_progress == 'true' }}
+    steps:
+      - name: Work on one submission
+        env:
+          SUB: ${{ matrix.sub }}
+          LABEL: ${{ inputs.label }}
+          SLEEP: ${{ inputs.sleep_seconds }}
+        run: |
+          case "$SUB" in '' | *[!A-Z]*) echo "PROBE-PA05 error=bad-sub"; exit 1 ;; esac
+          case "$SLEEP" in '' | *[!0-9]*) SLEEP=60 ;; esac
+          if [ "$SLEEP" -gt 600 ]; then SLEEP=600; fi
+          echo "PROBE-PA05 label=$LABEL job=work-$SUB group=probe-pa05-sub-$SUB start_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          sleep "$SLEEP"
+          echo "PROBE-PA05 label=$LABEL job=work-$SUB end_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  other:
+    name: other
+    if: ${{ github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {}
+    steps:
+      - name: Unrelated work in the same run (no concurrency group)
+        env:
+          LABEL: ${{ inputs.label }}
+          SLEEP: ${{ inputs.sleep_seconds }}
+        run: |
+          case "$SLEEP" in '' | *[!0-9]*) SLEEP=60 ;; esac
+          if [ "$SLEEP" -gt 600 ]; then SLEEP=600; fi
+          echo "PROBE-PA05 label=$LABEL job=other start_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          sleep "$SLEEP"
+          echo "PROBE-PA05 label=$LABEL job=other end_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

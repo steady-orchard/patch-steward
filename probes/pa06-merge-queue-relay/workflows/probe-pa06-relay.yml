@@ -1,0 +1,33 @@
+# PA06 probe (merge-queue relay), PA06.1: the credential-free relay. It runs for merge_group checks_requested on the
+# queue ref with no secrets, no Environment, no checkout, and empty permissions, and only records the group.
+# merge_group runs use the workflow definition inside the merge group commit, so this file is deployed to master
+# AND to the queue's base branch probe-pa06-base.
+# Canonical source: probes/pa06-merge-queue-relay/workflows/probe-pa06-relay.yml
+# Deployed copy:    .github/workflows/probe-pa06-relay.yml on master and probe-pa06-base (byte-identical).
+name: probe-pa06-relay
+run-name: probe-pa06-relay ${{ github.event.merge_group.head_sha }}
+
+on:
+  merge_group:
+    types: [checks_requested]
+
+permissions: {}
+
+jobs:
+  relay:
+    name: relay
+    if: ${{ startsWith(github.event.merge_group.base_ref, 'refs/heads/probe-pa06-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Record the merge group (no credentials, no checkout)
+        env:
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          BASE_REF: ${{ github.event.merge_group.base_ref }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          echo "PROBE-PA06 job=relay head_sha=$HEAD_SHA head_ref=$HEAD_REF base_sha=$BASE_SHA base_ref=$BASE_REF"
+          echo "PROBE-PA06 job=relay ref=$GITHUB_REF sha=$GITHUB_SHA sender=$SENDER actor=$GITHUB_ACTOR run_id=$GITHUB_RUN_ID utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

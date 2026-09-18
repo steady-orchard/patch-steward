@@ -1,0 +1,27 @@
+# PA03 probe (trusted triggers): the upstream run whose completion starts a workflow_run run of
+# probe-pa03-events.yml. Dispatched on the NON-default branch probe-pa03-base (PA03.3).
+# Canonical source: probes/pa03-trusted-triggers/workflows/probe-pa03-upstream.yml
+# Deployed copy:    .github/workflows/probe-pa03-upstream.yml on master and on probe-pa03-base (byte-identical).
+name: probe-pa03-upstream
+run-name: probe-pa03-upstream ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  upstream:
+    name: upstream
+    if: ${{ github.repository != 'jambolo/patch-steward-testbed-public' && github.event.sender.login == 'jambolo' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Record the ref of the upstream run
+        run: echo "PROBE-PA03 job=upstream ref=$GITHUB_REF sha=$GITHUB_SHA run_id=$GITHUB_RUN_ID utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

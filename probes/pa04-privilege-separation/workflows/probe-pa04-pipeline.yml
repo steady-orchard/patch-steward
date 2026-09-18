@@ -1,0 +1,155 @@
+# PA04 probe (job privilege separation), PA04.3 and PA04.4: a reusable workflow shaped like the design's pipeline
+# (gate -> intake -> execute -> assess, then publish with the design's condition). Inputs choose which job fails,
+# which is skipped, and whether the run cancels itself while execute is running. Every job logs one line
+# "PROBE-PA04 scenario=<s> job=<name> ..." so the log shows which jobs ran.
+# Canonical source: probes/pa04-privilege-separation/workflows/probe-pa04-pipeline.yml
+# Deployed copy:    .github/workflows/probe-pa04-pipeline.yml on master (byte-identical).
+name: probe-pa04-pipeline
+
+on:
+  workflow_call:
+    inputs:
+      scenario:
+        required: true
+        type: string
+      gate_result:
+        description: success | failure
+        required: true
+        type: string
+      committed:
+        description: 'true | false (gate output)'
+        required: true
+        type: string
+      execute_result:
+        description: success | failure
+        required: true
+        type: string
+      skip_assess:
+        description: 'true skips assess by its own if'
+        required: true
+        type: string
+      cancel_after:
+        description: seconds after which job canceller cancels this run; 0 = never
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      committed: ${{ steps.commit.outputs.committed }}
+    steps:
+      - name: Set the committed output
+        id: commit
+        env:
+          COMMITTED: ${{ inputs.committed }}
+          SCENARIO: ${{ inputs.scenario }}
+        run: |
+          echo "committed=$COMMITTED" >> "$GITHUB_OUTPUT"
+          echo "PROBE-PA04 scenario=$SCENARIO job=gate committed=$COMMITTED utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      - name: Fail the gate when asked
+        if: ${{ inputs.gate_result == 'failure' }}
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+        run: |
+          echo "PROBE-PA04 scenario=$SCENARIO job=gate failing=yes"
+          exit 1
+
+  intake:
+    name: intake
+    needs: gate
+    if: ${{ needs.gate.outputs.committed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Intake
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+          COMMITTED: ${{ needs.gate.outputs.committed }}
+        run: echo "PROBE-PA04 scenario=$SCENARIO job=intake ran=yes gate_committed_seen=$COMMITTED"
+
+  execute:
+    name: execute
+    needs: intake
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - name: Hold while the canceller acts (cancel scenario only)
+        if: ${{ inputs.cancel_after != '0' }}
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+        run: |
+          echo "PROBE-PA04 scenario=$SCENARIO job=execute hold_start_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          sleep 300
+          echo "PROBE-PA04 scenario=$SCENARIO job=execute hold_end_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      - name: Fail execute when asked
+        if: ${{ inputs.execute_result == 'failure' }}
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+        run: |
+          echo "PROBE-PA04 scenario=$SCENARIO job=execute failing=yes"
+          exit 1
+      - name: Execute
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+        run: echo "PROBE-PA04 scenario=$SCENARIO job=execute ran=yes"
+
+  assess:
+    name: assess
+    needs: execute
+    if: ${{ inputs.skip_assess != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Assess
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+        run: echo "PROBE-PA04 scenario=$SCENARIO job=assess ran=yes"
+
+  canceller:
+    name: canceller
+    needs: gate
+    if: ${{ inputs.cancel_after != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel this workflow run while execute is running
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCENARIO: ${{ inputs.scenario }}
+          AFTER: ${{ inputs.cancel_after }}
+        run: |
+          case "$AFTER" in '' | *[!0-9]*) AFTER=30 ;; esac
+          sleep "$AFTER"
+          echo "PROBE-PA04 scenario=$SCENARIO job=canceller cancel_request_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/cancel"
+          sleep 60
+          echo "PROBE-PA04 scenario=$SCENARIO job=canceller still_running_after_60s=yes"
+
+  publish:
+    name: publish
+    needs: [gate, intake, execute, assess]
+    if: ${{ always() && needs.gate.result == 'success' && needs.gate.outputs.committed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Publish
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+          GATE: ${{ needs.gate.result }}
+          INTAKE: ${{ needs.intake.result }}
+          EXECUTE: ${{ needs.execute.result }}
+          ASSESS: ${{ needs.assess.result }}
+          COMMITTED: ${{ needs.gate.outputs.committed }}
+        run: echo "PROBE-PA04 scenario=$SCENARIO job=publish ran=yes gate=$GATE intake=$INTAKE execute=$EXECUTE assess=$ASSESS committed=$COMMITTED utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
