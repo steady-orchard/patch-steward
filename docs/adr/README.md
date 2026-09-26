@@ -60,3 +60,19 @@ ADR-0001 to ADR-0016 record the decisions selected with the architecture, in the
 | [ADR-0031](0031-merge-queue-relay-membership.md)                | Merge-queue relay membership and echo filtering                     | accepted | 2026-09-25 |
 | [ADR-0032](0032-organization-billing-unverified-marker.md)      | Unverified marker for the organization billing path                 | accepted | 2026-09-25 |
 | [ADR-0033](0033-explicit-secrets-mapping.md)                    | Explicit per-name secrets mapping into the pinned reusable workflow | accepted | 2026-09-25 |
+| [ADR-0034](0034-policy-schema-covers-every-area.md)             | Policy schema covers every policy area in version 1                 | accepted | 2026-09-26 |
+| [ADR-0035](0035-integer-schema-versions.md)                     | Integer schema versions and the rule for evolving schemas           | accepted | 2026-09-26 |
+| [ADR-0036](0036-zod-single-schema-source.md)                    | Zod as the single schema source                                     | accepted | 2026-09-26 |
+| [ADR-0037](0037-strict-yaml-policy-subset.md)                   | Strict YAML subset for the policy file                              | accepted | 2026-09-26 |
+| [ADR-0038](0038-policy-revision-git-tree-id.md)                 | Policy revision is the git tree id of the policy directory          | accepted | 2026-09-26 |
+| [ADR-0039](0039-optional-inference-section.md)                  | Optional inference section and provider pairing                     | accepted | 2026-09-26 |
+| [ADR-0040](0040-required-keys-and-documented-defaults.md)       | Required policy keys and documented defaults                        | accepted | 2026-09-26 |
+| [ADR-0041](0041-policy-change-default-enforced.md)              | `policy_change` defaults to `enforced`                              | accepted | 2026-09-26 |
+| [ADR-0042](0042-free-form-submissions-off-by-default.md)        | Free-form submissions are off by default                            | accepted | 2026-09-26 |
+| [ADR-0043](0043-default-label-names.md)                         | Default label names                                                 | accepted | 2026-09-26 |
+| [ADR-0044](0044-built-in-dismissal-code-catalog.md)             | Built-in dismissal-code catalog                                     | accepted | 2026-09-26 |
+| [ADR-0045](0045-public-policy-subset.md)                        | Public policy subset                                                | accepted | 2026-09-26 |
+| [ADR-0046](0046-hard-bounds-are-steward-constants.md)           | Hard bounds are steward constants                                   | accepted | 2026-09-26 |
+| [ADR-0047](0047-redaction-patterns.md)                          | Redaction patterns                                                  | accepted | 2026-09-26 |
+| [ADR-0048](0048-steward-policy-command.md)                      | `steward policy` command                                            | accepted | 2026-09-26 |
+| [ADR-0049](0049-separate-type-check-pass-for-tests.md)          | Tests are type-checked by a separate compiler pass                  | accepted | 2026-09-26 |

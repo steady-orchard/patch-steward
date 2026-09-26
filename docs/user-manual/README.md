@@ -1,12 +1,16 @@
 # Patch Steward User Manual
 
 Patch Steward is a work in progress. This repository contains a development
-scaffold and design documents. The screening core, CLI, GitHub action and
-screening workflows, browser app, adapters, and sandboxed runner are not
+scaffold, design documents, the policy module (loading, validation, revision
+identity, defaults, and the public subset), shared vocabularies, version-1
+record schemas, a redaction module, and the `steward policy` command. The
+screening pipeline, the other CLI commands, the GitHub action and screening
+workflows, the browser app, the adapters, and the sandboxed runner are not
 implemented.
 
-The installation guide covers the runnable scaffold. Sections marked **Proposed**
-describe the documented product design, not available functionality.
+The installation guide covers the runnable scaffold. Sections marked
+**Available** describe what runs today; sections marked **Proposed** describe
+the documented product design, not available functionality.
 
 ## Table of contents
 
@@ -32,13 +36,13 @@ describe the documented product design, not available functionality.
    - [Calibrate enforcement](usage.md#calibrate-enforcement-proposed)
 4. [Command reference](commands.md)
    - [Development commands](commands.md#development-commands-available)
+   - [`steward policy`](commands.md#steward-policy-available)
    - [CLI commands](commands.md#cli-commands-proposed)
    - [GitHub conversation commands](commands.md#github-conversation-commands-proposed)
 5. [Configuration](configuration.md)
-   - [Policy format and precedence](configuration.md#policy-format-and-precedence-proposed)
-   - [Named settings and defaults](configuration.md#named-settings-and-defaults-proposed)
-   - [Example policy fragment](configuration.md#example-policy-fragment-proposed)
-   - [Complete documented policy areas](configuration.md#documented-policy-areas-proposed)
+   - [Policy file and revision](configuration.md#policy-file-and-revision-available)
+   - [Policy validation](configuration.md#policy-validation-available)
+   - [Policy keys](configuration.md#policy-keys-available)
    - [Credentials and deployment](configuration.md#credentials-and-deployment-proposed)
    - [Evidence and visibility](configuration.md#evidence-and-visibility-proposed)
    - [Scaffold configuration](configuration.md#scaffold-configuration-available)
@@ -58,6 +62,8 @@ This manual uses only repository material:
 - [Whitepaper](../whitepaper.md): methodology and evaluation goals.
 - [Architecture](../architecture.md): components, boundaries, configuration areas, and open decisions.
 - [Processes](../processes.md): workflows, decisions, commands, and failure handling.
+- [Policy template](../../templates/policy/policy.yml)
+  and [policy module](../../packages/core/src/policy/): the implemented policy schema and validation.
 - [Package manifest](../../package.json), [sample source](../../packages/core/src/index.ts),
   [sample test](../../packages/core/src/index.test.ts), and [repository guidance](../../CLAUDE.md): development behavior.
 - [CI](../../.github/workflows/ci.yml), [CD](../../.github/workflows/cd.yml),
@@ -69,5 +75,4 @@ boundaries, the processes govern steps and behavior, and the whitepaper defers
 to both.
 
 `[NEEDS INPUT]` callouts identify information absent or unresolved in the sources.
-No published CLI installation command, complete policy schema, or project issue
-export was supplied.
+No published CLI installation command or project issue export was supplied.

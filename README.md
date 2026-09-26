@@ -35,12 +35,17 @@ quality. Passing checks does not establish project value or authorize merging.
 
 This is a **WORK IN PROGRESS**
 
-Project scaffold and design documentation. The screening core, CLI, GitHub
-action and workflows, browser app, LLM and GitHub adapters, and sandboxed runner
-are not implemented. The sample source and test only verify the development
-toolchain. The probes/ directory holds the platform-assumption probe suite and
-its findings for disposable test-bed repositories; it is not product code and
-never runs in CI.
+Project scaffold, design documentation, and the policy layer. Implemented:
+loading a policy from an explicit git revision or a named local file; strict
+validation against the version-1 schema with hard bounds; the policy revision
+(the git tree id of `.github/patch-steward/`); the resolved policy and its
+public subset; shared vocabularies; version-1 record schemas; a redaction
+module; and the `steward policy` command. The screening pipeline, the other
+CLI commands, the GitHub action and workflows, the browser app, the LLM and
+GitHub adapters, the evidence store, and the sandboxed runner are, however,
+not implemented yet. The probes/ directory holds the platform-assumption
+probe suite and its findings for disposable test-bed repositories; it is not
+product code and never runs in CI.
 
 The [user manual](docs/user-manual/README.md) covers scaffold setup, proposed
 workflows, configuration, and troubleshooting, with explicit documentation gaps.
@@ -76,17 +81,28 @@ Install Node.js 24 and pnpm. The exact pnpm version is recorded in package.json.
 ```sh
 pnpm install --frozen-lockfile
 pnpm build
+pnpm typecheck
 pnpm test
 pnpm lint
 pnpm format:check
 pnpm coverage
 ```
 
-- packages/: workspace packages core, cli, action, and web; toolchain smoke
-  code only.
-- fixtures/: shared corpus for fixture-tier tests.
-- templates/: files that later milestones will install into target
-  repositories via steward init; nothing is installed today.
+Validate a policy with the built CLI (the packages are private, so no global
+`steward` command is installed):
+
+```sh
+node packages/cli/dist/main.js policy --file templates/policy/policy.yml
+```
+
+- packages/: workspace packages. core holds the policy module, shared
+  vocabularies, version-1 record schemas, the redaction module, and invariant
+  conformance tests; cli implements `steward policy`; action and web hold
+  toolchain smoke code only.
+- fixtures/: shared corpus for fixture-tier tests, including valid, invalid,
+  and hostile policies.
+- templates/: files `steward init` is designed to install into target
+  repositories; today the policy template and its editor JSON Schema.
 - probes/: platform-assumption probes PA01–PA09 (sub-claims PA0N.M) against
   disposable test-bed repositories, with findings in probes/findings.md; not a
   workspace package and never run in CI.
@@ -98,13 +114,13 @@ pnpm coverage
   failure handling, and measures.
 - docs/adr/: architecture decision records ADR-NNNN, one per design decision,
   recording why it was made; the design documents govern.
-- docs/deferred.md: designs of features excluded from version 1 (DF01–DF09);
+- docs/deferred.md: designs of features excluded from version 1 (DF01–DF10);
   the other documents assume they will not be implemented.
 - .github/workflows/: scaffold CI and release automation.
 
 ## Automation
 
-CI builds and tests on Node 24 on Windows and Linux for PRs targeting any
+CI builds, type-checks, and tests on Node 24 on Windows and Linux for PRs targeting any
 branch and for pushes to master, develop, and release branches. Lint and
 formatting checks run for PRs. Coverage uploads from develop use the
 CODECOV_TOKEN repository secret. GitHub Pages deployment

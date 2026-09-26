@@ -1,0 +1,3 @@
+version: 1
+supported_behavior: &behavior
+  description: anchored

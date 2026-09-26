@@ -33,6 +33,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Compile
         run: pnpm build
+      - name: Typecheck
+        run: pnpm typecheck
       - name: Test
         run: pnpm test
 

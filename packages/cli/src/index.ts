@@ -1,5 +1,2 @@
-import { greet } from '@patch-steward/core';
-
-export function stewardGreeting(): string {
-  return greet('steward');
-}
+export * from './cli.js';
+export * from './policy-command.js';

@@ -1,3 +1,15 @@
-import { stewardGreeting } from './index.js';
+#!/usr/bin/env node
+import process from 'node:process';
+import { runCli } from './cli.js';
 
-console.log(stewardGreeting());
+process.exitCode = await runCli(process.argv.slice(2), {
+  cwd: process.cwd(),
+  io: {
+    stdout: (text) => {
+      process.stdout.write(text);
+    },
+    stderr: (text) => {
+      process.stderr.write(text);
+    },
+  },
+});

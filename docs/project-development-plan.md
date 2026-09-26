@@ -69,8 +69,9 @@ PD01–PD08; architecture decisions are cited by ADR id (ADR-0001–ADR-0016 in 
 
 ### 0.3 Definition of done for every milestone
 
-- Build, tests, lint, and format checks pass on Ubuntu and Windows. Tests are
-  type-checked by the test runner, because the build excludes them.
+- Build, type-check, tests, lint, and format checks pass on Ubuntu and
+  Windows. Tests are type-checked by `pnpm typecheck`, because the build
+  excludes them and the test runner does not type-check.
 - Every new input that crosses into the core (policy, GitHub responses,
   artifacts, model output, result files) is validated at runtime (invariant 5)
   and handled as data: it reaches no shell, workflow expression, or
@@ -331,8 +332,9 @@ Outputs:
 - Shared schemas and vocabularies: outcomes, waiting states, classifications,
   finding severities, label families, dismissal codes, failure causes.
 - `steward policy`: validate a policy and show the revision that would govern.
-- The policy skeleton in `templates/`, with the default dismissal-code
-  catalog.
+- The policy skeleton in `templates/`. The built-in dismissal-code catalog
+  is a set of core constants that the skeleton shows as comments; a policy
+  lists only project additions.
 - Configuration documentation that describes the real schema.
 
 Exit criteria:
@@ -369,8 +371,10 @@ Inputs:
 
 Decisions to settle first:
 
-- Canonical submission fields and the versioned mapping from rendered form
-  labels and PR headings (SP06 step 3).
+- The versioned mapping from rendered form labels and PR headings to the
+  canonical submission field ids (SP06 step 3). M03 fixed the field ids,
+  because policy required-field lists are validated against them; M04 adds
+  ids only additively.
 - Category-versus-diff consistency rules (SP06 step 4).
 - Default trusted and execution-sensitive path lists (§8).
 - Attachment destinations, limits, and formats (SP06 step 5).
@@ -429,7 +433,8 @@ Decisions to settle first:
 
 - Report section caps and wording rules (SP13 step 2).
 - Evidence run-directory layout and record formats (§11, §15).
-- Default redaction patterns.
+- Built-in redaction detectors beyond the set M03 delivered with the
+  redaction module, and the record fields redaction covers at persistence.
 - CLI conventions for every command: arguments, exit codes, output formats.
 
 Outputs:
@@ -663,8 +668,9 @@ Decisions to settle first:
 - Default model per adapter, or none; generation settings; the
   required-capability vocabulary (§15).
 - Repair strategy for malformed structured output (§15).
-- Local credential conventions and the fixed environment-variable names
-  (§15).
+- Local credential conventions: reuse of the user's Copilot login for
+  `github-token` (§15). M03 fixed the `env` variable name,
+  `STEWARD_LLM_API_KEY`.
 - Whether read-only Copilot built-in tools consult the permission handler
   (§15); until confirmed, the empty working directory stays the primary
   control.
@@ -1410,7 +1416,7 @@ Exit criteria:
 | Platform coverage beyond Linux containers                                 | M08                                          |
 | Numerical limits                                                          | M03 provisional; M07, M09, M14, M17 by area  |
 | Enforcement thresholds from observation                                   | M17 record format; M21 values                |
-| Local credential conventions; environment variable names                  | M09                                          |
+| Local credential conventions: Copilot login reuse                         | M09 (M03 fixed `STEWARD_LLM_API_KEY`)        |
 | Capability probing at installation                                        | M02 probes; M20 decides                      |
 | Read-only Copilot tools and the permission handler                        | M09                                          |
 | Copilot system-prompt mode                                                | M09; revisited after M11 and M12             |

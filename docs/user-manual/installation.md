@@ -10,8 +10,8 @@ For the existing development scaffold:
 - Node.js 24. The CI workflows pin Node 24; the CLI package declares `engines.node >=24`.
 - pnpm **10.20.0**, as pinned in `package.json`.
 
-The scaffold's CI runs builds and tests on Windows and Linux. Its packages are
-marked private and contain no CLI executable declaration.
+The scaffold's CI runs builds, type-checks, and tests on Windows and Linux.
+Its packages are private and unpublished; the CLI package declares a `steward` executable that runs from the build output.
 
 > **[NEEDS INPUT]** The sources do not specify Node.js/pnpm installation
 > commands or a canonical clone URL. They also do not supply a published
@@ -57,10 +57,11 @@ expect(greet('world')).toBe('Hello, world!');
 ```
 
 This assertion is from `packages/core/src/index.test.ts`. A successful build and passing test
-verify the scaffold's compilation and test execution. Then run the documented
-quality checks:
+verify the scaffold's compilation and test execution.
+Then run the documented quality checks:
 
 ```sh
+pnpm typecheck
 pnpm lint
 pnpm format:check
 pnpm coverage
@@ -70,8 +71,17 @@ Coverage uses the LCOV reporter. The CI workflow reads `coverage/lcov.info` for
 its Codecov upload. `CODECOV_TOKEN` is needed for that upload from `develop`, not
 for the local coverage command.
 
+Validate the policy template with the built CLI:
+
+```sh
+node packages/cli/dist/main.js policy --file templates/policy/policy.yml
+```
+
+It prints `policy: valid`, the non-authoritative notice, and one
+`policy.llm-model-placeholder` warning, and exits `0`.
+
 Sources: [sample test](../../packages/core/src/index.test.ts), [package scripts](../../package.json),
-[CI workflow](../../.github/workflows/ci.yml).
+[CI workflow](../../.github/workflows/ci.yml), [`steward policy`](commands.md#steward-policy-available).
 
 ## Target-repository installation (Proposed)
 
@@ -120,7 +130,11 @@ components or templates exists yet.
    refuses rulesets, so this restriction is unavailable; `steward init` is
    designed to report that.
 
-5. Configure the policy and begin in `observe` mode.
+5. Copy the [policy template](../../templates/policy/policy.yml) to
+   `.github/patch-steward/policy.yml`, replace the placeholder model id and the
+   project-specific values, keep `modes.default: observe`, and validate it with
+   [`steward policy`](commands.md#steward-policy-available) before and after
+   merging it to the default branch.
 
 6. For public repositories, enable Pages with Actions as its deployment source.
    Private repositories keep public publication disabled unless an explicit
@@ -146,7 +160,7 @@ components or templates exists yet.
 
 > **[NEEDS INPUT]** Completing these steps requires the CLI distribution,
 > version/commit to pin, App registration or installation details, Environment and
-> secret names, stable check name, valid policy template, runner image setup, and
+> secret names, stable check name, runner image setup, and
 > exact self-test inputs. The sources describe their roles but do not provide a
 > runnable installation recipe.
 

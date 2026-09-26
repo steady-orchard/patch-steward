@@ -3,6 +3,9 @@
   "version": "0.0.2",
   "private": true,
   "type": "module",
+  "bin": {
+    "steward": "./dist/main.js"
+  },
   "engines": {
     "node": ">=24"
   },

@@ -4,10 +4,11 @@
 
 ## Work on the scaffold
 
-The existing commands compile, test, lint, and format this repository:
+The existing commands compile, type-check, test, lint, and format this repository:
 
 ```sh
 pnpm build
+pnpm typecheck
 pnpm test
 pnpm lint
 pnpm format:check
@@ -20,16 +21,24 @@ pnpm vitest run packages/core/src/index.test.ts
 pnpm vitest run -t 'greets by name'
 ```
 
+To validate a policy with the built CLI (after `pnpm build`):
+
+```sh
+node packages/cli/dist/main.js policy --file templates/policy/policy.yml
+node packages/cli/dist/main.js policy --ref origin/HEAD --json
+```
+
 To apply formatting to the repository:
 
 ```sh
 pnpm format
 ```
 
-These commands exercise the sample `greet` function and development tools. They
-do not screen a submission.
+The tests exercise the policy module, record schemas, redaction, `steward policy`,
+and the sample `greet` function. None of these commands screens a submission.
 
-Sources: [package scripts](../../package.json), [repository commands](../../CLAUDE.md#commands).
+Sources: [package scripts](../../package.json), [repository commands](../../CLAUDE.md#commands),
+[`steward policy`](commands.md#steward-policy-available).
 
 ## Prepare a submission (Proposed)
 

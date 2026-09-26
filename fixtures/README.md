@@ -14,3 +14,9 @@ Tests locate this corpus relative to the test file via `import.meta.url`. Corpus
 Current entries:
 
 - `smoke/greeting.txt` — smoke entry proving the fixture-tier wiring.
+- `policies/valid/` — valid policies: minimal without inference, Copilot SDK, OpenAI-compatible, and one whose free-text
+  fields carry prompt-injection and shell text that must stay data.
+- `policies/invalid/` — policies that each break one validation rule; `.txt` so the formatter never rewrites them.
+- `policies/hostile/` — hostile YAML: aliases, anchors, duplicate keys, custom tags, multiple documents, deep nesting,
+  prototype keys, a catastrophic redaction pattern, non-string keys.
+- `policies/expectations.json` — validity and failure codes per fixture; the fixture-tier test checks it both ways.

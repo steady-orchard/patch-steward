@@ -131,17 +131,20 @@ CODEOWNERS, defines:
 - Runtime, token, retry, and other resource limits.
 - Inference: the shipped adapter, model, authentication method, and admission
   rule, as credential references only; no default provider is substituted.
+  The section is optional: without it deterministic stages still run, and a
+  run that reaches a model stage ends inconclusive.
 - Operating mode per category: observe, advise, or enforce, with neutral gate
   checks for unenforced categories when a repository-wide check is required.
 - The follow-up limit, passive hygiene heuristics, evidence retention and
   publication settings, and the dismissal-code catalog.
 
 A PR may propose policy changes, but cannot make those changes govern its own
-screening run. Each report records the policy revision used: the content hash
-of the policy directory, with the trusted-branch commit at load recorded
-alongside it; unrelated default-branch commits do not change the revision. An
-invalid policy on the trusted
-branch makes every run inconclusive; the steward never falls back to defaults
+screening run. Each report records the policy revision used: the git tree id
+of the policy directory at the trusted commit, read from git objects, with
+that commit recorded alongside it; unrelated default-branch commits do not
+change the revision, and any change inside the directory does. An invalid or
+missing policy on the trusted branch makes every run inconclusive; the
+steward never falls back to defaults beyond the few the design documents
 (SP01).
 
 ## 4. Submission contract and bug validation
@@ -408,7 +411,7 @@ requests, and a draft PR opened per the template is marked ready for review on
 pass. Observe mode never promotes drafts or requests reviewers; the template
 explains ordinary manual readiness/review for that mode. Reports bind to
 body/linked evidence, persistent author responses, target/base/head, sharing
-PR set, and policy content hash. Steward/provider/model/adapter/runner
+PR set, and the policy revision. Steward/provider/model/adapter/runner
 identities are recorded separately as run provenance. A changed input starts a new run through its own event, through
 propagation from a linked issue or a recorded maintainer action, or through
 the policy-change sweep. An unpublished run superseded by a policy change
@@ -570,7 +573,8 @@ GitHub token and denies every tool, and an OpenAI-compatible HTTP adapter with
 a project-supplied key. The trusted policy selects provider, model, and
 authentication method (`github-token` or `env`); it holds credential
 references, never secrets, and the steward never substitutes a provider or
-model. In Actions the model credential reaches only the model-using jobs
+model. A policy without an inference section is valid; a run that then reaches
+a model stage ends inconclusive. In Actions the model credential reaches only the model-using jobs
 through job `GITHUB_TOKEN` permissions for Copilot or a separate
 default-branch-only Environment for `env` keys; the CLI
 uses the user's own Copilot login or provider key; containers receive nothing.
@@ -655,8 +659,9 @@ unavailable, like enforcement. Local uploads stay non-authoritative.
 Run inexpensive checks first: contract checks before any model call,
 deterministic reference checks before claim validation, execution before
 challenge, and challenge last and only for categories that require it. Hard
-call, retry, timeout, resource, and byte limits are enforced; Copilot credit
-limits are soft, checked after each model call, and may overshoot. Usage
+call, retry, timeout, resource, and byte limits are enforced as steward
+constants that a policy can lower but never raise (architecture §12); Copilot
+credit limits are soft, checked after each model call, and may overshoot. Usage
 across all sessions/rounds debits one run/stage allowance; exhausted limits
 are never automatically extended. Daily and per-author caps are approximate counts
 taken from GitHub's run list and are documented as cost controls. Inference
@@ -669,7 +674,10 @@ and abandoned holds expose this O01 tradeoff even in observe mode. Ownership
 and freshness checks, not cancellation, prevent superseded runs from
 publishing. Baselines are cached by
 base commit, policy, platform, command/harness, and environment;
-execution output is captured with bounds and redacted before storage. Daily run
+execution output is captured with bounds and redacted before storage.
+Built-in credential detectors always run before storage; project redaction
+patterns are limited to a safe regular-expression subset under size and time
+bounds, and a timeout fails closed. Daily run
 caps and per-author concurrency caps limit steward cost without judging identity
 (O01). Existing project CI is independent and outside those cost guarantees.
 
@@ -755,12 +763,19 @@ effectiveness.
 ## 14. Scaffold and open implementation decisions
 
 The repository starts with pnpm, strict TypeScript, ESLint, Prettier, Vitest,
-coverage support, an MIT license, and GitHub CI/CD templates. Authored
-documentation is tracked in docs. The monorepo layout in §9 is implemented;
-the packages contain only toolchain smoke code.
+a separate type-check pass over sources and tests, coverage support, an MIT
+license, and GitHub CI/CD templates. Authored documentation is tracked in
+docs. The monorepo layout in §9 is implemented.
 
-The sample sources are only toolchain smoke code. No working screening command,
-provider integration, workflow, or browser app is claimed.
+Implemented so far: the policy module in `core` (loading from an explicit git
+revision or a named local file, strict YAML and schema validation, hard
+bounds, the policy revision as the git tree id of the policy directory,
+documented defaults, and the public subset), shared vocabularies, version-1
+record schemas, a redaction module, conformance tests for invariants 2, 5,
+and 7, the `steward policy` command in `cli`, the policy template and its
+editor schema in `templates`, and a policy fixture corpus. The `action` and
+`web` packages hold toolchain smoke code only. No screening stage, provider
+integration, workflow, or browser app is claimed.
 
 Decisions recorded on September 15, 2026 and revised on September 16, 2026
 (ADR-0001–ADR-0016 in `docs/adr`) settle the browser code's role, the absence of browser
@@ -771,23 +786,34 @@ inference admission, the evidence store, passive handling of automated
 participation, distribution, repository layout, and single-run orchestration
 with ownership commitment and job-level privilege separation.
 
-Decisions still to be made are implementation details (architecture §15):
-policy, submission, evidence, finding, report, and metrics schemas, including
-the `llm` section; the container image strategy and the network policy for
-dependency installation; the default model per shipped adapter and prompt and
-repair design; the context selection strategy and its token budget; test
-result parsing; the duplicate search method; platform coverage beyond Linux
-containers; numerical limits, retention, and audit sample sizes;
-enforcement thresholds derived from observation; local credential conventions
-and installation-time capability probing (what an administrator token can
-read about the model provider's state without an inference request; the job
-token reads none of it); whether read-only Copilot tools
-consult the permission handler; and evidence retention mechanics. Additional
-open details are daily inference aggregation; efficient live PR-link
-reconciliation; ownership artifact naming, retention, and listing consistency;
-Copilot prompt-mode evaluation; fixed round-job expansion and budget handoff;
-and installation confirmation of latest-check and neutral-check semantics.
-Architecture §15 is the authoritative open list.
+Decisions recorded on September 26, 2026 (ADR-0034–ADR-0049 in `docs/adr`)
+settle the version-1 policy schema, in which each platform lists the commands
+it runs; integer schema versions with an additive evolution rule and
+canonical JSON for record hashes; Zod as the single schema source; a strict
+YAML subset for the policy file; the policy revision as the git tree id of
+the policy directory; the optional inference section and provider pairing;
+required keys with a few documented defaults, including `policy_change:
+enforced`, free-form submissions off, and the default label names; the
+built-in dismissal-code catalog; the public policy subset; hard bounds as
+steward constants; redaction patterns; the `steward policy` command; and the
+separate type-check pass for tests.
+
+Decisions still to be made are implementation details (architecture §15): the
+evidence store's run-directory layout and stored-record file format; the
+container image strategy and the network policy for dependency installation;
+the default model per shipped adapter and prompt and repair design; the
+context selection strategy and its token budget; test result parsing; the
+duplicate search method; platform coverage beyond Linux containers;
+enforcement thresholds derived from observation; reusing the user's Copilot login
+for local inference; installation-time capability probing (what an
+administrator token can read about the model provider's state without an
+inference request; the job token reads none of it); whether read-only Copilot
+tools consult the permission handler; and evidence retention mechanics.
+Additional open details are daily inference aggregation; efficient live
+PR-link reconciliation; ownership artifact naming, retention, and listing
+consistency; Copilot prompt-mode evaluation; fixed round-job expansion and
+budget handoff; and installation confirmation of latest-check and
+neutral-check semantics. Architecture §15 is the authoritative open list.
 
 ## 15. References
 
