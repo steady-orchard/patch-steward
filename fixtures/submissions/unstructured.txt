@@ -1,0 +1,3 @@
+The parser crashes when I give it an empty file. Please fix it.
+
+Steps: run widget parse on an empty file.

@@ -80,13 +80,22 @@ node packages/cli/dist/main.js policy --file templates/policy/policy.yml
 It prints `policy: valid`, the non-authoritative notice, and one
 `policy.llm-model-placeholder` warning, and exits `0`.
 
+With network access, the live tier reads a public test-bed repository through
+the GitHub adapter; it never runs in CI. Set `GH_TOKEN` to avoid the lower
+unauthenticated rate limit:
+
+```sh
+GH_TOKEN=$(gh auth token) pnpm test:live
+```
+
 Sources: [sample test](../../packages/core/src/index.test.ts), [package scripts](../../package.json),
 [CI workflow](../../.github/workflows/ci.yml), [`steward policy`](commands.md#steward-policy-available).
 
 ## Target-repository installation (Proposed)
 
-The following is the documented adoption sequence. None of its screening
-components or templates exists yet.
+The following is the documented adoption sequence. The policy template, issue
+forms, and PR template exist in `templates/`; `steward init`, which would install
+them, and the screening components do not exist yet.
 
 ### Required resources
 

@@ -190,4 +190,224 @@ describe('invariant 5 conformance', () => {
       expect('value' in (result as object)).toBe(false);
     }
   });
+
+  it('invariant 5: every exported load, validate, resolve, parse, capture, and check function rejects invalid input', async () => {
+    const names = Object.keys(core)
+      .filter(
+        (name) =>
+          /^(load|validate|resolve|parse|capture|check)/.test(name) &&
+          typeof (core as Record<string, unknown>)[name] === 'function',
+      )
+      .sort();
+    expect(names).toEqual([
+      'captureIssue',
+      'capturePullRequest',
+      'checkContract',
+      'checkPolicyRules',
+      'checkRedactionPattern',
+      'loadPolicy',
+      'parseCategoryValue',
+      'parseIssueBody',
+      'parseLinkedIssueValue',
+      'parsePullRequestBody',
+      'parseStrictYaml',
+      'parseStrictYamlDocument',
+      'resolveCommit',
+      'resolvePolicy',
+      'validatePolicy',
+      'validatePolicyBytes',
+    ]);
+
+    function expectResultRejection(result: unknown, expectedCode?: string): void {
+      const r = result as { ok: boolean; failure?: { outcome: string; code: string } };
+      expect(r.ok).toBe(false);
+      if (!r.ok) {
+        expect(r.failure?.outcome).toBe('inconclusive');
+        if (expectedCode !== undefined) {
+          expect(r.failure?.code).toBe(expectedCode);
+        }
+      }
+    }
+
+    // loadPolicy, resolveCommit, resolvePolicy, validatePolicy, validatePolicyBytes: reuse the existing test's invalid inputs.
+    expectResultRejection(await core.loadPolicy({ kind: 'file', path: '/does-not-exist/policy.yml' }));
+    expectResultRejection(core.validatePolicy({ version: 1 }));
+    expectResultRejection(core.validatePolicyBytes(Buffer.from('version: 1\n')));
+    expectResultRejection(core.resolvePolicy({ dismissal_codes: [] } as unknown as core.Policy));
+    const gitOptions = { repoDir: os.tmpdir(), timeoutMs: 1000, maxOutputBytes: 1000 };
+    expectResultRejection(await core.resolveCommit(gitOptions, '-x'));
+
+    // parseCategoryValue / parseLinkedIssueValue: invalid status, not a Result.
+    expect(core.parseCategoryValue('bugfix feature')).toEqual({ status: 'invalid' });
+    expect(core.parseLinkedIssueValue('#1, #2', 'o/r').status).toBe('invalid');
+
+    // parseIssueBody / parsePullRequestBody: Result rejections.
+    expectResultRejection(core.parseIssueBody('x'.repeat(65537)), 'submission.body-too-large');
+    expectResultRejection(core.parsePullRequestBody('\uD800'), 'submission.body-malformed');
+
+    // parseStrictYaml / parseStrictYamlDocument: anchor rejection.
+    const yamlBounds = { maxBytes: 1000, maxDepth: 10, maxNodes: 100 };
+    expectResultRejection(core.parseStrictYaml(Buffer.from('a: &x 1\n'), yamlBounds), 'yaml.anchor');
+    expectResultRejection(core.parseStrictYamlDocument(Buffer.from('a: &x 1\n'), yamlBounds), 'yaml.anchor');
+
+    // checkContract: an unstructured issue body against the template policy.
+    const templatePolicyResult = await core.loadPolicy({ kind: 'file', path: filePathForTemplate() });
+    expect(templatePolicyResult.ok).toBe(true);
+    if (templatePolicyResult.ok) {
+      const contractResult = core.checkContract({
+        type: 'issue',
+        repository: { fullName: 'steady-orchard/patch-steward-testbed-public', defaultBranch: 'main' },
+        policy: templatePolicyResult.value.policy,
+        body: { structured: false, reason: 'no-template-match' },
+        requestedKind: null,
+        attachments: { limit: 5, countExceeded: false, items: [] },
+      });
+      expect(contractResult.disposition).toBe('needs-changes');
+    }
+
+    // checkPolicyRules: an undeclared execution command reference.
+    const rawResult = core.parseStrictYaml(templateBytes, {
+      maxBytes: core.POLICY_FILE_MAX_BYTES,
+      maxDepth: core.POLICY_YAML_MAX_DEPTH,
+      maxNodes: core.POLICY_YAML_MAX_NODES,
+    });
+    expect(rawResult.ok).toBe(true);
+    if (rawResult.ok) {
+      const raw = rawResult.value as { execution: { platforms: { commands: string[] }[] } };
+      const platform = raw.execution.platforms[0];
+      expect(platform).toBeDefined();
+      if (platform) {
+        platform.commands = ['test', 'missing'];
+      }
+      const policy = core.policySchema.parse(raw);
+      const violations = core.checkPolicyRules(policy);
+      expect(violations.length).toBeGreaterThan(0);
+      expect(violations[0]?.code).toBe('policy.undeclared-reference');
+    }
+
+    // checkRedactionPattern: catastrophic backtracking pattern is rejected.
+    expect(core.checkRedactionPattern('(a+)+$')).not.toBeNull();
+
+    // captureIssue / capturePullRequest: a repository read that does not match the expected schema.
+    async function schemaMismatchFetch(): Promise<Response> {
+      return new Response('{}', { status: 200 });
+    }
+    const captureClient = core.createGitHubClient({
+      token: null,
+      budget: core.createGitHubBudget({ requests: 10, retriesPerRequest: 0 }),
+      fetch: schemaMismatchFetch,
+    });
+    const captureContext: core.CaptureContext = {
+      client: captureClient,
+      repository: { owner: 'steady-orchard', name: 'patch-steward-testbed-public' },
+      policy: core.DEFAULT_CHECKLIST_POLICY,
+      policyRevision: 'a'.repeat(40),
+      attachmentResolver: () => {
+        throw new Error('unexpected attachment resolver call');
+      },
+      attachmentTransport: () => {
+        throw new Error('unexpected attachment transport call');
+      },
+      authorResponses: [],
+    };
+    expectResultRejection(await core.captureIssue(captureContext, 1), 'github.schema-mismatch');
+    expectResultRejection(await core.capturePullRequest(captureContext, 1), 'github.schema-mismatch');
+  });
+
+  it('invariant 5: new adapters reject malformed input with a typed result', async () => {
+    async function schemaMismatchFetch(): Promise<Response> {
+      return new Response('{}', { status: 200 });
+    }
+    const client = core.createGitHubClient({
+      token: null,
+      budget: core.createGitHubBudget({ requests: 10, retriesPerRequest: 0 }),
+      fetch: schemaMismatchFetch,
+    });
+    const repository = { owner: 'steady-orchard', name: 'patch-steward-testbed-public' };
+
+    const repoResult = await core.readRepository(client, repository);
+    expect(repoResult.ok).toBe(false);
+    if (!repoResult.ok) {
+      expect(repoResult.failure.code).toBe('github.schema-mismatch');
+      expect(repoResult.failure.outcome).toBe('inconclusive');
+    }
+
+    const malformedRunner: ProcessRunner = async () =>
+      ok({ exitCode: 0, stdout: Buffer.from('Q\u0000x\u0000'), stderr: Buffer.alloc(0) });
+    const changedPathsResult = await core.listChangedPaths(
+      { repoDir: os.tmpdir(), timeoutMs: 1000, maxOutputBytes: 1000, runner: malformedRunner },
+      'a'.repeat(40),
+      'b'.repeat(40),
+    );
+    expect(changedPathsResult.ok).toBe(false);
+    if (!changedPathsResult.ok) {
+      expect(changedPathsResult.failure.code).toBe('git.malformed-output');
+      expect(changedPathsResult.failure.outcome).toBe('inconclusive');
+    }
+
+    const dirSha = 'd'.repeat(40);
+    const otherTreeSha = 'e'.repeat(40);
+    async function policyTreeFetch(url: string): Promise<Response> {
+      if (url.includes('/contents/')) {
+        return new Response(
+          JSON.stringify([{ name: 'patch-steward', path: '.github/patch-steward', sha: dirSha, type: 'dir', size: 0 }]),
+          { status: 200 },
+        );
+      }
+      if (url.includes('/git/trees/')) {
+        return new Response(JSON.stringify({ sha: otherTreeSha, truncated: false, tree: [] }), { status: 200 });
+      }
+      throw new Error(`unexpected url: ${url}`);
+    }
+    const policyTreeClient = core.createGitHubClient({
+      token: null,
+      budget: core.createGitHubBudget({ requests: 10, retriesPerRequest: 0 }),
+      fetch: policyTreeFetch,
+    });
+    const proposedPolicyResult = await core.readProposedPolicyFromGitHub(policyTreeClient, repository, 'c'.repeat(40));
+    expect(proposedPolicyResult.ok).toBe(false);
+    if (!proposedPolicyResult.ok) {
+      expect(proposedPolicyResult.failure.code).toBe('github.malformed-response');
+      expect(proposedPolicyResult.failure.outcome).toBe('inconclusive');
+    }
+
+    const redirectOutcome = await core.fetchAttachment('https://github.com/user-attachments/files/1/a.txt', {
+      destinations: ['github.com'],
+      maxRedirects: 5,
+      timeoutMs: 1000,
+      maxFileBytes: 1000,
+      remainingTotalBytes: 1000,
+      resolver: async () => [{ address: '93.184.216.34', family: 4 }],
+      transport: async () => ({
+        kind: 'response',
+        status: 302,
+        location: null,
+        body: (async function* () {})(),
+        close: () => undefined,
+      }),
+    });
+    expect(redirectOutcome).toEqual({
+      kind: 'unavailable',
+      url: 'https://github.com/user-attachments/files/1/a.txt',
+      reason: 'redirect-invalid',
+      message: 'The attachment redirect target is invalid.',
+    });
+
+    const zipInspection = core.inspectZipArchive(Buffer.from('not a zip'), 1000);
+    expect(zipInspection.kind).toBe('violation');
+    if (zipInspection.kind === 'violation') {
+      expect(zipInspection.reason).toBe('malformed');
+    }
+
+    const bodyResult = core.parsePullRequestBody('\uD800');
+    expect(bodyResult.ok).toBe(false);
+    if (!bodyResult.ok) {
+      expect(bodyResult.failure.code).toBe('submission.body-malformed');
+      expect(bodyResult.failure.outcome).toBe('inconclusive');
+    }
+  });
 });
+
+function filePathForTemplate(): string {
+  return fileURLToPath(new URL('../../../../templates/policy/policy.yml', import.meta.url));
+}

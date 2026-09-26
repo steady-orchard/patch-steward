@@ -1,0 +1,334 @@
+import type { ResolvedPolicy } from '../policy/schema.js';
+
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object') {
+    for (const child of Object.values(value)) {
+      deepFreeze(child);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}
+
+// Resolved policy template, embedded so the CLI needs no template file at runtime; a test keeps it equal to the template.
+
+export const DEFAULT_CHECKLIST_POLICY: ResolvedPolicy = deepFreeze<ResolvedPolicy>({
+  version: 1,
+  supported_behavior: {
+    description:
+      'Describe the behavior this project supports, in the terms maintainers use to decide whether a report is a defect.',
+    environments: [],
+    platforms: [],
+    compatibility: [],
+    versions: [],
+    components: [],
+    documents: [],
+    decisions: [],
+    design_rules: [],
+  },
+  trusted_paths: {
+    additional: [],
+  },
+  execution_sensitive_paths: {
+    additional: [],
+  },
+  categories: {
+    bugfix: {
+      required_fields: [
+        'category',
+        'problem',
+        'intended-behavior',
+        'linked-issue',
+        'reproduction-command',
+        'expected-result',
+        'regression-test',
+      ],
+      linked_issue: 'required',
+      references: 'optional',
+      reproduction: 'required',
+      regression_test: 'required',
+    },
+    feature: {
+      required_fields: ['category', 'problem', 'benefit', 'intended-behavior', 'acceptance-criteria', 'linked-issue'],
+      linked_issue: 'required',
+      references: 'optional',
+      reproduction: 'not-applicable',
+      regression_test: 'not-applicable',
+    },
+    refactor: {
+      required_fields: ['category', 'problem', 'benefit'],
+      linked_issue: 'optional',
+      references: 'optional',
+      reproduction: 'not-applicable',
+      regression_test: 'not-applicable',
+    },
+    docs: {
+      required_fields: ['category', 'problem'],
+      linked_issue: 'optional',
+      references: 'optional',
+      reproduction: 'not-applicable',
+      regression_test: 'not-applicable',
+    },
+    chore: {
+      required_fields: ['category', 'problem'],
+      linked_issue: 'optional',
+      references: 'optional',
+      reproduction: 'not-applicable',
+      regression_test: 'not-applicable',
+    },
+    security: {
+      required_fields: ['category', 'problem', 'intended-behavior', 'reproduction-command', 'expected-result', 'regression-test'],
+      linked_issue: 'optional',
+      references: 'optional',
+      reproduction: 'required',
+      regression_test: 'required',
+    },
+  },
+  submission: {
+    free_form: false,
+    unrequested_change: 'propose-first',
+    issue_fields: {
+      defect: [
+        'expected-behavior',
+        'authoritative-basis',
+        'actual-behavior',
+        'affected-version',
+        'reproduction-command',
+        'expected-result',
+      ],
+      proposal: ['problem', 'benefit', 'proposed-scope'],
+    },
+    reference_hosts: {
+      mode: 'any-public',
+      allowlist: [],
+    },
+    attachments: {
+      destinations: [
+        'github.com',
+        'objects.githubusercontent.com',
+        'github-production-user-asset-6210df.s3.amazonaws.com',
+        'user-images.githubusercontent.com',
+        'private-user-images.githubusercontent.com',
+      ],
+      formats: ['txt', 'log', 'md', 'json', 'patch', 'diff', 'zip', 'gz', 'png', 'jpg', 'jpeg', 'gif'],
+    },
+  },
+  execution: {
+    commands: [
+      {
+        id: 'test',
+        kind: 'test',
+        run: ['make', 'test'],
+        working_directory: '.',
+        mandatory: true,
+        result_files: [],
+      },
+    ],
+    platforms: [
+      {
+        id: 'linux',
+        os: 'linux',
+        required: true,
+        source: 'container',
+        ci_workflow: null,
+        commands: ['test'],
+      },
+    ],
+  },
+  runner: {
+    image: {
+      source: 'registry',
+      reference: 'docker.io/library/debian:stable-slim',
+    },
+    network: 'none',
+    dependency_step: null,
+    resources: {
+      cpus: 2,
+      memory_mb: 4096,
+      pids: 512,
+    },
+  },
+  llm: {
+    provider: 'copilot-sdk',
+    model: 'replace-with-model-id',
+    auth: {
+      type: 'github-token',
+    },
+    generation: {
+      temperature: null,
+    },
+    required_capabilities: {
+      structured_output: 'any',
+    },
+    admission: 'all',
+    limits: {
+      model_calls_per_run: 40,
+      retries_per_call: 2,
+      repair_attempts_per_session: 1,
+      call_seconds: 120,
+      daily_inference_runs: 30,
+      ai_credits_per_run: 90,
+    },
+  },
+  stages: {
+    continue_after_blocking: false,
+    per_category: {
+      bugfix: ['fix-verification', 'regression', 'challenge'],
+      feature: ['regression', 'challenge'],
+      refactor: ['regression'],
+      docs: [],
+      chore: ['regression'],
+      security: ['fix-verification', 'regression', 'challenge'],
+    },
+    challenge_rounds: 2,
+    high_impact_paths: [],
+    reproduction_as_before_evidence: true,
+  },
+  escalation: {
+    sensitive_paths: [],
+    security_terms: [],
+    security_reporting_url: null,
+  },
+  limits: {
+    caps: {
+      daily_runs: 50,
+      per_author_concurrent_runs: 2,
+    },
+    github: {
+      requests_per_run: 300,
+      retries_per_request: 3,
+    },
+    execution: {
+      execution_seconds: 1800,
+      run_execution_seconds: 7200,
+      executions_per_run: 40,
+      output_bytes: 1048576,
+      result_file_bytes: 5242880,
+      dependency_step_seconds: 600,
+    },
+    attachments: {
+      count: 5,
+      file_bytes: 1048576,
+      total_bytes: 5242880,
+      decompressed_bytes: 10485760,
+      redirects: 3,
+      fetch_seconds: 20,
+    },
+    references: {
+      count: 50,
+      fetches_per_run: 20,
+      fetch_seconds: 10,
+      fetch_bytes: 1048576,
+      redirects: 3,
+    },
+    evidence: {
+      run_bytes: 10485760,
+      write_retries: 5,
+    },
+    stale_check_minutes: 1440,
+    stage_seconds: 3600,
+    audit_samples_per_week: 5,
+  },
+  policy_change: 'enforced',
+  modes: {
+    default: 'observe',
+    per_category: {},
+  },
+  follow_through: {
+    max_follow_ups_per_cycle: 1,
+  },
+  hygiene: {
+    report_flagged: false,
+    allowlist: [],
+    heuristics: {
+      automated_accounts: true,
+      near_duplicates: true,
+      unreferenced_reviews: true,
+      automated_exchanges: true,
+    },
+    max_flagged: 10,
+  },
+  evidence: {
+    store: {
+      type: 'orphan-branch',
+      branch: 'patch-steward-evidence',
+    },
+    retention_days: 365,
+    redaction_patterns: [],
+    publication: {
+      pages: false,
+      private_repository: false,
+      exclude: [],
+    },
+  },
+  dismissal_codes: [
+    {
+      code: 'no-reproduction',
+      definition: 'The claimed behavior did not reproduce with the supplied reproduction in the claimed supported environment.',
+      built_in: true,
+    },
+    {
+      code: 'intended-behavior',
+      definition: 'The reported behavior is what the project intends, as shown by a cited document, test, or recorded decision.',
+      built_in: true,
+    },
+    {
+      code: 'not-applicable-version',
+      definition: 'The claim affects only versions the project does not support, and no supported version or target reproduces it.',
+      built_in: true,
+    },
+    {
+      code: 'unsupported-claim',
+      definition: 'The claim is not backed by the evidence it cites or that the policy requires, so it cannot be validated.',
+      built_in: true,
+    },
+    {
+      code: 'fabricated-reference',
+      definition:
+        'The submission cites a file, symbol, quotation, issue, pull request, document section, or version that is definitively absent at the stated revision.',
+      built_in: true,
+    },
+    {
+      code: 'duplicate',
+      definition:
+        'The submission repeats an existing issue or pull request, or a previously dismissed claim, without new evidence.',
+      built_in: true,
+    },
+    {
+      code: 'out-of-scope',
+      definition:
+        "The submission concerns behavior outside the project's components or supported behavior, such as vendored or third-party code or another application.",
+      built_in: true,
+    },
+    {
+      code: 'insufficient-benefit',
+      definition: 'Maintainers decided that the stated benefit does not justify adopting and maintaining the change.',
+      built_in: true,
+    },
+    {
+      code: 'proposal-required',
+      definition:
+        "The pull request implements a feature or design change without an accepted proposal, a maintainer's acceptance of its claim, or a waiver.",
+      built_in: true,
+    },
+  ],
+  labels: {
+    status: {
+      queued: 'steward:queued',
+      'awaiting-approval': 'steward:awaiting-approval',
+      screening: 'steward:screening',
+      pass: 'steward:pass',
+      'awaiting-author': 'steward:awaiting-author',
+      triage: 'steward:triage',
+    },
+    classification: {
+      'supported-defect': 'claim:supported-defect',
+      'intended-behavior': 'claim:intended-behavior',
+      'feature-request': 'claim:feature-request',
+      'accepted-proposal': 'claim:accepted-proposal',
+      'proposal-pending': 'claim:proposal-pending',
+      duplicate: 'claim:duplicate',
+      uncertain: 'claim:uncertain',
+    },
+  },
+});

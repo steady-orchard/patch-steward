@@ -1,12 +1,22 @@
 import { z } from 'zod';
 
 import { categorySchema, issueKindSchema, submissionTypeSchema } from '../vocabulary.js';
+import { submissionTemplateFormSchema } from '../submission/field-mapping.js';
+import { attachmentUrlSchema, snapshotSchema, snapshotHash } from '../submission/snapshot.js';
+import {
+  ARCHIVE_ENTRIES_MAX,
+  ARCHIVE_ENTRY_NAME_MAX_BYTES,
+  VALIDATION_ERRORS_MAX,
+  POLICY_ID_MAX_LENGTH,
+} from '../policy/bounds.js';
 
 import {
   recordSchemaVersionSchema,
   recordRepositorySchema,
   recordPositiveIntSchema,
+  recordCountSchema,
   recordContentHashSchema,
+  recordCommitIdSchema,
   recordIdentifierSchema,
   recordTextSchema,
   recordList,
@@ -68,6 +78,56 @@ function coupling(value: z.infer<typeof submissionRecordShape>, ctx: z.Refinemen
         path: ['shared_head_pull_requests'],
       });
     }
+    if (value.policy_change !== undefined) {
+      ctx.addIssue({ code: 'custom', message: 'issue submissions must not carry policy_change', path: ['policy_change'] });
+    }
+    if (value.claim_scope_hash !== undefined && value.claim_scope_hash !== null) {
+      ctx.addIssue({ code: 'custom', message: 'issue submissions must not carry claim_scope_hash', path: ['claim_scope_hash'] });
+    }
+  }
+
+  if (value.snapshot !== undefined) {
+    if (
+      value.snapshot.type !== value.type ||
+      value.snapshot.repository !== value.repository ||
+      value.snapshot.number !== value.number
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'snapshot must describe the same submission', path: ['snapshot'] });
+    } else if (value.snapshot.type === 'pull_request' && value.type === 'pull_request') {
+      if (value.snapshot.target_branch !== value.target_branch) {
+        ctx.addIssue({ code: 'custom', message: 'snapshot target_branch must match the record', path: ['snapshot'] });
+      }
+      if (value.snapshot.head_commit !== value.head_commit) {
+        ctx.addIssue({ code: 'custom', message: 'snapshot head_commit must match the record', path: ['snapshot'] });
+      }
+    }
+    const hashResult = snapshotHash(value.snapshot);
+    if (!hashResult.ok || hashResult.value !== value.snapshot_hash) {
+      ctx.addIssue({ code: 'custom', message: 'snapshot_hash must match the snapshot', path: ['snapshot_hash'] });
+    }
+  }
+
+  if (value.template !== undefined && value.template !== null) {
+    if (value.type === 'pull_request') {
+      if (value.template.form !== 'pull_request') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'pull request submissions require a pull_request template form',
+          path: ['template'],
+        });
+      }
+    } else if (value.template.form !== value.issue_kind) {
+      ctx.addIssue({ code: 'custom', message: 'issue template form must match issue_kind', path: ['template'] });
+    }
+  }
+
+  if (value.policy_change !== undefined) {
+    if (value.policy_change.changed && value.policy_change.proposed === null) {
+      ctx.addIssue({ code: 'custom', message: 'a changed policy requires a proposed result', path: ['policy_change'] });
+    }
+    if (!value.policy_change.changed && value.policy_change.proposed !== null) {
+      ctx.addIssue({ code: 'custom', message: 'an unchanged policy must not carry a proposed result', path: ['policy_change'] });
+    }
   }
 }
 
@@ -116,6 +176,65 @@ const submissionRecordShape = z.strictObject({
   ),
   trusted_paths_changed: z.boolean().nullable(),
   execution_sensitive_paths_changed: z.boolean().nullable(),
+  template: z.strictObject({ form: submissionTemplateFormSchema, version: recordPositiveIntSchema }).nullable().optional(),
+  snapshot: snapshotSchema.optional(),
+  policy_change: z
+    .strictObject({
+      changed: z.boolean(),
+      proposed: z
+        .discriminatedUnion('status', [
+          z.strictObject({ status: z.literal('valid'), revision: recordCommitIdSchema }),
+          z.strictObject({
+            status: z.literal('invalid'),
+            revision: recordCommitIdSchema,
+            errors: z
+              .array(
+                z.strictObject({
+                  code: recordIdentifierSchema,
+                  path: recordTextSchema,
+                  message: recordTextSchema,
+                  line: recordPositiveIntSchema.nullable(),
+                  column: recordPositiveIntSchema.nullable(),
+                }),
+              )
+              .min(1)
+              .max(VALIDATION_ERRORS_MAX),
+          }),
+          z.strictObject({ status: z.literal('removed') }),
+        ])
+        .nullable(),
+    })
+    .optional(),
+  attachments: recordList(
+    z.strictObject({
+      url: attachmentUrlSchema,
+      format: z
+        .string()
+        .min(1)
+        .max(POLICY_ID_MAX_LENGTH)
+        .regex(/^[a-z0-9]+(?:\.[a-z0-9]+)*$/)
+        .nullable(),
+      bytes: recordCountSchema.nullable(),
+      content_hash: recordContentHashSchema.nullable(),
+      required: z.boolean(),
+      entries: z
+        .array(
+          z.strictObject({
+            name: recordTextSchema.refine(
+              (name) => {
+                const byteLength = Buffer.byteLength(name, 'utf8');
+                return byteLength >= 1 && byteLength <= ARCHIVE_ENTRY_NAME_MAX_BYTES;
+              },
+              { message: `entry name must be 1-${ARCHIVE_ENTRY_NAME_MAX_BYTES} UTF-8 bytes` },
+            ),
+            bytes: recordCountSchema,
+          }),
+        )
+        .max(ARCHIVE_ENTRIES_MAX)
+        .nullable(),
+    }),
+  ).optional(),
+  claim_scope_hash: recordContentHashSchema.nullable().optional(),
 });
 
 function recordCommitOrNullSchema() {

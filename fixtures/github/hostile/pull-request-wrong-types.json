@@ -1,0 +1,12 @@
+{
+  "number": "26",
+  "state": "closed",
+  "title": "x",
+  "body": null,
+  "draft": "no",
+  "head": { "sha": 42, "ref": "h" },
+  "base": { "sha": "b46eef5018c202bcb2470bf62e3defd7496ec65b", "ref": "base" },
+  "user": null,
+  "author_association": "NONE",
+  "changed_files": 1
+}

@@ -1,0 +1,34 @@
+### Expected behavior
+
+`widget parse` accepts an empty file and prints an empty document.
+
+### Authoritative basis
+
+docs/format.md, section "Empty input": an empty file is a valid document.
+
+### Actual behavior
+
+`widget parse empty.txt` exits with status 1 and prints `TypeError: cannot read properties of undefined`.
+
+### Reproduction command
+
+```shell
+touch empty.txt
+widget parse empty.txt
+```
+
+### Expected result
+
+Exit status 0 and the output `[]`.
+
+### Proposed scope
+
+Handle empty input in the parser entry point only.
+
+### References
+
+_No response_
+
+### Security claim
+
+- [ ] This report claims a security problem

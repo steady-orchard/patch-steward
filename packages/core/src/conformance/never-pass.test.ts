@@ -13,6 +13,11 @@ import type {
   RedactionFailureCode,
   PublicSubsetFailureCode,
   RecordFailureCode,
+  GitHubFailureCode,
+  MergeBaseFailureCode,
+  GitHubPolicySourceFailureCode,
+  BodyParseFailureCode,
+  SnapshotFailureCode,
   Result,
   Policy,
   ProcessRunner,
@@ -41,6 +46,16 @@ import {
   POLICY_FILE_MAX_BYTES,
   POLICY_YAML_MAX_DEPTH,
   POLICY_YAML_MAX_NODES,
+  createGitHubClient,
+  createGitHubBudget,
+  readRepository,
+  readIssue,
+  readOpenPullRequestsForCommit,
+  readDirectoryEntries,
+  readGitBlob,
+  findMergeBase,
+  parseIssueBody,
+  buildIssueSnapshot,
 } from '../index.js';
 
 type Trigger = () => Promise<Result<unknown, string>> | Result<unknown, string>;
@@ -53,7 +68,12 @@ type NonContentFailureCode =
   | CanonicalJsonFailureCode
   | RedactionFailureCode
   | PublicSubsetFailureCode
-  | RecordFailureCode;
+  | RecordFailureCode
+  | GitHubFailureCode
+  | MergeBaseFailureCode
+  | GitHubPolicySourceFailureCode
+  | BodyParseFailureCode
+  | SnapshotFailureCode;
 
 const templateBytes = fs.readFileSync(fileURLToPath(new URL('../../../../templates/policy/policy.yml', import.meta.url)));
 
@@ -135,6 +155,68 @@ for (const [key, value] of Object.entries(process.env)) {
   }
 }
 const processOpts = { cwd: os.tmpdir(), env: baseEnv, timeoutMs: 5000, maxOutputBytes: 1024 };
+
+const GITHUB_REPO = { owner: 'octo', name: 'demo' };
+
+function ghClient(
+  fetchImpl: (url: string, init: { readonly signal: AbortSignal }) => Promise<Response>,
+): ReturnType<typeof createGitHubClient> {
+  return createGitHubClient({
+    token: null,
+    budget: createGitHubBudget({ requests: 50, retriesPerRequest: 0 }),
+    fetch: fetchImpl as NonNullable<Parameters<typeof createGitHubClient>[0]['fetch']>,
+    sleep: () => Promise.resolve(),
+  });
+}
+
+function ghJson(status: number, body: unknown, headers: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), { status, headers });
+}
+
+const POLICY_OWNER = 'example-owner';
+const POLICY_REPO = 'example-repo';
+const POLICY_BRANCH = 'main';
+
+function policyRefUrl(): string {
+  return `https://api.github.com/repos/${POLICY_OWNER}/${POLICY_REPO}/git/ref/heads/${POLICY_BRANCH}`;
+}
+
+function policyContentsUrl(): string {
+  return `https://api.github.com/repos/${POLICY_OWNER}/${POLICY_REPO}/contents/.github?ref=${commit}`;
+}
+
+function policyTreeUrl(): string {
+  return `https://api.github.com/repos/${POLICY_OWNER}/${POLICY_REPO}/git/trees/${treeId}?recursive=1`;
+}
+
+function policyRefBody(): unknown {
+  return { ref: `refs/heads/${POLICY_BRANCH}`, object: { sha: commit, type: 'commit' } };
+}
+
+function policySource(
+  routes: ReadonlyMap<string, { readonly status: number; readonly body?: unknown }>,
+): Parameters<typeof loadPolicy>[0] {
+  const client = ghClient((url) => {
+    const route = routes.get(url);
+    if (route === undefined) {
+      return Promise.resolve(new Response('not mapped', { status: 404 }));
+    }
+    return Promise.resolve(ghJson(route.status, route.body ?? {}));
+  });
+  return { kind: 'github', client, repository: { owner: POLICY_OWNER, name: POLICY_REPO }, branch: POLICY_BRANCH };
+}
+
+function policyContentsListing(includePolicyDir: boolean, policyEntryType: 'dir' | 'file' = 'dir'): unknown {
+  const entries: unknown[] = [];
+  if (includePolicyDir) {
+    entries.push({ name: 'patch-steward', path: '.github/patch-steward', sha: treeId, type: policyEntryType, size: 1 });
+  }
+  return entries;
+}
+
+function policyTreeBody(entries: readonly Record<string, unknown>[], truncated = false): unknown {
+  return { sha: treeId, truncated, tree: entries };
+}
 
 function templateRaw(): Record<string, unknown> {
   const parsed = parseStrictYaml(templateBytes, {
@@ -268,6 +350,206 @@ const TRIGGERS: { readonly [K in NonContentFailureCode]: Trigger } = {
       })(),
       { stewardVersion: '0.0.2', loadedAt: 'yesterday' },
     ),
+  'github.network': () =>
+    readRepository(
+      ghClient(() => {
+        throw new Error('injected network failure');
+      }),
+      GITHUB_REPO,
+    ),
+  'github.timeout': () =>
+    readRepository(
+      createGitHubClient({
+        token: null,
+        budget: createGitHubBudget({ requests: 50, retriesPerRequest: 0 }),
+        fetch: (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+          }),
+        timeoutMs: 20,
+        sleep: () => Promise.resolve(),
+      }),
+      GITHUB_REPO,
+    ),
+  'github.server-error': () =>
+    readRepository(
+      ghClient(() => Promise.resolve(ghJson(500, {}))),
+      GITHUB_REPO,
+    ),
+  'github.rate-limited': () =>
+    readRepository(
+      ghClient(() => Promise.resolve(ghJson(429, {}, { 'retry-after': '3600' }))),
+      GITHUB_REPO,
+    ),
+  'github.unauthorized': () =>
+    readRepository(
+      ghClient(() => Promise.resolve(ghJson(401, {}))),
+      GITHUB_REPO,
+    ),
+  'github.not-found': () =>
+    readRepository(
+      ghClient(() => Promise.resolve(ghJson(404, {}))),
+      GITHUB_REPO,
+    ),
+  'github.unexpected-status': () =>
+    readRepository(
+      ghClient(() => Promise.resolve(ghJson(302, {}))),
+      GITHUB_REPO,
+    ),
+  'github.response-too-large': () =>
+    readRepository(
+      ghClient(() => Promise.resolve(new Response(new Uint8Array(5242881), { status: 200 }))),
+      GITHUB_REPO,
+    ),
+  'github.malformed-response': () =>
+    readRepository(
+      ghClient(() => Promise.resolve(new Response('{', { status: 200 }))),
+      GITHUB_REPO,
+    ),
+  'github.schema-mismatch': () =>
+    readRepository(
+      ghClient(() => Promise.resolve(ghJson(200, {}))),
+      GITHUB_REPO,
+    ),
+  'github.budget-exhausted': () =>
+    readRepository(
+      createGitHubClient({
+        token: null,
+        budget: createGitHubBudget({ requests: 0, retriesPerRequest: 0 }),
+        fetch: () => Promise.resolve(ghJson(200, {})),
+        sleep: () => Promise.resolve(),
+      }),
+      GITHUB_REPO,
+    ),
+  'github.invalid-request': () =>
+    readRepository(
+      ghClient(() => Promise.resolve(ghJson(200, {}))),
+      { owner: '-bad', name: 'r' },
+    ),
+  'github.not-an-issue': () =>
+    readIssue(
+      ghClient(() =>
+        Promise.resolve(
+          ghJson(200, {
+            number: 1,
+            title: 't',
+            body: null,
+            state: 'open',
+            user: null,
+            author_association: 'NONE',
+            pull_request: {},
+          }),
+        ),
+      ),
+      GITHUB_REPO,
+      1,
+    ),
+  'github.not-a-directory': () =>
+    readDirectoryEntries(
+      ghClient(() => Promise.resolve(ghJson(200, {}))),
+      GITHUB_REPO,
+      'docs',
+      'b'.repeat(40),
+    ),
+  'github.blob-too-large': () =>
+    readGitBlob(
+      ghClient(() => Promise.resolve(ghJson(200, { sha: 'b'.repeat(40), size: 5, encoding: 'base64', content: 'aGVsbG8=' }))),
+      GITHUB_REPO,
+      'b'.repeat(40),
+      1,
+    ),
+  'github.pagination-exceeded': () =>
+    readOpenPullRequestsForCommit(
+      ghClient(() => Promise.resolve(ghJson(200, [], { link: '<https://api.github.com/x?page=2>; rel="next"' }))),
+      GITHUB_REPO,
+      'a'.repeat(40),
+    ),
+  'github.pagination-invalid': () =>
+    readOpenPullRequestsForCommit(
+      ghClient(() => Promise.resolve(ghJson(200, [], { link: '<https://evil.example/x>; rel="next"' }))),
+      GITHUB_REPO,
+      'a'.repeat(40),
+    ),
+  'git.no-merge-base': () =>
+    findMergeBase(
+      {
+        repoDir: os.tmpdir(),
+        timeoutMs: 1000,
+        maxOutputBytes: 1000,
+        runner: () => Promise.resolve(ok({ exitCode: 1, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) })),
+      },
+      'a'.repeat(40),
+      'b'.repeat(40),
+    ),
+  'policy-source.not-published': () =>
+    loadPolicy(
+      policySource(
+        new Map([
+          [policyRefUrl(), { status: 200, body: policyRefBody() }],
+          [policyContentsUrl(), { status: 200, body: policyContentsListing(false) }],
+        ]),
+      ),
+    ) as Promise<Result<unknown, string>>,
+  'policy-source.not-a-directory': () =>
+    loadPolicy(
+      policySource(
+        new Map([
+          [policyRefUrl(), { status: 200, body: policyRefBody() }],
+          [policyContentsUrl(), { status: 200, body: policyContentsListing(true, 'file') }],
+        ]),
+      ),
+    ) as Promise<Result<unknown, string>>,
+  'policy-source.tree-truncated': () =>
+    loadPolicy(
+      policySource(
+        new Map([
+          [policyRefUrl(), { status: 200, body: policyRefBody() }],
+          [policyContentsUrl(), { status: 200, body: policyContentsListing(true) }],
+          [policyTreeUrl(), { status: 200, body: policyTreeBody([], true) }],
+        ]),
+      ),
+    ) as Promise<Result<unknown, string>>,
+  'policy-source.entry-not-regular': () =>
+    loadPolicy(
+      policySource(
+        new Map([
+          [policyRefUrl(), { status: 200, body: policyRefBody() }],
+          [policyContentsUrl(), { status: 200, body: policyContentsListing(true) }],
+          [
+            policyTreeUrl(),
+            { status: 200, body: policyTreeBody([{ path: 'policy.yml', mode: '120000', type: 'blob', sha: blobId, size: 10 }]) },
+          ],
+        ]),
+      ),
+    ) as Promise<Result<unknown, string>>,
+  'policy-source.blob-too-large': () =>
+    loadPolicy(
+      policySource(
+        new Map([
+          [policyRefUrl(), { status: 200, body: policyRefBody() }],
+          [policyContentsUrl(), { status: 200, body: policyContentsListing(true) }],
+          [
+            policyTreeUrl(),
+            {
+              status: 200,
+              body: policyTreeBody([{ path: 'policy.yml', mode: '100644', type: 'blob', sha: blobId, size: 262145 }]),
+            },
+          ],
+        ]),
+      ),
+    ) as Promise<Result<unknown, string>>,
+  'submission.body-too-large': () => parseIssueBody('x'.repeat(65537)),
+  'submission.body-malformed': () => parseIssueBody('\uD800'),
+  'snapshot.invalid': () =>
+    buildIssueSnapshot({
+      repository: 'octo/widgets',
+      number: 7,
+      title: 'Crash',
+      body: 'No crash',
+      attachments: [],
+      authorResponses: [],
+      policyRevision: 'local:' + 'a'.repeat(64),
+    }),
 };
 
 function expectNeverPass(result: Result<unknown, string>, code: string): void {

@@ -1,0 +1,76 @@
+name: Defect report
+description: Report behavior that differs from what the project documents or has decided.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe one defect: what should happen, where the project establishes it, and what happens instead.
+
+        Maintainers assess severity. This form has no severity field, and severity wording in any field does not change screening.
+
+        Do not report security vulnerabilities here; use the project's private vulnerability reporting channel.
+
+        Put reproduction files in the Reproduction command field as fenced code blocks (the info string may name the file) or as attachments.
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What the project should do.
+    validations:
+      required: true
+  - type: textarea
+    id: authoritative-basis
+    attributes:
+      label: Authoritative basis
+      description: The document, specification, test, or recorded decision that establishes the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual behavior
+      description: What the project does instead.
+    validations:
+      required: true
+  - type: input
+    id: affected-version
+    attributes:
+      label: Affected version
+      description: The released version or commit that shows the defect.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction-command
+    attributes:
+      label: Reproduction command
+      description: The exact command that shows the defect. Put needed files here as fenced code blocks or attach them.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-result
+    attributes:
+      label: Expected result
+      description: The exit status or output text the reproduction command should produce.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-scope
+    attributes:
+      label: Proposed scope
+      description: Optional. What a fix should change and what it should leave alone.
+    validations:
+      required: false
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Optional. Related issues, pull requests, documents, or specifications.
+    validations:
+      required: false
+  - type: checkboxes
+    id: security-claim
+    attributes:
+      label: Security claim
+      description: Check this only if the defect has security impact. Keep exploit details out of public issues.
+      options:
+        - label: This report claims a security problem

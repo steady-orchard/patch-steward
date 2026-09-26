@@ -1,0 +1,18 @@
+[
+  {
+    "name": "workflows",
+    "path": ".github/workflows",
+    "sha": "baf268a28f2dc267519d1cf0d31ae038747badd0",
+    "size": 0,
+    "url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/contents/.github/workflows?ref=1809582794e9aa5a3c4e4eab03e99933d83e9fb3",
+    "html_url": "https://github.com/steady-orchard/patch-steward-testbed-public/tree/1809582794e9aa5a3c4e4eab03e99933d83e9fb3/.github/workflows",
+    "git_url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/git/trees/baf268a28f2dc267519d1cf0d31ae038747badd0",
+    "download_url": null,
+    "type": "dir",
+    "_links": {
+      "self": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/contents/.github/workflows?ref=1809582794e9aa5a3c4e4eab03e99933d83e9fb3",
+      "git": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/git/trees/baf268a28f2dc267519d1cf0d31ae038747badd0",
+      "html": "https://github.com/steady-orchard/patch-steward-testbed-public/tree/1809582794e9aa5a3c4e4eab03e99933d83e9fb3/.github/workflows"
+    }
+  }
+]

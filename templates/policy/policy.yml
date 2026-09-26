@@ -82,8 +82,13 @@ submission:
     mode: any-public
     allowlist: []
   attachments:
-    destinations: [github.com]
-    formats: [png, jpg, txt]
+    destinations:
+      - github.com
+      - objects.githubusercontent.com
+      - github-production-user-asset-6210df.s3.amazonaws.com
+      - user-images.githubusercontent.com
+      - private-user-images.githubusercontent.com
+    formats: [txt, log, md, json, patch, diff, zip, gz, png, jpg, jpeg, gif]
 
 execution:
   commands:

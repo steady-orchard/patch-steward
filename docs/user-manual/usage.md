@@ -28,60 +28,86 @@ node packages/cli/dist/main.js policy --file templates/policy/policy.yml
 node packages/cli/dist/main.js policy --ref origin/HEAD --json
 ```
 
+To check a draft against a repository's submission contract with the built CLI
+(reads GitHub; see [`steward preflight`](commands.md#steward-preflight-available)):
+
+```sh
+node packages/cli/dist/main.js preflight --issue defect --draft fixtures/submissions/defect-complete.txt --repo steady-orchard/patch-steward-testbed-public
+```
+
 To apply formatting to the repository:
 
 ```sh
 pnpm format
 ```
 
-The tests exercise the policy module, record schemas, redaction, `steward policy`,
-and the sample `greet` function. None of these commands screens a submission.
+The tests exercise the policy module, record schemas, redaction, the submission
+module and its GitHub, git, and attachment adapters, `steward policy`,
+`steward preflight`, and the sample `greet` function; `pnpm test:live` adds
+read-only tests against a public test-bed repository. None of these commands
+screens a submission.
 
 Sources: [package scripts](../../package.json), [repository commands](../../CLAUDE.md#commands),
-[`steward policy`](commands.md#steward-policy-available).
+[`steward policy`](commands.md#steward-policy-available), [`steward preflight`](commands.md#steward-preflight-available).
 
-## Prepare a submission (Proposed)
+## Prepare a submission (Available)
 
 1. Read the target project's published quality contract. Check the category's
    evidence requirements, supported versions, and proposal policy.
-2. Prepare the expected behavior and its authoritative basis, actual behavior,
-   affected version, reproduction command and observable result, scope, and
-   references. For a proposal, describe the problem, benefit, and any existing
-   acceptance or decision.
-3. Use the proposed local preflight entry point on your own checkout:
+2. Write the draft as the rendered form or template would: a Markdown file with
+   the issue form's `### <label>` headings, or the pull request template's marker
+   line and `## <heading>` sections (see the
+   [submission settings](configuration.md#submission)). For a defect, give the
+   expected behavior and its authoritative basis, actual behavior, affected
+   version, reproduction command and expected result, scope, and references; for
+   a proposal, the problem, benefit, and any existing decision. Put reproduction
+   files in the `Reproduction command` field as fenced code blocks or
+   attachments.
+3. Check the draft with `steward preflight` from your own checkout. For an
+   issue:
 
-   ```text
-   steward preflight
+   ```sh
+   node packages/cli/dist/main.js preflight --issue defect --draft draft.md --repo owner/name
    ```
 
-   The design fetches the upstream trusted-branch policy, checks the draft, runs
-   mandatory commands locally without a sandbox, and previews a declared
-   regression test on the base and branch. These deterministic steps need no
-   inference account.
+   For a pull request, commit your change first, then run it from the branch:
 
-4. Optionally select a shipped adapter for self-review with your own credential.
-   Before sending draft text, diffs, code, tests, and policy context, the CLI is
-   designed to disclose exactly what leaves the machine and wait for confirmation.
-5. Address the gaps. You may include the resulting unverified preflight summary
-   in your submission; official screening treats it as a claim to verify.
+   ```sh
+   node packages/cli/dist/main.js preflight --pr --draft pr.md
+   ```
 
-The proposed browser assistant offers the same intake fields and deterministic
-checks, then produces a prefilled issue-form URL or PR-body text with a compare
-URL. It does not run code or inference and holds no credentials. If no published
-policy exists, preflight uses the default checklist from the steward template.
+   It reads the upstream policy, or the default checklist when none is
+   published, checks the draft and, for a pull request, the committed changes
+   against the submission contract, and prints each finding with a numbered
+   request. Exit status `0` means the contract is met, `1` that the draft needs
+   changes or a maintainer decision, and `2` that the check could not run. It
+   needs no inference account and writes nothing to GitHub.
 
-> **[NEEDS INPUT]** The draft format, input-path arguments, upstream selection,
-> inference-selection options, and preflight output format are not specified.
-> The default checklist and browser bundle are also absent. `steward preflight`
-> above identifies the proposed entry point, not a complete runnable invocation.
+4. Address the requests. You may include the preflight summary in your
+   submission; official screening treats it as a claim to verify and repeats
+   every check.
 
-Source: [preflight process SP05](../processes.md#sp05-contributor-preflight).
+Proposed and not yet implemented: running the mandatory commands locally without
+a sandbox and previewing a declared regression test on the base and branch;
+optional self-review with a shipped adapter and your own credential, after the
+CLI discloses exactly what leaves the machine; and the browser assistant, which
+offers the same intake fields and deterministic checks and produces a prefilled
+issue-form URL or PR-body text with a compare URL, without running code or
+inference.
+
+Sources: [preflight process SP05](../processes.md#sp05-contributor-preflight),
+[`steward preflight`](commands.md#steward-preflight-available).
 
 ## Report a defect or propose a change (Proposed)
 
 For a defect:
 
-1. Use the target's defect form and supply the required fields and references.
+1. Use the target's "Defect report" form (installed from
+   `templates/issue-forms/steward-defect.yml`). It asks for `Expected behavior`,
+   `Authoritative basis`, `Actual behavior`, `Affected version`,
+   `Reproduction command`, and `Expected result` (required), and
+   `Proposed scope`, `References`, and the `Security claim` checkbox (optional).
+   Keep the rendered labels: screening finds each field by its label.
 2. Include a self-contained reproduction as fenced code or attached files, with
    an exact command and expected output or exit status.
 3. Screening checks the submission contract and references, validates the claim
@@ -95,7 +121,10 @@ already contains a fix. Screening records affected releases and any backport nee
 
 For a feature or design proposal:
 
-1. Use the proposal form to describe the problem and benefit.
+1. Use the "Change proposal" form (installed from
+   `templates/issue-forms/steward-proposal.yml`): `Problem`, `Benefit`, and
+   `Proposed scope` are required, `Existing decision` and `References`
+   optional.
 2. A well-formed proposal without recorded acceptance passes as `proposal-pending`
    into the proposal backlog. It has no author requests.
 3. A maintainer records acceptance using `/steward accept REASON` on the issue.
@@ -106,18 +135,26 @@ An ordinary issue claiming a security problem follows the configured escalation
 rule, typically triage with a pointer to the project's private reporting channel.
 The steward does not take in private vulnerability reports.
 
-> **[NEEDS INPUT]** The supplied repository has no generated issue forms or exact
-> rendered field labels. A copyable submission template and a real project defect
-> reproduction cannot be supplied from the current material.
+Screening parses the forms as the [submission settings](configuration.md#submission)
+describe; a body that matches no form is returned with a link to the form
+chooser unless the policy allows free-form submissions.
 
 Sources: [SP06](../processes.md#sp06-intake-and-submission-contract-check),
 [SP08](../processes.md#sp08-claim-validation), [SP09](../processes.md#sp09-reproduction).
 
 ## Submit a pull request (Proposed)
 
-1. Complete the installed PR template. Link a successfully validated issue when
-   policy requires one. Linked validation must still match the current issue,
-   policy, supported target, and claim scope.
+1. Complete the installed PR template (from
+   `templates/pull-request/pull_request_template.md`). Keep its first line, the
+   marker `<!-- patch-steward:pr-template v1 -->`, and its `##` headings:
+   `Category`, `Problem`, `Benefit`, `Intended behavior`, `Acceptance criteria`,
+   `Linked issue`, `Regression test`, `Test scaffolding`, `Reproduction command`,
+   `Expected result`, and `References`. Name exactly one category, and in
+   `Linked issue` one issue in the same repository, such as `Fixes #123`. A
+   category that does not fit the changed paths, such as `docs` with code
+   changes, needs a maintainer decision. Link a successfully validated issue
+   when policy requires one. Linked validation must still match the current
+   issue, policy, supported target, and claim scope.
 2. For a feature or design change, follow `unrequested_change`. Its documented
    default, `propose-first`, requires an accepted proposal, maintainer acceptance
    on the PR, or a waiver. Otherwise the result is `needs-changes` with

@@ -9,6 +9,7 @@
     "build": "pnpm -r build",
     "typecheck": "tsc --noEmit -p packages/core/tsconfig.test.json && tsc --noEmit -p packages/cli/tsconfig.test.json && tsc --noEmit -p packages/action/tsconfig.test.json && tsc --noEmit -p packages/web/tsconfig.test.json",
     "test": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
     "coverage": "vitest run --coverage --coverage.reporter=lcov",
     "lint": "eslint .",
     "format": "prettier --write .",

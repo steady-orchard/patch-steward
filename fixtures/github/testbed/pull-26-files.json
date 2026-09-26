@@ -1,0 +1,14 @@
+[
+  {
+    "sha": "4b9e0022cedf256d1e6638d7ec531229c7ee7ac1",
+    "filename": "probe-pa06/entry-2-5.txt",
+    "status": "added",
+    "additions": 1,
+    "deletions": 0,
+    "changes": 1,
+    "blob_url": "https://github.com/steady-orchard/patch-steward-testbed-public/blob/b46eef5018c202bcb2470bf62e3defd7496ec65b/probe-pa06%2Fentry-2-5.txt",
+    "raw_url": "https://github.com/steady-orchard/patch-steward-testbed-public/raw/b46eef5018c202bcb2470bf62e3defd7496ec65b/probe-pa06%2Fentry-2-5.txt",
+    "contents_url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/contents/probe-pa06%2Fentry-2-5.txt?ref=b46eef5018c202bcb2470bf62e3defd7496ec65b",
+    "patch": "@@ -0,0 +1 @@\n+probe PA06 merge-queue entry marker"
+  }
+]

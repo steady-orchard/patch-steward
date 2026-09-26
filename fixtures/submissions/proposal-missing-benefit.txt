@@ -1,0 +1,19 @@
+### Problem
+
+Parsing a large file reads the whole file into memory.
+
+### Benefit
+
+_No response_
+
+### Existing decision
+
+_No response_
+
+### Proposed scope
+
+Add a streaming reader behind the existing `parse` API, with no new options.
+
+### References
+
+docs/format.md

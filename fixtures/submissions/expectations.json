@@ -1,0 +1,490 @@
+{
+  "cases": [
+    {
+      "name": "defect complete",
+      "body": "defect-complete.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": { "template": "defect v1", "codes": [], "disposition": "met", "effective_mode": "observe", "enforced": false }
+    },
+    {
+      "name": "defect field without a response",
+      "body": "defect-no-response.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": {
+        "template": "defect v1",
+        "codes": ["submission.field-missing"],
+        "disposition": "needs-changes",
+        "fields": ["authoritative-basis"],
+        "request_contains": "Fill in the \"Authoritative basis\" section of the issue body."
+      }
+    },
+    {
+      "name": "defect duplicated label",
+      "body": "defect-duplicate-label.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": {
+        "template": "defect v1",
+        "codes": ["submission.field-duplicate"],
+        "disposition": "needs-changes",
+        "fields": ["actual-behavior"],
+        "request_contains": "Keep exactly one \"Actual behavior\" section in the issue body."
+      }
+    },
+    {
+      "name": "defect label inside a fence",
+      "body": "defect-label-in-fence.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": { "template": "defect v1", "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "defect headings inside a comment",
+      "body": "defect-headings-in-comment.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": { "template": "defect v1", "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "defect deleted label",
+      "body": "defect-deleted-label.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": {
+        "template": null,
+        "codes": ["submission.unstructured"],
+        "disposition": "needs-changes",
+        "details": ["issue-form"],
+        "request_contains": "https://github.com/steady-orchard/patch-steward-testbed-public/issues/new/choose"
+      }
+    },
+    {
+      "name": "defect severity wording",
+      "body": "defect-severity.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": { "template": "defect v1", "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "defect injection text",
+      "body": "defect-injection.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": { "template": "defect v1", "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "defect security claim checked",
+      "body": "defect-security-checked.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": { "template": "defect v1", "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "defect security claim unchecked",
+      "body": "defect-security-unchecked.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": { "template": "defect v1", "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "proposal complete",
+      "body": "proposal-complete.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": { "template": "proposal v1", "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "proposal missing benefit",
+      "body": "proposal-missing-benefit.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": {
+        "template": "proposal v1",
+        "codes": ["submission.field-missing"],
+        "disposition": "needs-changes",
+        "fields": ["benefit"]
+      }
+    },
+    {
+      "name": "unstructured issue",
+      "body": "unstructured.txt",
+      "type": "issue",
+      "policy": "template",
+      "expect": {
+        "template": null,
+        "codes": ["submission.unstructured"],
+        "disposition": "needs-changes",
+        "request_contains": "https://github.com/steady-orchard/patch-steward-testbed-public/issues/new/choose"
+      }
+    },
+    {
+      "name": "unstructured issue with free form",
+      "body": "unstructured.txt",
+      "type": "issue",
+      "policy": "free-form",
+      "expect": { "template": null, "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "bugfix complete",
+      "body": "pr-bugfix-complete.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": [],
+        "disposition": "met",
+        "category": "bugfix",
+        "effective_mode": "observe",
+        "enforced": false
+      }
+    },
+    {
+      "name": "pull request missing marker",
+      "body": "pr-missing-marker.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": null,
+        "codes": ["submission.unstructured"],
+        "disposition": "needs-changes",
+        "details": ["pull-request-template"],
+        "request_contains": "https://github.com/steady-orchard/patch-steward-testbed-public/blob/master/.github/pull_request_template.md"
+      }
+    },
+    {
+      "name": "pull request duplicated heading",
+      "body": "pr-duplicate-heading.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.field-duplicate"],
+        "disposition": "needs-changes",
+        "fields": ["problem"]
+      }
+    },
+    {
+      "name": "pull request unknown section",
+      "body": "pr-unknown-section.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": { "template": "pull_request v1", "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "pull request category missing",
+      "body": "pr-category-missing.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.category-missing"],
+        "disposition": "needs-changes",
+        "fields": ["category"],
+        "category": null
+      }
+    },
+    {
+      "name": "pull request category invalid",
+      "body": "pr-category-invalid.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.category-invalid"],
+        "disposition": "needs-changes",
+        "category": null
+      }
+    },
+    {
+      "name": "pull request several categories",
+      "body": "pr-category-several.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": { "template": "pull_request v1", "codes": ["submission.category-invalid"], "disposition": "needs-changes" }
+    },
+    {
+      "name": "docs with a code path",
+      "body": "pr-docs.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/docs-with-code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.category-mismatch"],
+        "disposition": "uncertain",
+        "details": ["docs"],
+        "category": "docs",
+        "enforced": false
+      }
+    },
+    {
+      "name": "docs only",
+      "body": "pr-docs.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/docs-only.json",
+      "expect": { "template": "pull_request v1", "codes": [], "disposition": "met", "category": "docs" }
+    },
+    {
+      "name": "docs renaming a code file",
+      "body": "pr-docs.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/rename-code-to-docs.json",
+      "expect": { "template": "pull_request v1", "codes": ["submission.category-mismatch"], "disposition": "uncertain" }
+    },
+    {
+      "name": "enforced ambiguity",
+      "body": "pr-docs.txt",
+      "type": "pull_request",
+      "policy": "bugfix-enforce",
+      "diff": "diffs/docs-with-code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.category-enforced-ambiguity", "submission.category-mismatch"],
+        "disposition": "uncertain",
+        "enforced": true,
+        "effective_mode": "enforce"
+      }
+    },
+    {
+      "name": "chore touching package.json",
+      "body": "pr-chore.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/package-json.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.execution-sensitive-change"],
+        "disposition": "uncertain",
+        "category": "chore"
+      }
+    },
+    {
+      "name": "chore changing a workflow",
+      "body": "pr-chore.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/workflow.json",
+      "expect": { "template": "pull_request v1", "codes": ["submission.trusted-path-change"], "disposition": "met" }
+    },
+    {
+      "name": "policy change with a valid proposed policy",
+      "body": "pr-chore.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/policy-file.json",
+      "proposed_policy": "proposed-policy-valid.yml",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.policy-change", "submission.trusted-path-change"],
+        "disposition": "met",
+        "details": ["valid"],
+        "proposed_status": "valid",
+        "effective_mode": "observe",
+        "enforced": false
+      }
+    },
+    {
+      "name": "policy change with an invalid proposed policy",
+      "body": "pr-chore.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/policy-file.json",
+      "proposed_policy": "proposed-policy-invalid.txt",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.policy-change", "submission.trusted-path-change"],
+        "disposition": "met",
+        "details": ["invalid"],
+        "proposed_status": "invalid",
+        "proposed_error_code": "policy.unknown-key",
+        "effective_mode": "observe"
+      }
+    },
+    {
+      "name": "policy file deleted",
+      "body": "pr-chore.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/policy-file-deleted.json",
+      "proposed_policy": "removed",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.policy-change", "submission.trusted-path-change"],
+        "disposition": "met",
+        "details": ["removed"],
+        "proposed_status": "removed"
+      }
+    },
+    {
+      "name": "linked issue missing",
+      "body": "pr-linked-issue-missing.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.linked-issue-missing"],
+        "disposition": "needs-changes",
+        "fields": ["linked-issue"],
+        "request_contains": "Name one issue in this repository in the \"Linked issue\" section of the pull request description, for example #123."
+      }
+    },
+    {
+      "name": "linked issue in another repository",
+      "body": "pr-linked-issue-cross-repository.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.linked-issue-invalid"],
+        "disposition": "needs-changes",
+        "details": ["cross-repository"]
+      }
+    },
+    {
+      "name": "several linked issues",
+      "body": "pr-linked-issue-several.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.linked-issue-invalid"],
+        "disposition": "needs-changes",
+        "details": ["several"]
+      }
+    },
+    {
+      "name": "linked issue that is not an issue",
+      "body": "pr-bugfix-complete.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "linked_issue": "not-found",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.linked-issue-invalid"],
+        "disposition": "needs-changes",
+        "details": ["not-an-issue"]
+      }
+    },
+    {
+      "name": "shared head",
+      "body": "pr-bugfix-complete.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "shared_heads": [27],
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.shared-head"],
+        "disposition": "needs-changes",
+        "request_contains": "#27"
+      }
+    },
+    {
+      "name": "diff too large",
+      "body": "pr-bugfix-complete.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "too-large",
+      "expect": { "template": "pull_request v1", "codes": ["submission.diff-too-large"], "disposition": "uncertain" }
+    },
+    {
+      "name": "attachment count",
+      "body": "pr-attachment-count.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.attachment-violation"],
+        "disposition": "needs-changes",
+        "details": ["count"],
+        "request_contains": "Link at most 5 attachments in the pull request description."
+      }
+    },
+    {
+      "name": "attachment format",
+      "body": "pr-attachment-format.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.attachment-violation"],
+        "disposition": "needs-changes",
+        "details": ["format"],
+        "fields": ["reproduction-command"]
+      }
+    },
+    {
+      "name": "attachment destination",
+      "body": "pr-attachment-destination.txt",
+      "type": "pull_request",
+      "policy": "no-legacy-image-host",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.attachment-violation"],
+        "disposition": "needs-changes",
+        "details": ["destination"]
+      }
+    },
+    {
+      "name": "attachment on an approved legacy image host",
+      "body": "pr-attachment-destination.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": { "template": "pull_request v1", "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "attachment scheme",
+      "body": "pr-attachment-scheme.txt",
+      "type": "pull_request",
+      "policy": "template",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": "pull_request v1",
+        "codes": ["submission.attachment-violation"],
+        "disposition": "needs-changes",
+        "details": ["scheme"]
+      }
+    },
+    {
+      "name": "unstructured pull request with free form",
+      "body": "unstructured.txt",
+      "type": "pull_request",
+      "policy": "free-form",
+      "diff": "diffs/docs-only.json",
+      "expect": { "template": null, "codes": [], "disposition": "met" }
+    },
+    {
+      "name": "unstructured pull request with free form and code changes",
+      "body": "unstructured.txt",
+      "type": "pull_request",
+      "policy": "free-form",
+      "diff": "diffs/code.json",
+      "expect": {
+        "template": null,
+        "codes": ["submission.linked-issue-missing"],
+        "disposition": "needs-changes",
+        "details": ["free-form"],
+        "request_contains": "https://github.com/steady-orchard/patch-steward-testbed-public/blob/master/.github/pull_request_template.md"
+      }
+    }
+  ]
+}

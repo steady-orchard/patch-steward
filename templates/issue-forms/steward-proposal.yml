@@ -1,0 +1,46 @@
+name: Change proposal
+description: Propose a feature or design change before implementing it.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem and why solving it is worth adopting and maintaining the change.
+
+        Maintainers assess severity and priority. This form has no severity field, and severity wording in any field does not change screening.
+
+        Do not report security vulnerabilities here; use the project's private vulnerability reporting channel.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: The problem this proposal addresses.
+    validations:
+      required: true
+  - type: textarea
+    id: benefit
+    attributes:
+      label: Benefit
+      description: Why the change is worth adopting and maintaining.
+    validations:
+      required: true
+  - type: textarea
+    id: existing-decision
+    attributes:
+      label: Existing decision
+      description: Optional. A recorded decision this proposal would change, and why it should change.
+    validations:
+      required: false
+  - type: textarea
+    id: proposed-scope
+    attributes:
+      label: Proposed scope
+      description: What the change covers and what it leaves out.
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Optional. Related issues, pull requests, documents, or specifications.
+    validations:
+      required: false

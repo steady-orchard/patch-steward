@@ -1,7 +1,11 @@
 # Patch Steward Processes
 
 **Status:** design document. Apart from policy loading and validation and the
-`steward policy` command (SP01), nothing described here is implemented. Each
+`steward policy` command (SP01), the deterministic part of `steward preflight`
+(SP05 CLI steps 1–2), and the deterministic contract check of SP06 steps 3–7
+with the submission capture it needs (without the merge-group branch,
+stored-validation reuse, or the author-response ledger), which no workflow runs
+yet, nothing described here is implemented. Each
 process below runs on the components defined in
 [architecture.md](architecture.md) and addresses numbered issues from the
 [problem statement](problem-statement.md). Methodology comes from the
@@ -14,23 +18,23 @@ components and boundaries and this document governs steps and behavior.
 
 ### 0.1 Vocabulary
 
-| Term                     | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Evidence                 | A record of a steward-controlled execution or reference check with verified provenance. It records observations, not proof that submitted code or its test output is honest.                                                                                                                                                                                                                                                                                                         |
-| Signal                   | An external result, such as project CI. Policy may allow it to supplement platform coverage after source, commit, environment, and integrity checks; its provenance remains a signal (architecture §4).                                                                                                                                                                                                                                                                              |
-| Claim                    | Anything a contributor states or produces, including preflight output. Never admissible; it tells the steward what to verify.                                                                                                                                                                                                                                                                                                                                                        |
-| Finding                  | A typed statement with severity `blocking`, `uncertain`, `advisory`, or `speculative`. Blocking findings carry a scenario, a location, evidence, and a validated requirement. Only required unresolved decisions are `uncertain`.                                                                                                                                                                                                                                                    |
-| Outcome                  | One of `pass`, `needs-changes`, `uncertain`, `inconclusive`, `overridden`, `superseded`.                                                                                                                                                                                                                                                                                                                                                                                             |
-| Trusted path             | A workflow, policy, runner, or CI control path whose change prevents reliance on PR-controlled CI. Unchanged paths establish neither test completeness nor result-file integrity.                                                                                                                                                                                                                                                                                                    |
-| Execution-sensitive path | Package scripts, build/test configuration, reporters, shared helpers, harness code, or a policy-listed execution dependency. Changes require triage even when a trusted container run passes.                                                                                                                                                                                                                                                                                        |
-| Session                  | A bounded model interaction with a response schema and stage identity. A (claim), B (challenge), and C (responsiveness) are context-isolation roles, not the complete call count. Extraction, output interpretation, design/impact analysis, hygiene, repairs, and preflight use separately budgeted sessions; no auxiliary session carries author prose or A/C history into B.                                                                                                      |
-| Required evidence        | The items the policy requires from the contributor for the category: fields, references, a reproduction with its command, a declared regression test. Their absence is `needs-changes`; steward-side failures are `inconclusive`.                                                                                                                                                                                                                                                    |
-| Flag                     | A report annotation from hygiene heuristics (SP16). Flags are not findings, carry no severity, and never affect the outcome.                                                                                                                                                                                                                                                                                                                                                         |
-| Trusted branch           | The repository's default branch, which holds the policy and the workflow definitions that trusted triggers use.                                                                                                                                                                                                                                                                                                                                                                      |
-| Snapshot                 | Repository, head/base commits or issue content hash, target, body and linked-issue/attachment hashes, persistent author-response ids and hashes keyed to stable request ids (SP14), open PRs sharing the head, and the policy revision (the git tree id of the policy directory, SP01). `gate` records it; `publish` recomputes it. Provider/model/adapter/steward/runner identities are separate run provenance.                                                                    |
-| Ownership record         | Immutable artifact uploaded after authentication, deduplication, admission decisions, and successful check creation (if active). Upload commits ownership: check id or null, run/attempt, snapshot hash and policy revision, waiting/runnable disposition, creation time. Only committed artifacts order owners. An unchanged-input duplicate never replaces an active owner; explicit reruns can. Publication requires current inputs, its own check, and no later committed owner. |
-| Repository gate          | Active when any category is in `advise` or `enforce` or a ruleset requires the steward check. Only then does `gate` create check runs; an all-observe repository without a required check has no checks, and ownership rests on the ownership record.                                                                                                                                                                                                                                |
-| Deterministic            | Computed by rules, parsing, or search without model judgment.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Term                     | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence                 | A record of a steward-controlled execution or reference check with verified provenance. It records observations, not proof that submitted code or its test output is honest.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Signal                   | An external result, such as project CI. Policy may allow it to supplement platform coverage after source, commit, environment, and integrity checks; its provenance remains a signal (architecture §4).                                                                                                                                                                                                                                                                                                                                                                                        |
+| Claim                    | Anything a contributor states or produces, including preflight output. Never admissible; it tells the steward what to verify.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Finding                  | A typed statement with severity `blocking`, `uncertain`, `advisory`, or `speculative`. Blocking findings carry a scenario, a location, evidence, and a validated requirement. Only required unresolved decisions are `uncertain`.                                                                                                                                                                                                                                                                                                                                                              |
+| Outcome                  | One of `pass`, `needs-changes`, `uncertain`, `inconclusive`, `overridden`, `superseded`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Trusted path             | A workflow, policy, runner, or CI control path whose change prevents reliance on PR-controlled CI. Unchanged paths establish neither test completeness nor result-file integrity.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Execution-sensitive path | Package scripts, build/test configuration, reporters, shared helpers, harness code, or a policy-listed execution dependency. Changes require triage even when a trusted container run passes.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Session                  | A bounded model interaction with a response schema and stage identity. A (claim), B (challenge), and C (responsiveness) are context-isolation roles, not the complete call count. Extraction, output interpretation, design/impact analysis, hygiene, repairs, and preflight use separately budgeted sessions; no auxiliary session carries author prose or A/C history into B.                                                                                                                                                                                                                |
+| Required evidence        | The items the policy requires from the contributor for the category: fields, references, a reproduction with its command, a declared regression test. Their absence is `needs-changes`; steward-side failures are `inconclusive`.                                                                                                                                                                                                                                                                                                                                                              |
+| Flag                     | A report annotation from hygiene heuristics (SP16). Flags are not findings, carry no severity, and never affect the outcome.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Trusted branch           | The repository's default branch, which holds the policy and the workflow definitions that trusted triggers use.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Snapshot                 | Repository, head commit or issue content hash, target branch (base ref), body and linked-issue/attachment hashes, persistent author-response ids and hashes keyed to stable request ids (SP14), open PRs sharing the head, and the policy revision (the git tree id of the policy directory, SP01). `gate` records it; `publish` recomputes it. The base commit is recorded with the snapshot but does not enter snapshot comparison, so base-branch movement never supersedes a run (architecture invariant 8). Provider/model/adapter/steward/runner identities are separate run provenance. |
+| Ownership record         | Immutable artifact uploaded after authentication, deduplication, admission decisions, and successful check creation (if active). Upload commits ownership: check id or null, run/attempt, snapshot hash and policy revision, waiting/runnable disposition, creation time. Only committed artifacts order owners. An unchanged-input duplicate never replaces an active owner; explicit reruns can. Publication requires current inputs, its own check, and no later committed owner.                                                                                                           |
+| Repository gate          | Active when any category is in `advise` or `enforce` or a ruleset requires the steward check. Only then does `gate` create check runs; an all-observe repository without a required check has no checks, and ownership rests on the ownership record.                                                                                                                                                                                                                                                                                                                                          |
+| Deterministic            | Computed by rules, parsing, or search without model judgment.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### 0.2 Rules that apply to every process
 
@@ -130,7 +134,12 @@ Steps:
    unavailable, an accepted limitation that SP02 step 8 reports. The PR
    is screened under the current trusted-branch policy; the report flags the
    proposed change and reports validation results for the proposed file as
-   data, without applying it.
+   data, without applying it. Any changed path under `.github/patch-steward/`
+   sets the flag, the advisory finding `submission.policy-change`, which never
+   changes the contract result by itself; the proposed `policy.yml` at the head
+   commit is validated like any policy and reported as `valid` with its
+   revision, `invalid` with its revision and bounded, escaped errors, or
+   `removed` when the directory or `policy.yml` is gone.
 3. On merge, the new revision governs subsequent runs. The
    revision is the git tree id of the policy directory (`.github/patch-steward/`) at the trusted commit, read from git
    objects (`git rev-parse <commit>:.github/patch-steward`; one GitHub API call in Actions). Any content, file, or
@@ -476,9 +485,16 @@ Browser assistant steps:
 
 CLI steps:
 
-1. Detect the upstream repository and fetch the policy from its trusted
-   branch.
-2. Parse the local draft and run the contract check exactly as SP06 does.
+1. Detect the upstream repository (`--repo`, else the `upstream` remote, else
+   `origin`) and read the policy from its default branch through the GitHub API,
+   without a git fetch. Without a published policy, the policy template's
+   resolved policy serves as the default checklist.
+2. Parse the local draft, a Markdown file in the rendered issue-form or
+   PR-template layout, and run the contract check exactly as SP06 does. For a
+   PR, the changed paths are the committed changes between the merge base of the
+   base ref and `HEAD`; the linked issue's existence is read through the GitHub
+   API; attachments are checked statically and never fetched; there is no
+   snapshot and no shared-head check.
 3. Run the mandatory commands on the contributor's machine without a sandbox.
    For a declared regression test, run it against a temporary checkout of the
    base commit and against the branch to preview the before-and-after result.
@@ -490,15 +506,23 @@ CLI steps:
    reviewer would ask, so the contributor can answer them in the submission
    (P06). Steps 1 to 3 need no inference account.
 5. Print the preflight report marked as produced on the contributor's machine
-   and unverified. The contributor may paste its summary into the submission;
-   the steward treats it as a claim.
+   and unverified, with exit status `0` when the contract is met and `1` for
+   `needs-changes` or `uncertain`. The contributor may paste its summary into the
+   submission; the steward treats it as a claim.
 
-Controls: no writes to GitHub; the inference credential is used only for the
+Controls: no writes to GitHub; the GitHub token, resolved from `GH_TOKEN`,
+`GITHUB_TOKEN`, or `gh auth token`, is never stored or printed; the inference
+credential is used only for the
 selected adapter and only after the disclosure; no telemetry leaves the
 contributor's machine or browser.
 
 Failure handling: a project without a published policy gets the default
-checklist from the steward template.
+checklist from the steward template. A published but invalid policy is never
+replaced by the default: the CLI exits with status `2` and prints the validation
+errors. Usage errors, an unreadable or oversize draft, a missing upstream remote,
+an unresolvable base, GitHub or git failures, and an `inconclusive` contract
+result also exit with status `2`; reading a missing or private repository without
+a token asks for one.
 
 Measures: none collected client-side; the contract pass rate at first
 submission (SP06) indicates preflight effectiveness.
@@ -555,37 +579,101 @@ Steps:
 
 3. Parse using a versioned mapping from unique rendered issue-form labels or
    PR headings to canonical fields. GitHub omits form `id` attributes from the
-   submitted Markdown; those ids serve URL prefilling only. Retain mappings
-   for supported template versions and reject ambiguous/duplicate fields with
-   a correction request. An unrecognized structure is treated as unstructured;
-   unless the policy sets `submission.free_form: true` (default `false`), the outcome is
-   `needs-changes` with a link to the assistant and template.
+   submitted Markdown; those ids serve URL prefilling only. Headings inside
+   fenced code blocks and HTML comments are ignored. An issue body matches a form
+   version when every label of that version appears as a `###` heading; versions
+   are tried newest first, the defect form before the proposal form, and other
+   headings are field content. A PR body names its template version only in the
+   marker line `<!-- patch-steward:pr-template v1 -->`; each known `##` heading,
+   compared case-insensitively, starts a field, and an unknown `##` heading ends
+   it. A field's value runs to the next such heading and is trivial when, after
+   normalization, it is empty or one of `_No response_`, `N/A`, `NA`, `none`, `-`,
+   `TBD`, `TODO`, or `...`. Retain mappings for supported template versions and
+   reject a duplicated field with a correction request
+   (`submission.field-duplicate`). An unrecognized structure is treated as
+   unstructured; unless the policy sets `submission.free_form: true` (default
+   `false`), the outcome is `needs-changes` (`submission.unstructured`) with a
+   link to the template (the repository's issue-form chooser for an issue, the
+   installed PR template for a PR) and, once it exists, to the submission
+   assistant. With `free_form: true`, no field rule applies, the category comes
+   from the diff alone, and attachment, path, shared-head, and linkage rules
+   still apply.
 4. Determine the category from the declared field and check it against the
-   diff; a mismatch (for example `docs` with code changes) is `uncertain`.
-   When any plausible category is enforced, ambiguity requires triage under
-   the enforced gate; a contributor cannot select an unenforced category to
-   bypass it. Once `gate` establishes that a PR is outside enforcement,
+   diff. The `Category` value must be exactly one category id, optionally in
+   backticks and in any letter case: an empty value is
+   `submission.category-missing` and anything else `submission.category-invalid`,
+   both `needs-changes`. Each changed path, including both sides of a rename or
+   copy, gets one built-in class, first match wins: test, docs, infra
+   (configuration, CI, dependencies, tooling, and every trusted or
+   execution-sensitive path), or code; the configuration reference lists the
+   patterns. `docs` is consistent with a diff whose paths are all docs or test,
+   at least one docs; `chore` with a diff without code paths and with at least
+   one docs or infra path; `bugfix`, `feature`, `refactor`, and `security` with a
+   diff that has a code path; an empty diff is consistent with no category. A
+   declared category the diff is not consistent with is a mismatch
+   (`submission.category-mismatch`, `uncertain`), for example `docs` with code
+   changes. The plausible categories are the consistent ones plus a valid
+   declared one, and the category is ambiguous when the declaration is absent,
+   invalid, or mismatched. The effective mode of a PR is the strictest mode
+   (`enforce`, then `advise`, then `observe`) over its plausible categories, or
+   over every category when none is plausible; an issue uses `modes.default`.
+   When any plausible category (every category when none is plausible) is
+   enforced, ambiguity requires triage under the enforced gate
+   (`submission.category-enforced-ambiguity`, `uncertain`); a contributor cannot
+   select an unenforced category to bypass it. A diff of more than 3000 changed
+   paths cannot be classified: it is `submission.diff-too-large` (`uncertain`),
+   every category stays plausible, and both path flags of step 6 are set. Once `gate` establishes that a PR is outside enforcement,
    complete its committed repository-wide gate check as neutral "not enforced"
    before shadow screening only if it is neither queued/awaiting-approval nor
    shared-head blocked (architecture §10). Later shadow/evidence failures cannot block that
    category. Issues without a diff use the declared type and claim contract.
-5. Contract check per category: required fields present and non-trivial;
-   severity assertions are ignored;
+5. Contract check per category: required fields present and non-trivial
+   (`submission.field-missing`; the policy's
+   `categories.<category>.required_fields` for PRs and
+   `submission.issue_fields.<kind>` for issues); severity assertions are ignored;
    reference requirements are noted for SP07. Reproduction files arrive as
-   fenced code blocks in the submission or as files attached to it. Enforce
+   fenced code blocks in the submission or as files attached to it. An
+   attachment is a URL in a field with a GitHub attachment shape
+   (`https://github.com/user-attachments/files/<id>/<name>`,
+   `https://github.com/user-attachments/assets/<id>`,
+   `https://github.com/<owner>/<repo>/files/<id>/<name>`, or any URL on
+   `user-images.githubusercontent.com` or
+   `private-user-images.githubusercontent.com`) or on a destination the project
+   added; it is required when its field is one the policy requires, and every
+   attachment of an unstructured free-form body is required. Enforce
    policy/hard limits on count, per-file and total bytes, redirects, fetch
    time, and decompressed size. Allow only approved public HTTPS destinations
    with no private/link-local redirects or forwarded credentials; hash bytes
-   before handoff. Size/format violations request changes; required fetch
-   failure is inconclusive.
-6. Compare trusted and execution-sensitive paths between base and head.
-   Control-path changes prevent reliance on PR-controlled CI. Changes to
-   package scripts, build/test configuration, reporters, shared test helpers,
-   and other execution-sensitive paths add a required maintainer-triage finding
-   even if container runs pass. Flag proposed policy changes without applying
-   them. These checks mitigate manipulation; unchanged paths do not prove
-   result integrity.
-7. Linkage (PRs): reuse only a stored successful validation, not an intermediate
+   before handoff. The format is the extension of the URL's last path segment,
+   or of the final redirect URL when the first has none, and must be an
+   approved format; images are hashed, never decoded, and zip and gzip archives
+   are inspected under the decompression bound, never extracted. Size, format,
+   destination, redirect, and archive violations request changes
+   (`submission.attachment-violation`, whose detail names the rule: `count`,
+   `destination`, `scheme`, `userinfo`, `format`, `file-bytes`, `total-bytes`,
+   `redirects`, `archive`, or `decompressed-bytes`). A fetch failure (DNS, a
+   non-public address, TLS, a timeout, or a non-success status, including the
+   one an attachment behind authentication returns) is `inconclusive` for a
+   required attachment (cause `attachment-fetch-failed`) and the advisory
+   finding `submission.attachment-unavailable` for an optional one.
+6. Compare trusted and execution-sensitive paths between base and head, using
+   the built-in lists plus the policy's `trusted_paths.additional` and
+   `execution_sensitive_paths.additional`. Control-path changes prevent reliance
+   on PR-controlled CI; they set the trusted-path flag and add the advisory
+   finding `submission.trusted-path-change`. Changes to package scripts,
+   build/test configuration, reporters, shared test helpers, and other
+   execution-sensitive paths add a required maintainer-triage finding
+   (`submission.execution-sensitive-change`, `uncertain`) even if container runs
+   pass. Flag proposed policy changes without applying them
+   (`submission.policy-change`, advisory; SP01 step 2). These checks mitigate
+   manipulation; unchanged paths do not prove result integrity.
+7. Linkage (PRs): the `Linked issue` field names exactly one issue in this
+   repository (`#<n>`, `<owner>/<repo>#<n>`, or the issue's URL, optionally after
+   a closing keyword). A missing reference where the category requires one is
+   `submission.linked-issue-missing`; several references, another repository,
+   an unreadable value, or a number that is not an existing issue is
+   `submission.linked-issue-invalid`; both are `needs-changes`. Reuse only a
+   stored successful validation, not an intermediate
    classification. It must match current issue body/attachment/evidence hashes,
    policy revision, applicable supported version/target branch, and validated
    claim scope; every required reproduction must have succeeded, with evidence
@@ -596,7 +684,13 @@ Steps:
    or (for PR intent acceptance only) the canonical claim-scope hash and target; otherwise request fresh maintainer action. If a validated issue
    is required but absent, request one. Prior negative classifications are
    context, not automatic rejection of an edited claim.
-8. Early exit: contract failures, over-cap runs, and runs awaiting inference
+8. Early exit: the deterministic contract result is `needs-changes` when another
+   open PR shares the head commit (`submission.shared-head`) or a blocking
+   finding exists, else `inconclusive` when a required read or fetch failed, else
+   `uncertain` when an `uncertain` finding exists, else the contract is met; it is
+   never `pass`. Each blocking finding carries a numbered request that names the
+   field or rule and the body field to edit. Contract failures, over-cap runs,
+   and runs awaiting inference
    admission end before any model call or steward execution. The run skips
    straight to `publish`, which records evidence and publishes `needs-changes`,
    the queued state, or the awaiting-approval state through SP13.
@@ -608,12 +702,17 @@ Steps:
    platform expectations, the source for each (container evidence or CI
    signal), and whether a stored baseline exists for the base commit (SP12).
 
-Controls: deterministic parsing; no model call in this process; if `gate`
+Controls: deterministic parsing; no model call and no execution in this
+process; no author identity, account history, AI-assistance disclosure, or
+severity statement is a contract input; if `gate`
 cannot create the check run, the run stops before ownership commitment and reports that
 the previous certification still stands (SP19).
 
 Failure handling: GitHub API unavailable ends the run `inconclusive`; a
-malformed template ends it `needs-changes` with the template link.
+malformed template ends it `needs-changes` with the template link. A body read
+from GitHub that exceeds GitHub's own 65536-character limit or is not
+well-formed Unicode is a malformed response and ends the run `inconclusive`; it
+never produces a request to shorten the text.
 
 Measures: contract pass rate at first submission; time to first report;
 distribution of contract failures.

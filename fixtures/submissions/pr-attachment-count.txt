@@ -1,0 +1,56 @@
+<!-- patch-steward:pr-template v1 -->
+
+## Category
+
+bugfix
+
+## Problem
+
+`widget parse` exits with status 1 on an empty file.
+
+## Benefit
+
+Empty files parse like any other valid document.
+
+## Intended behavior
+
+An empty file parses to an empty document and exits with status 0.
+
+## Acceptance criteria
+
+- `widget parse empty.txt` prints `[]`.
+- Exit status is 0.
+
+## Linked issue
+
+Fixes #29
+
+## Regression test
+
+`src/parse.test.ts`, test `parses an empty file`
+
+## Test scaffolding
+
+<!-- Non-test files the regression test needs. -->
+
+## Reproduction command
+
+```shell
+touch empty.txt
+widget parse empty.txt
+```
+
+[case-1.txt](https://github.com/user-attachments/files/1000001/case-1.txt)
+[case-2.txt](https://github.com/user-attachments/files/1000002/case-2.txt)
+[case-3.txt](https://github.com/user-attachments/files/1000003/case-3.txt)
+[case-4.txt](https://github.com/user-attachments/files/1000004/case-4.txt)
+[case-5.txt](https://github.com/user-attachments/files/1000005/case-5.txt)
+[case-6.txt](https://github.com/user-attachments/files/1000006/case-6.txt)
+
+## Expected result
+
+Exit status 0 and the output `[]`.
+
+## References
+
+docs/format.md

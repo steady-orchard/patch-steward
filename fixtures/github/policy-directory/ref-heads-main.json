@@ -1,0 +1,10 @@
+{
+  "ref": "refs/heads/main",
+  "node_id": "REF_example",
+  "url": "https://api.github.com/repos/example-owner/example-repo/git/refs/heads/main",
+  "object": {
+    "sha": "0123456789abcdef0123456789abcdef01234567",
+    "type": "commit",
+    "url": "https://api.github.com/repos/example-owner/example-repo/git/commits/0123456789abcdef0123456789abcdef01234567"
+  }
+}

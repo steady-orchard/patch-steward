@@ -1,0 +1,13 @@
+[
+  {
+    "name": "workflows",
+    "path": ".github/workflows",
+    "sha": "baf268a28f2dc267519d1cf0d31ae038747badd0",
+    "size": 0,
+    "url": "https://api.github.com/repos/example-owner/example-repo/contents/.github/workflows?ref=0123456789abcdef0123456789abcdef01234567",
+    "html_url": "https://github.com/example-owner/example-repo/tree/0123456789abcdef0123456789abcdef01234567/.github/workflows",
+    "git_url": "https://api.github.com/repos/example-owner/example-repo/git/trees/baf268a28f2dc267519d1cf0d31ae038747badd0",
+    "download_url": null,
+    "type": "dir"
+  }
+]

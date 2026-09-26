@@ -4,9 +4,12 @@
 
 The policy file format is available: the core loads, validates, and resolves a
 policy, and [`steward policy`](commands.md#steward-policy-available) checks one
-from the command line. No screening stage reads the policy yet, so sections
-marked Proposed describe settings whose effects are not implemented. [Policy
-keys](#policy-keys-available) lists every key.
+from the command line. The deterministic submission contract check, which
+`steward preflight` runs, reads the trusted and execution-sensitive paths,
+categories, submission settings, modes, and GitHub and attachment limits. No
+screening stage runs yet, so sections marked Proposed describe settings whose
+effects are not implemented. [Policy keys](#policy-keys-available) lists every
+key.
 
 ## Policy file and revision (Available)
 
@@ -175,10 +178,66 @@ Ids are unique within each list. No version-1 policy key references these ids.
 
 ### Trusted and execution-sensitive paths
 
-| Key                                    | Value         | Notes                                                                                                                                                        |
-| -------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `trusted_paths.additional`             | list of globs | Added to the built-in trusted list that always applies: workflow definitions, wrapper workflows, the policy directory, the runner directory, CI scripts.     |
-| `execution_sensitive_paths.additional` | list of globs | Added to the built-in execution-sensitive list that always applies: package scripts, build/test configuration, reporters, shared test helpers, harness code. |
+| Key                                    | Value         | Notes                                                                                                       |
+| -------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `trusted_paths.additional`             | list of globs | Added to the [built-in trusted paths](#built-in-trusted-paths), which always apply.                         |
+| `execution_sensitive_paths.additional` | list of globs | Added to the [built-in execution-sensitive paths](#built-in-execution-sensitive-paths), which always apply. |
+
+#### Glob syntax
+
+Every glob in the policy and in the built-in lists below uses one syntax. Paths
+are repository-relative POSIX paths, compared case-sensitively. A pattern
+without `/` matches the last path segment at any depth; a pattern with `/` is
+anchored at the repository root. `**` as a whole segment matches zero or more
+segments; `*` matches any run of characters except `/`, including a leading
+`.`; `?` matches one character except `/`; every other character is literal, so
+there are no braces, brackets, or negation. Matching never builds a regular
+expression from pattern text.
+
+#### Built-in trusted paths
+
+A changed path that matches one of these patterns, or a
+`trusted_paths.additional` entry, prevents reliance on PR-controlled CI: it sets
+the submission's trusted-path flag and adds the advisory finding
+`submission.trusted-path-change`.
+
+`.github/workflows/**`, `.github/actions/**`, `action.yml`, `action.yaml`,
+`.github/patch-steward/**`, `CODEOWNERS`, `.github/scripts/**`,
+`.gitlab-ci.yml`, `.gitlab/ci/**`, `.circleci/**`, `.travis.yml`,
+`azure-pipelines.yml`, `azure-pipelines.yaml`, `.azure-pipelines/**`,
+`.buildkite/**`, `Jenkinsfile`, `.drone.yml`, `.woodpecker.yml`,
+`.woodpecker/**`, `appveyor.yml`, `.appveyor.yml`, `bitbucket-pipelines.yml`,
+`cloudbuild.yaml`, `cloudbuild.yml`, `ci/**`, `.ci/**`
+
+#### Built-in execution-sensitive paths
+
+A changed path that matches one of these patterns, or an
+`execution_sensitive_paths.additional` entry, adds the finding
+`submission.execution-sensitive-change` (`uncertain`): maintainer triage is
+required even when container runs pass. A path may match both lists. A diff of
+more than 3000 changed paths cannot be checked path by path; it sets both flags
+and adds `submission.diff-too-large` (`uncertain`). Known false positives, which
+cost triage and never a rejection: `scripts/**` and `**/harness/**` can hold
+product code, and `.clang-format` and `.prettierrc*` affect formatting only.
+
+| Group                                                                             | Patterns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| JavaScript and TypeScript manifests, lockfiles, and package-manager configuration | `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.pnpmfile.cjs`, `yarn.lock`, `.yarnrc`, `.yarnrc.yml`, `.npmrc`, `bun.lock`, `bun.lockb`, `deno.json`, `deno.jsonc`, `deno.lock`                                                                                                                                                                                                                                                          |
+| JavaScript and TypeScript build and test configuration                            | `tsconfig*.json`, `jsconfig*.json`, `vitest.config.*`, `vitest.workspace.*`, `vite.config.*`, `jest.config.*`, `babel.config.*`, `.babelrc`, `.babelrc.*`, `karma.conf.*`, `.mocharc*`, `playwright.config.*`, `cypress.config.*`, `webpack.config.*`, `rollup.config.*`, `esbuild.config.*`, `.swcrc`, `nx.json`, `turbo.json`, `lerna.json`, `.nycrc*`, `eslint.config.*`, `.eslintrc*`, `prettier.config.*`, `.prettierrc*`                                                                  |
+| Rust                                                                              | `Cargo.toml`, `Cargo.lock`, `build.rs`, `rust-toolchain`, `rust-toolchain.toml`, `**/.cargo/**`, `clippy.toml`, `.clippy.toml`, `deny.toml`, `rustfmt.toml`, `.rustfmt.toml`, `.config/nextest.toml`                                                                                                                                                                                                                                                                                            |
+| C and C++                                                                         | `CMakeLists.txt`, `*.cmake`, `CMakePresets.json`, `CMakeUserPresets.json`, `vcpkg.json`, `vcpkg-configuration.json`, `conanfile.py`, `conanfile.txt`, `meson.build`, `meson_options.txt`, `meson.options`, `Makefile`, `makefile`, `GNUmakefile`, `*.mk`, `configure`, `configure.ac`, `Makefile.am`, `Makefile.in`, `.clang-tidy`, `.clang-format`, `*.vcxproj`, `*.vcxproj.filters`                                                                                                           |
+| Go                                                                                | `go.mod`, `go.sum`, `go.work`, `go.work.sum`, `.golangci.*`                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Python                                                                            | `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements*.txt`, `constraints*.txt`, `Pipfile`, `Pipfile.lock`, `poetry.lock`, `uv.lock`, `pdm.lock`, `tox.ini`, `noxfile.py`, `pytest.ini`, `conftest.py`, `mypy.ini`, `.mypy.ini`, `ruff.toml`, `.ruff.toml`, `.pylintrc`, `pylintrc`, `.flake8`                                                                                                                                                                                               |
+| Ruby                                                                              | `Gemfile`, `Gemfile.lock`, `*.gemspec`, `Rakefile`, `.rspec`, `.rubocop.yml`, `spec_helper.rb`, `rails_helper.rb`, `test_helper.rb`                                                                                                                                                                                                                                                                                                                                                             |
+| JVM                                                                               | `pom.xml`, `build.gradle`, `build.gradle.kts`, `settings.gradle`, `settings.gradle.kts`, `gradle.properties`, `gradlew`, `gradlew.bat`, `gradle/**`, `.mvn/**`                                                                                                                                                                                                                                                                                                                                  |
+| .NET                                                                              | `*.csproj`, `*.fsproj`, `*.vbproj`, `*.sln`, `*.props`, `*.targets`, `global.json`, `nuget.config`, `NuGet.Config`, `packages.lock.json`, `.config/dotnet-tools.json`                                                                                                                                                                                                                                                                                                                           |
+| PHP and Elixir                                                                    | `composer.json`, `composer.lock`, `phpunit.xml`, `phpunit.xml.dist`, `mix.exs`, `mix.lock`                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Bazel                                                                             | `BUILD`, `BUILD.bazel`, `WORKSPACE`, `WORKSPACE.bazel`, `MODULE.bazel`, `*.bzl`, `.bazelrc`, `.bazelversion`                                                                                                                                                                                                                                                                                                                                                                                    |
+| Containers                                                                        | `Dockerfile`, `Dockerfile.*`, `*.dockerfile`, `docker-compose.yml`, `docker-compose.yaml`, `compose.yml`, `compose.yaml`                                                                                                                                                                                                                                                                                                                                                                        |
+| Repository mechanics                                                              | `.gitmodules`, `.gitattributes`                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Reporters                                                                         | `**/reporters/**`, `**/reporter/**`, `*reporter.config.*`                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Shared test helpers and harness code                                              | `**/test/helpers/**`, `**/tests/helpers/**`, `**/test/support/**`, `**/tests/support/**`, `**/spec/support/**`, `**/spec/helpers/**`, `**/test-utils/**`, `**/test_utils/**`, `**/testutils/**`, `**/test-helpers/**`, `**/test_helpers/**`, `**/tests/common/**`, `**/cypress/support/**`, `**/harness/**`, `**/test-harness/**`, `setupTests.*`, `test-setup.*`, `test_setup.*`, `vitest.setup.*`, `jest.setup.*`, `global-setup.*`, `globalSetup.*`, `global-teardown.*`, `globalTeardown.*` |
+| Scripts                                                                           | `scripts/**`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ### Categories
 
@@ -193,6 +252,40 @@ All six category keys are required under `categories`: `bugfix`, `feature`,
 | `categories.<category>.reproduction`    | `required`, `optional`, or `not-applicable` |                                                                                                                                                                                                          |
 | `categories.<category>.regression_test` | `required` or `not-applicable`              | Must match whether `fix-verification` is listed in `stages.per_category.<category>` (`policy.stage-conflict`).                                                                                           |
 
+#### Category consistency
+
+Screening checks a pull request's declared category against its changed paths
+with built-in path classes; no policy key changes them. Each changed path,
+including both sides of a rename or copy, gets exactly one class: the first of
+these that matches.
+
+| Class | Patterns                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| test  | `**/test/**`, `**/tests/**`, `**/__tests__/**`, `**/spec/**`, `**/specs/**`, `**/testdata/**`, `**/test-data/**`, `**/fixtures/**`, `**/__fixtures__/**`, `**/__snapshots__/**`, `**/__mocks__/**`, `**/testing/**`, `*.test.*`, `*.spec.*`, `*_test.*`, `*_tests.*`, `*_unittest.*`, `test_*.py`, `*_spec.rb`, `*Test.java`, `*Tests.java`, `*Test.kt`, `*Tests.kt`, `*Test.cs`, `*Tests.cs`, `conftest.py`                                                                                                 |
+| docs  | `*.md`, `*.mdx`, `*.markdown`, `*.rst`, `*.adoc`, `*.asciidoc`, `*.rdoc`, `docs/**`, `doc/**`, `documentation/**`, `man/**`, `README`, `README.*`, `CHANGELOG`, `CHANGELOG.*`, `CHANGES`, `CHANGES.*`, `HISTORY`, `HISTORY.*`, `NEWS`, `NEWS.*`, `CONTRIBUTING`, `CONTRIBUTING.*`, `CODE_OF_CONDUCT`, `CODE_OF_CONDUCT.*`, `SECURITY.*`, `SUPPORT.*`, `AUTHORS`, `AUTHORS.*`, `CONTRIBUTORS`, `CONTRIBUTORS.*`, `LICENSE`, `LICENSE.*`, `LICENCE`, `LICENCE.*`, `COPYING`, `COPYING.*`, `NOTICE`, `NOTICE.*` |
+| infra | Every built-in trusted and execution-sensitive pattern, plus `.github/**`, `.*` (dotfiles at any depth), `**/.*/**` (anything inside a dot-directory), `*.yml`, `*.yaml`, `*.toml`, `*.ini`, `*.cfg`, `*.conf`, `*.properties`, `*.lock`, `scripts/**`, `script/**`, `tools/**`, `tooling/**`                                                                                                                                                                                                                |
+| code  | Any path that no earlier class matches                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+
+A declared category is consistent with the changed paths when:
+
+- `docs`: every path is docs or test, and at least one is docs.
+- `chore`: no path is code, and at least one is docs or infra.
+- `bugfix`, `feature`, `refactor`, `security`: at least one path is code.
+- An empty diff is consistent with no category.
+
+A declared category that is not consistent is `submission.category-mismatch`
+(`uncertain`). The plausible categories are the consistent ones plus a valid
+declared one. When the declaration is absent, invalid, or mismatched, and any
+plausible category (every category when none is plausible) is in `enforce`, the
+result also carries `submission.category-enforced-ambiguity` (`uncertain`,
+enforced). The effective mode of a pull request is the strictest mode over its
+plausible categories (every category when none is plausible); an issue uses
+`modes.default`. A mismatch is never a
+rejection. Known limits: JSON files fall to code, so a docs change that touches
+only `*.json` files is a mismatch; `*.yml`, `*.yaml`, and `*.toml` files are
+infra even where a project treats them as product source; `tools/**` may hold
+product code; `.github/CONTRIBUTING.md` is docs, because docs comes before infra.
+
 ### Submission
 
 | Key                                    | Value                       | Notes                                                                                                                                                                                      |
@@ -201,17 +294,188 @@ All six category keys are required under `categories`: `bugfix`, `feature`,
 | `submission.issue_fields.proposal`     | list of proposal field ids  | Field ids: `problem`, `benefit`, `existing-decision`, `proposed-scope`, `references`.                                                                                                      |
 | `submission.reference_hosts.mode`      | `any-public` or `allowlist` |                                                                                                                                                                                            |
 | `submission.reference_hosts.allowlist` | list of hostnames           | Used when `mode` is `allowlist`.                                                                                                                                                           |
-| `submission.attachments.destinations`  | list of hostnames           | Approved public HTTPS reproduction-attachment destinations.                                                                                                                                |
+| `submission.attachments.destinations`  | list of hostnames           | Approved public HTTPS attachment destinations; see [Attachments](#attachments).                                                                                                            |
 | `submission.attachments.formats`       | list of file extensions     |                                                                                                                                                                                            |
 
 `submission.free_form` (default `false`): an unstructured submission is
-`needs-changes` with a link to the template and assistant.
+`needs-changes` (`submission.unstructured`) with a link to the template. With
+`true`, an unstructured body raises no template or field finding, its category
+comes from the diff alone, and attachment, path, shared-head, and linkage rules
+still apply; a free-form pull request whose plausible categories require a linked
+issue gets `submission.linked-issue-missing`, because it has no `Linked issue`
+field.
 `submission.unrequested_change` (default `propose-first`): `propose-first`
 returns an unaccepted feature/design PR as `needs-changes` with
 `proposal-required`; `triage` routes the missing intent decision to a
 maintainer as `uncertain`.
 
-> **[NEEDS INPUT]** The mapping from rendered issue-form labels and PR headings to these field ids, and the issue forms and PR template that carry it, are not specified.
+#### Field mapping
+
+Screening finds fields by their rendered labels and headings, never by form
+element ids, which GitHub omits from submitted bodies; the ids equal the field
+ids and serve only URL prefilling. Version 1 of the mapping:
+
+Defect issue form "Defect report",
+[`templates/issue-forms/steward-defect.yml`](../../templates/issue-forms/steward-defect.yml),
+installed as `.github/ISSUE_TEMPLATE/steward-defect.yml`:
+
+| Field id               | Rendered label         | Form element                                                   | Required in the form |
+| ---------------------- | ---------------------- | -------------------------------------------------------------- | -------------------- |
+| `expected-behavior`    | `Expected behavior`    | textarea                                                       | yes                  |
+| `authoritative-basis`  | `Authoritative basis`  | textarea                                                       | yes                  |
+| `actual-behavior`      | `Actual behavior`      | textarea                                                       | yes                  |
+| `affected-version`     | `Affected version`     | input                                                          | yes                  |
+| `reproduction-command` | `Reproduction command` | textarea                                                       | yes                  |
+| `expected-result`      | `Expected result`      | textarea                                                       | yes                  |
+| `proposed-scope`       | `Proposed scope`       | textarea                                                       | no                   |
+| `references`           | `References`           | textarea                                                       | no                   |
+| `security-claim`       | `Security claim`       | checkboxes, one option `This report claims a security problem` | no                   |
+
+Proposal issue form "Change proposal",
+[`templates/issue-forms/steward-proposal.yml`](../../templates/issue-forms/steward-proposal.yml),
+installed as `.github/ISSUE_TEMPLATE/steward-proposal.yml`:
+
+| Field id            | Rendered label      | Form element | Required in the form |
+| ------------------- | ------------------- | ------------ | -------------------- |
+| `problem`           | `Problem`           | textarea     | yes                  |
+| `benefit`           | `Benefit`           | textarea     | yes                  |
+| `existing-decision` | `Existing decision` | textarea     | no                   |
+| `proposed-scope`    | `Proposed scope`    | textarea     | yes                  |
+| `references`        | `References`        | textarea     | no                   |
+
+The forms have no `labels:` key and no severity field. A leading note, which is
+not part of the submitted body, says that maintainers assess severity, that
+security vulnerabilities go to the project's private reporting channel, and, on
+the defect form, that reproduction files go into the `Reproduction command`
+field as fenced code blocks or attachments. The forms' required flags equal the
+policy template's `submission.issue_fields` lists; the policy, not the form,
+governs screening.
+
+Pull request template,
+[`templates/pull-request/pull_request_template.md`](../../templates/pull-request/pull_request_template.md),
+installed as `.github/pull_request_template.md`. Its first line is the version
+marker `<!-- patch-steward:pr-template v1 -->`, followed by a comment explaining
+drafts: where the repository screens drafts with feedback, open a draft and
+request review after the screening report; in observe mode, follow the
+repository's ordinary readiness and review process. Each field is a `##`
+heading followed by a hint comment:
+
+| Field id               | Heading                | Hint (summary)                                                                   |
+| ---------------------- | ---------------------- | -------------------------------------------------------------------------------- |
+| `category`             | `Category`             | exactly one of `bugfix`, `feature`, `refactor`, `docs`, `chore`, `security`      |
+| `problem`              | `Problem`              | the problem the change addresses                                                 |
+| `benefit`              | `Benefit`              | why the change is worth adopting and maintaining                                 |
+| `intended-behavior`    | `Intended behavior`    | the behavior after the change                                                    |
+| `acceptance-criteria`  | `Acceptance criteria`  | checkable conditions                                                             |
+| `linked-issue`         | `Linked issue`         | one issue in this repository, such as `#123`, optionally after a closing keyword |
+| `regression-test`      | `Regression test`      | the test file and test name that fail before and pass after                      |
+| `test-scaffolding`     | `Test scaffolding`     | non-test files the regression test needs                                         |
+| `reproduction-command` | `Reproduction command` | the exact command; files as fenced code blocks or attachments                    |
+| `expected-result`      | `Expected result`      | the exit status or output text                                                   |
+| `references`           | `References`           | documents, specifications, or decisions                                          |
+
+Keep labels, headings, and the marker line unchanged when installing the
+templates: a changed label or heading makes submissions unstructured. A later
+template version adds its own mapping, and older versions stay supported.
+
+#### Parsing
+
+Headings inside fenced code blocks and HTML comments are ignored. An issue body
+is structured when every label of a mapping version appears in it as a `###`
+heading; versions are tried newest first and the defect form before the
+proposal form, and any other heading is field content. Issue-form labels are
+compared case-sensitively, because GitHub renders them verbatim. A pull request
+body names its version only in the marker line; without a marker, or with two
+markers naming different versions, it is unstructured. Each known `##` heading
+starts a field, compared case-insensitively; an unknown `##` heading ends the
+current field, and deeper headings are content. Labels and headings are
+compared after Unicode normalization, trimming, and collapsing whitespace. A
+mapped heading that appears twice is `submission.field-duplicate`.
+
+A field's value is the text up to the next field heading. Before any rule reads
+it, the value is normalized: CRLF and lone CR become LF, HTML comments are
+removed, the text is put in Unicode NFC, trailing spaces and tabs are removed
+from each line, and leading and trailing empty lines are removed. A normalized
+value is trivial when it is empty or, in any letter case, `_No response_`,
+`N/A`, `NA`, `none`, `-`, `TBD`, `TODO`, or `...`; a required field that is
+absent or trivial is `submission.field-missing`. The `Security claim` checkbox
+is claimed only when its option line is `- [X]` or `- [x]` followed by the
+option label. Severity wording in any field never changes a finding.
+
+The `Category` value, with comments removed, must be one category id,
+optionally in backticks, in any letter case: an empty value is
+`submission.category-missing`, anything else `submission.category-invalid`.
+The `Linked issue` value must be exactly one issue in the same repository:
+`#123`, `owner/name#123`, or `https://github.com/owner/name/issues/123`,
+optionally after one closing keyword (`close`, `closes`, `closed`, `fix`,
+`fixes`, `fixed`, `resolve`, `resolves`, `resolved`, with an optional colon).
+No reference where the category requires one is
+`submission.linked-issue-missing`; several references, another repository,
+extra text, or a number that is not an existing issue (a pull request number
+included) is `submission.linked-issue-invalid`. The issue's open or closed state
+is not checked.
+
+#### Attachments
+
+An attachment is a URL in a field, as a Markdown link, image, autolink, or bare
+URL, that has one of GitHub's attachment shapes:
+`https://github.com/user-attachments/files/<id>/<name>`,
+`https://github.com/user-attachments/assets/<id>`,
+`https://github.com/<owner>/<repo>/files/<id>/<name>`, or any URL on
+`user-images.githubusercontent.com` or
+`private-user-images.githubusercontent.com`. A URL on a destination the project
+added beyond these hosts is also an attachment; other `github.com` URLs are
+references. URLs inside HTML comments are ignored, and a URL listed twice is one
+attachment. An attachment is required when its field is one the policy
+requires for the submission (`categories.<category>.required_fields` for pull
+requests, `submission.issue_fields.<kind>` for issues); in an unstructured
+free-form body every attachment is required.
+
+The policy template approves these destinations: `github.com`,
+`objects.githubusercontent.com`,
+`github-production-user-asset-6210df.s3.amazonaws.com`,
+`user-images.githubusercontent.com`, and
+`private-user-images.githubusercontent.com`. It approves these formats: `txt`,
+`log`, `md`, `json`, `patch`, `diff`, `zip`, `gz`, `png`, `jpg`, `jpeg`, and
+`gif`. The format is the lowercase text after the last `.` of the URL's last
+path segment or, when that segment has none, of the final redirect URL's last
+path segment.
+
+Screening fetches each attachment under these rules; `limits.attachments` sets
+the numbers:
+
+- Only `https`, only hosts in `submission.attachments.destinations`, no user
+  information or explicit port in the URL, and at most 2048 characters.
+- Every address the host resolves to must be public, and the connection uses the
+  checked address; every redirect hop is checked the same way, and redirects are
+  counted.
+- No `Authorization` header, cookie, token, or proxy credential is sent, so an
+  attachment that needs authentication, such as one in a private repository,
+  cannot be fetched.
+- Time, bytes per file, and total bytes per submission are bounded; bytes are
+  hashed with SHA-256 as they arrive, before any other use.
+- Images are hashed, never decoded. A `zip` archive may hold only stored or
+  deflated entries: encrypted entries, ZIP64, multiple disks, symbolic links,
+  and entry names that are absolute or contain `..`, backslashes, or control
+  characters are violations, and it may hold at most 1000 entries with names of
+  at most 512 bytes. A `gz` file may hold one or more gzip members. The
+  decompressed size of either, declared and actual, must stay within
+  `limits.attachments.decompressed_bytes`; archives are never extracted, and
+  nested archives are not expanded.
+
+More attachments than `limits.attachments.count`, a host outside the
+destinations, a scheme other than `https`, user information, a format that is
+not approved or cannot be determined, too many bytes, too many redirects, or an
+archive violation is `submission.attachment-violation` (`needs-changes`); its
+detail names the rule: `count`, `destination`, `scheme`, `userinfo`, `format`,
+`file-bytes`, `total-bytes`, `redirects`, `archive`, or `decompressed-bytes`. A
+fetch failure (DNS, a non-public address, TLS, a timeout, or a non-success
+status) makes a required attachment an `inconclusive` cause
+(`attachment-fetch-failed`) and an optional one the advisory finding
+`submission.attachment-unavailable`. `steward preflight` checks count,
+destination, scheme, user information, and format from the URL only and never
+fetches; an attachment whose URL does not show its format gets the warning
+`attachment.format-unverified`.
 
 ### Execution
 
@@ -441,7 +705,7 @@ leading or trailing whitespace or control characters (`policy.label-name`).
 Colors and descriptions are fixed by the steward. The generic key forms are
 `labels.status.<state>` and `labels.classification.<classification>`.
 
-Sources: [architecture §8](../architecture.md#8-policy-the-quality-contract), [SP01](../processes.md#sp01-policy-management), [SP06](../processes.md#sp06-intake-and-submission-contract-check), [SP19](../processes.md#sp19-resource-control-and-failure-handling), [policy template](../../templates/policy/policy.yml).
+Sources: [architecture §8](../architecture.md#8-policy-the-quality-contract), [SP01](../processes.md#sp01-policy-management), [SP06](../processes.md#sp06-intake-and-submission-contract-check), [SP19](../processes.md#sp19-resource-control-and-failure-handling), [policy template](../../templates/policy/policy.yml), [built-in path lists](../../packages/core/src/submission/path-lists.ts), [issue forms](../../templates/issue-forms/), [pull request template](../../templates/pull-request/pull_request_template.md).
 
 ## Credentials and deployment (Proposed)
 
@@ -540,13 +804,14 @@ The CLI package declares `engines.node >=24`, depends on the core package as
 the core package depends on `zod` and `yaml`, and its `exports` map resolves
 `@patch-steward/core` to its compiled `dist/` output at Node runtime.
 
-| File                       | Current settings                                                                                                                                                                                                |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.github/workflows/ci.yml` | Node 24; build, typecheck, and test on Ubuntu and Windows for PRs and pushes to `master`, `develop`, and `release/**`; lint/format for PRs; Codecov upload from `develop` using `CODECOV_TOKEN`.                |
-| `.github/workflows/cd.yml` | Runs when the root `package.json` changes on `master`; builds/tests, creates absent `v<version>` tag, then merges `master` into `develop` only when that new tag was created.                                   |
-| `vitest.config.ts`         | Test tiers by filename suffix: unit (`*.test.ts`) and fixture (`*.fixture.test.ts`) projects run under `pnpm test`; container and live suffixes are excluded. Coverage merges to the root `coverage/lcov.info`. |
-| `eslint.config.mjs`        | ESLint and TypeScript ESLint recommended configurations; ignores `**/dist/`, `docs/`, and `coverage/`.                                                                                                          |
-| `.prettierignore`          | Excludes `pnpm-lock.yaml`, `dist/`, `coverage/`, `node_modules/`, and `development-artifacts/`.                                                                                                                 |
+| File                       | Current settings                                                                                                                                                                                                                                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/ci.yml` | Node 24; build, typecheck, and test on Ubuntu and Windows for PRs and pushes to `master`, `develop`, and `release/**`; lint/format for PRs; Codecov upload from `develop` using `CODECOV_TOKEN`.                                                                                                                                |
+| `.github/workflows/cd.yml` | Runs when the root `package.json` changes on `master`; builds/tests, creates absent `v<version>` tag, then merges `master` into `develop` only when that new tag was created.                                                                                                                                                   |
+| `vitest.config.ts`         | Test tiers by filename suffix: unit (`*.test.ts`) and fixture (`*.fixture.test.ts`) projects run under `pnpm test`; container and live suffixes are excluded. Coverage merges to the root `coverage/lcov.info`.                                                                                                                 |
+| `vitest.live.config.ts`    | Live-probe tier: `pnpm test:live` runs `packages/*/src/**/*.live.test.ts` one file at a time with 60-second timeouts. The tests read only the public test-bed repository `steady-orchard/patch-steward-testbed-public`, use `GH_TOKEN` when it is set, and skip with a message when GitHub is unreachable. It never runs in CI. |
+| `eslint.config.mjs`        | ESLint and TypeScript ESLint recommended configurations; ignores `**/dist/`, `docs/`, and `coverage/`.                                                                                                                                                                                                                          |
+| `.prettierignore`          | Excludes `pnpm-lock.yaml`, `dist/`, `coverage/`, `node_modules/`, and `development-artifacts/`.                                                                                                                                                                                                                                 |
 
 The CD workflow requires both remote branches and permissions/rules allowing its
 tag and merge operations. Scaffold automation does not implement screening or
@@ -646,6 +911,6 @@ These are explicit repository settings, not Patch Steward screening-policy defau
 
 Sources: [package manifest](../../package.json), [workspace file](../../pnpm-workspace.yaml),
 [CI](../../.github/workflows/ci.yml), [CD](../../.github/workflows/cd.yml),
-[Vitest](../../vitest.config.ts), [ESLint](../../eslint.config.mjs),
+[Vitest](../../vitest.config.ts), [Vitest live tier](../../vitest.live.config.ts), [ESLint](../../eslint.config.mjs),
 [Prettier exclusions](../../.prettierignore), [TypeScript base](../../tsconfig.base.json),
 [Prettier](../../.prettierrc.json), [repository guidance](../../CLAUDE.md#toolchain-constraints).

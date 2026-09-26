@@ -3,10 +3,12 @@
 Patch Steward is a work in progress. This repository contains a development
 scaffold, design documents, the policy module (loading, validation, revision
 identity, defaults, and the public subset), shared vocabularies, version-1
-record schemas, a redaction module, and the `steward policy` command. The
-screening pipeline, the other CLI commands, the GitHub action and screening
-workflows, the browser app, the adapters, and the sandboxed runner are not
-implemented.
+record schemas, a redaction module, the submission module with its
+deterministic contract check, a read-only GitHub adapter, the issue forms and PR
+template, and the `steward policy` and `steward preflight` commands; preflight
+covers its deterministic checks only. The screening pipeline, the other CLI
+commands, the GitHub action and screening workflows, the browser app, the LLM
+adapters, GitHub writes, and the sandboxed runner are not implemented.
 
 The installation guide covers the runnable scaffold. Sections marked
 **Available** describe what runs today; sections marked **Proposed** describe
@@ -27,7 +29,7 @@ the documented product design, not available functionality.
    - [Install screening in a target repository](installation.md#target-repository-installation-proposed)
 3. [Usage](usage.md)
    - [Work on the scaffold](usage.md#work-on-the-scaffold)
-   - [Prepare a submission](usage.md#prepare-a-submission-proposed)
+   - [Prepare a submission](usage.md#prepare-a-submission-available)
    - [Report a defect or propose a change](usage.md#report-a-defect-or-propose-a-change-proposed)
    - [Submit a pull request](usage.md#submit-a-pull-request-proposed)
    - [Read a report and respond](usage.md#read-a-report-and-respond-proposed)
@@ -37,6 +39,7 @@ the documented product design, not available functionality.
 4. [Command reference](commands.md)
    - [Development commands](commands.md#development-commands-available)
    - [`steward policy`](commands.md#steward-policy-available)
+   - [`steward preflight`](commands.md#steward-preflight-available)
    - [CLI commands](commands.md#cli-commands-proposed)
    - [GitHub conversation commands](commands.md#github-conversation-commands-proposed)
 5. [Configuration](configuration.md)
@@ -64,6 +67,8 @@ This manual uses only repository material:
 - [Processes](../processes.md): workflows, decisions, commands, and failure handling.
 - [Policy template](../../templates/policy/policy.yml)
   and [policy module](../../packages/core/src/policy/): the implemented policy schema and validation.
+- [Issue forms](../../templates/issue-forms/), [PR template](../../templates/pull-request/pull_request_template.md),
+  and [submission module](../../packages/core/src/submission/): the implemented submission contract.
 - [Package manifest](../../package.json), [sample source](../../packages/core/src/index.ts),
   [sample test](../../packages/core/src/index.test.ts), and [repository guidance](../../CLAUDE.md): development behavior.
 - [CI](../../.github/workflows/ci.yml), [CD](../../.github/workflows/cd.yml),

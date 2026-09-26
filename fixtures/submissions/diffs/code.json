@@ -1,0 +1,4 @@
+[
+  { "kind": "modified", "path": "src/parse.ts", "previousPath": null },
+  { "kind": "modified", "path": "src/parse.test.ts", "previousPath": null }
+]

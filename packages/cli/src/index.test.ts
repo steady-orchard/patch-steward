@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runCli, STEWARD_USAGE } from './index.js';
+import { PREFLIGHT_USAGE, runCli, STEWARD_USAGE } from './index.js';
 
 describe('steward cli', () => {
   it('steward without a command prints usage and exits 2', async () => {
@@ -62,5 +62,45 @@ describe('steward cli', () => {
     });
     expect(exit).toBe(2);
     expect(stderr.join('')).toContain('usage.conflicting-options');
+  });
+
+  it('steward help lists the policy and preflight commands', async () => {
+    const stdout: string[] = [];
+    const exit = await runCli(['help'], {
+      cwd: process.cwd(),
+      io: {
+        stdout: (text) => {
+          stdout.push(text);
+        },
+        stderr: () => {},
+      },
+      env: {},
+    });
+    expect(exit).toBe(0);
+    const lines = stdout.join('').split('\n');
+    expect(lines.some((line) => line.startsWith('  policy '))).toBe(true);
+    expect(lines.some((line) => line.startsWith('  preflight '))).toBe(true);
+  });
+
+  it('steward preflight dispatches to the preflight command', async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const io = {
+      stdout: (text: string) => {
+        stdout.push(text);
+      },
+      stderr: (text: string) => {
+        stderr.push(text);
+      },
+    };
+    const exit = await runCli(['preflight', '--issue', 'defect', '--pr', '--draft', 'x.txt'], {
+      cwd: process.cwd(),
+      io,
+      env: {},
+    });
+    expect(exit).toBe(2);
+    expect(stdout.join('')).toBe('');
+    expect(stderr.join('')).toContain('usage.conflicting-options');
+    expect(stderr.join('')).toContain(PREFLIGHT_USAGE);
   });
 });

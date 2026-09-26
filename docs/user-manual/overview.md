@@ -3,8 +3,9 @@
 [Manual contents](README.md) · [Installation](installation.md)
 
 **Status:** Product behavior on this page is proposed. The development
-scaffold, the policy module, and the `steward policy` command exist; screening
-does not.
+scaffold, the policy module, the submission contract check, the `steward policy`
+command, and the deterministic part of `steward preflight` exist; screening does
+not.
 
 ## Purpose and scope
 
@@ -35,23 +36,23 @@ Sources: [README](../../README.md), [architecture §1](../architecture.md#1-scop
 
 ## Key concepts
 
-| Term                      | Meaning                                                                                                                                                                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Quality contract / policy | Maintainer-owned definition of supported behavior, required evidence and checks, limits, and operating modes.                                                                                                |
-| Submission contract       | The fields, references, reproduction details, and other information required for an issue or PR's category.                                                                                                  |
-| Trusted branch            | The repository's default branch, which supplies the active policy and trusted workflow definitions.                                                                                                          |
-| Policy revision           | The git tree id of `.github/patch-steward/` at the trusted commit. The default-branch commit is recorded separately for traceability; a named local policy file is `local:<sha256>` and never authoritative. |
-| Claim                     | Anything a contributor states or produces, including local preflight output. It identifies what needs verification.                                                                                          |
-| Evidence                  | A steward-controlled execution or reference-check record with verified provenance. It records observations, not proof that test output is honest.                                                            |
-| Signal                    | An external result, such as project CI. It keeps its external provenance even when policy permits its use for platform coverage.                                                                             |
-| Finding                   | A statement classified as `blocking`, `uncertain`, `advisory`, or `speculative`. An actionable blocker needs a scenario, location, evidence, and a validated requirement.                                    |
-| Snapshot                  | The inputs certified by a run: commits or issue content, target, body, linked evidence, relevant author responses, PRs sharing the head, and the policy revision.                                            |
-| Ownership record          | An immutable artifact identifying the run entitled to publish for a submission. Publication checks both ownership and input freshness.                                                                       |
-| Repository gate           | Active when any category uses `advise` or `enforce`, or a ruleset requires the steward check. It controls creation of check runs.                                                                            |
-| Trusted path              | Workflow, policy, runner, or CI control path. Changes prevent reliance on PR-controlled CI.                                                                                                                  |
-| Execution-sensitive path  | Package scripts, test/build configuration, reporters, helpers, or harness code. Changes require maintainer triage even when tests pass.                                                                      |
-| Independent challenge     | Additional tests derived from trusted requirements and code without the author's explanation, intended to find concrete counterexamples.                                                                     |
-| Dismissal code            | A stable reason, such as `proposal-required`, used in reports and maintainer actions: nine built-in codes plus the project's additions.                                                                      |
+| Term                      | Meaning                                                                                                                                                                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quality contract / policy | Maintainer-owned definition of supported behavior, required evidence and checks, limits, and operating modes.                                                                                                                                                              |
+| Submission contract       | The fields, references, reproduction details, and other information required for an issue or PR's category.                                                                                                                                                                |
+| Trusted branch            | The repository's default branch, which supplies the active policy and trusted workflow definitions.                                                                                                                                                                        |
+| Policy revision           | The git tree id of `.github/patch-steward/` at the trusted commit. The default-branch commit is recorded separately for traceability; a named local policy file is `local:<sha256>` and never authoritative.                                                               |
+| Claim                     | Anything a contributor states or produces, including local preflight output. It identifies what needs verification.                                                                                                                                                        |
+| Evidence                  | A steward-controlled execution or reference-check record with verified provenance. It records observations, not proof that test output is honest.                                                                                                                          |
+| Signal                    | An external result, such as project CI. It keeps its external provenance even when policy permits its use for platform coverage.                                                                                                                                           |
+| Finding                   | A statement classified as `blocking`, `uncertain`, `advisory`, or `speculative`. An actionable blocker needs a scenario, location, evidence, and a validated requirement.                                                                                                  |
+| Snapshot                  | The inputs certified by a run: head commit or issue content, target branch, body, linked evidence, relevant author responses, PRs sharing the head, and the policy revision. The base commit is recorded but not compared, so base-branch movement never supersedes a run. |
+| Ownership record          | An immutable artifact identifying the run entitled to publish for a submission. Publication checks both ownership and input freshness.                                                                                                                                     |
+| Repository gate           | Active when any category uses `advise` or `enforce`, or a ruleset requires the steward check. It controls creation of check runs.                                                                                                                                          |
+| Trusted path              | Workflow, policy, runner, or CI control path. Changes prevent reliance on PR-controlled CI.                                                                                                                                                                                |
+| Execution-sensitive path  | Package scripts, test/build configuration, reporters, helpers, or harness code. Changes require maintainer triage even when tests pass.                                                                                                                                    |
+| Independent challenge     | Additional tests derived from trusted requirements and code without the author's explanation, intended to find concrete counterexamples.                                                                                                                                   |
+| Dismissal code            | A stable reason, such as `proposal-required`, used in reports and maintainer actions: nine built-in codes plus the project's additions.                                                                                                                                    |
 
 Rules in the core determine outcomes. Model responses supply findings and analysis;
 the model does not make the final decision. Advisory and speculative findings

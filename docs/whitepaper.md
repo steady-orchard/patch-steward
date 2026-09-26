@@ -153,14 +153,18 @@ The contributor supplies expected behavior and an authoritative basis, actual
 behavior, affected version, a minimal reproduction with an execution command,
 and the proposed scope of the fix. References may include documentation,
 specifications, or an accepted maintainer decision. Issue forms with stable,
-unique rendered labels and a PR template with headed sections carry these fields; a
+unique rendered labels and a PR template with headed sections and a hidden
+version marker carry these fields; a
 browser assistant and a local preflight command help contributors complete them
 before submitting (SP05, SP06). A submission that does not follow the template
 is returned with a request to use it unless the policy allows free-form
 submissions.
 
-Parsing uses versioned label/heading mappings; GitHub's form ids are used for
-prefilled URLs and are not present in submitted issue bodies. Linked issues
+Parsing uses versioned label/heading mappings, recognizing an issue form's
+version by its set of labels and the PR template's by its marker; GitHub's form
+ids are used for prefilled URLs and are not present in submitted issue bodies.
+The contract check is deterministic and makes no model call; `steward preflight`
+runs the same check on a local draft. Linked issues
 skip claim validation only when a successful final validation, all required
 reproductions, policy, content/evidence hashes, target applicability, and claim
 scope still match. A classification alone is insufficient (SP06).
@@ -410,8 +414,10 @@ Only passed submissions in feedback-enabled modes receive automatic reviewer
 requests, and a draft PR opened per the template is marked ready for review on
 pass. Observe mode never promotes drafts or requests reviewers; the template
 explains ordinary manual readiness/review for that mode. Reports bind to
-body/linked evidence, persistent author responses, target/base/head, sharing
-PR set, and the policy revision. Steward/provider/model/adapter/runner
+body/linked evidence, persistent author responses, target/head, sharing PR set,
+and the policy revision; the base commit is recorded with the snapshot but does
+not enter snapshot comparison, so base-branch movement never supersedes a run.
+Steward/provider/model/adapter/runner
 identities are recorded separately as run provenance. A changed input starts a new run through its own event, through
 propagation from a linked issue or a recorded maintainer action, or through
 the policy-change sweep. An unpublished run superseded by a policy change
@@ -691,8 +697,8 @@ pass. The threat table in architecture §13 lists mitigations for workflow and
 policy tampering, prompt injection, test weakening, credential exposure, model
 credential exposure, the Copilot runtime's instruction files and tools,
 container escape, forged evidence, cost exhaustion, model failure, provider
-retirement, shared blind spots, log leakage, compromised releases, and event
-loops.
+retirement, shared blind spots, log leakage, compromised releases, event loops,
+and attachment fetches aimed at internal hosts.
 
 ## 13. Calibration and enforcement
 
@@ -768,14 +774,22 @@ license, and GitHub CI/CD templates. Authored documentation is tracked in
 docs. The monorepo layout in §9 is implemented.
 
 Implemented so far: the policy module in `core` (loading from an explicit git
-revision or a named local file, strict YAML and schema validation, hard
-bounds, the policy revision as the git tree id of the policy directory,
-documented defaults, and the public subset), shared vocabularies, version-1
-record schemas, a redaction module, conformance tests for invariants 2, 5,
-and 7, the `steward policy` command in `cli`, the policy template and its
-editor schema in `templates`, and a policy fixture corpus. The `action` and
-`web` packages hold toolchain smoke code only. No screening stage, provider
-integration, workflow, or browser app is claimed.
+revision, the GitHub API, or a named local file, strict YAML and schema
+validation, hard bounds, the policy revision as the git tree id of the policy
+directory, documented defaults, and the public subset), shared vocabularies,
+version-1 record schemas, a redaction module, the submission module (versioned
+field mapping and parsing, category and path classification with built-in
+trusted and execution-sensitive lists, attachment rules with a bounded fetcher
+and archive inspector, the policy-change flag, snapshot and claim-scope
+hashing, the deterministic contract check, and issue and PR capture), a
+read-only GitHub REST adapter, git diff, merge-base, and remote reads,
+conformance tests for invariants 1, 2, 5, 6, 7, and 8, the `steward policy`
+command and the deterministic part of `steward preflight` in `cli`, the policy
+template and its editor schema, the issue forms, and the PR template in
+`templates`, and policy, submission, and recorded GitHub response fixture
+corpora. The `action` and `web` packages hold toolchain smoke code only. No
+screening stage, workflow, provider integration, GitHub write, or browser app is
+claimed.
 
 Decisions recorded on September 15, 2026 and revised on September 16, 2026
 (ADR-0001–ADR-0016 in `docs/adr`) settle the browser code's role, the absence of browser
@@ -797,6 +811,16 @@ enforced`, free-form submissions off, and the default label names; the
 built-in dismissal-code catalog; the public policy subset; hard bounds as
 steward constants; redaction patterns; the `steward policy` command; and the
 separate type-check pass for tests.
+
+Further decisions recorded on September 26, 2026 (ADR-0050–ADR-0061 in
+`docs/adr`) settle the versioned field mapping by rendered labels and a PR
+template marker; one glob syntax for repository paths; built-in path classes
+for category consistency; built-in trusted and execution-sensitive path lists;
+attachment destinations, formats, and fetching; the snapshot composition and
+hash, which record the base commit without comparing it; the canonical
+claim-scope text; the deterministic contract result; a GitHub read adapter
+without an SDK dependency; CLI GitHub authentication; the `steward preflight`
+command; and the live-probe test runner.
 
 Decisions still to be made are implementation details (architecture §15): the
 evidence store's run-directory layout and stored-record file format; the

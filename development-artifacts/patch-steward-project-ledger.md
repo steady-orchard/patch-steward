@@ -6,7 +6,7 @@
 - project-plan: docs/project-development-plan.md
 - artifacts-dir: development-artifacts
 - develop-branch: develop
-- current-milestone: 4
+- current-milestone: 5
 
 ## Milestones
 
@@ -14,8 +14,8 @@
 | --: | ---------------------------------------------------------- | ------- | -------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------ |
 |   1 | Monorepo foundation                                        | done    | milestone/1-monorepo-foundation        | 9c2a1cb      | 2 phases, 17 steps; root manifest metadata restored by lead before merge                                     |
 |   2 | Platform assumption probes                                 | done    | milestone/2-platform-assumption-probes | 60d2505      | 7 phases (4–7 added by amendments), 13 amendments; probes/ suite, findings, doc changes, 33 ADRs in docs/adr |
-|   3 | Policy and data contracts                                  | done    | milestone/3-policy-and-data-contracts | 5c505dc      | 4 phases, 52 steps; 3 amendments (owner gate, T7 site, platform commands); ADR-0034 to ADR-0049                                                                                                              |
-|   4 | Submission intake and contract check                       | pending |                                        |              |                                                                                                              |
+|   3 | Policy and data contracts                                  | done    | milestone/3-policy-and-data-contracts | b3d7582      | 4 phases, 52 steps; 3 amendments (owner gate, T7 site, platform commands); ADR-0034 to ADR-0049                                                                                                              |
+|   4 | Submission intake and contract check                       | done    | milestone/4-submission-intake-and-contract-check | eca528e      | 5 phases, 75 steps; 1 amendment (owner gate); ADR-0050 to ADR-0061                                           |
 |   5 | Decision, report, evidence records, local skeleton         | pending |                                        |              |                                                                                                              |
 |   6 | GitHub-hosted skeleton: gate, ownership, evidence, publish | pending |                                        |              |                                                                                                              |
 |   7 | Sandboxed execution                                        | pending |                                        |              |                                                                                                              |
@@ -82,6 +82,15 @@
 | M03       | Platform command mapping | `execution.platforms[].commands` lists command ids (planner amendment 30c9a2b, confirmed); recorded in ADR-0034 | 2026-09-26 |
 | M03       | ADR-0008 | Stays `accepted`; ADR-0039 records the optional-`llm` refinement and links it | 2026-09-26 |
 | M03       | Findings citations | `probes/findings.md` citations of removed architecture section 15 "Numerical limits" retargeted to section 12.1 "Hard bounds" by the lead at merge (4d247f2) | 2026-09-26 |
+| M04       | Field mapping versions | Plain human labels; one mapping table per template version in core; issue-form version detected by matching the rendered heading set newest-first; PR template carries a hidden `<!-- patch-steward:pr-template v1 -->` marker; planner drafts exact labels, owner reviews at plan gate | 2026-09-26 |
+| M04       | Category-versus-diff rules | Built-in path classes as core constants, no new policy keys: `docs` only doc paths; `chore` no source code (config, CI, dependencies, tooling); `bugfix`, `feature`, `refactor`, `security` require a code change; tests allowed with any; mismatch `uncertain`; planner drafts globs, owner reviews at plan gate | 2026-09-26 |
+| M04       | Built-in path lists | Broad ecosystem-generic trusted and execution-sensitive lists (workflows, actions, policy directory, CODEOWNERS, CI scripts; manifests, lockfiles, build/test configuration, reporters, test helpers) covering TypeScript, the PD04 compiled ecosystem, and other common ecosystems; planner returns needs-human for owner approval before decomposition | 2026-09-26 |
+| M04       | Attachments | Default destinations GitHub user-attachment hosts only; formats text (txt, log, md, json, patch, diff) plus zip and gz under decompression bounds; images hashed, never parsed; no credentials forwarded, so auth-gated private-repository attachments are a fetch failure (`inconclusive` if required); template updated to match | 2026-09-26 |
+| M04       | Claim-scope text | RFC 8785 JSON of problem, benefit, intended-behavior, acceptance-criteria plus linked proposal (repository, number, content hash); per field Unicode NFC, CRLF to LF, HTML comments removed, trailing whitespace per line and leading or trailing blank lines trimmed, Markdown otherwise verbatim; missing or ambiguous field means no claim scope (clarification required) | 2026-09-26 |
+| M04       | CLI GitHub auth | Resolve `GH_TOKEN`, then `GITHUB_TOKEN`, then `gh auth token` (subprocess when gh is installed); never stored or logged; public-repository reads fall back to unauthenticated with a rate-limit warning; private repository without a token exits 2 | 2026-09-26 |
+| M04       | Preflight surface | `steward preflight (--issue defect or proposal, or --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--json]`; draft is Markdown in the rendered form or template layout; upstream from `--repo`, else the `upstream` remote, else `origin`; policy from the upstream default branch via the GitHub API; no published policy uses the template policy as the default checklist; output marked unverified; exit 0 contract met, 1 not met, 2 usage or environment | 2026-09-26 |
+| M04       | Owner gate | Field mapping v1 labels, category path classes, built-in trusted and execution-sensitive lists, attachment defaults (5 hosts, 12 formats), hard-only constants K13-K26 approved as proposed; interpretations I1-I26 accepted (same-repository linked issue, fetch by commit deferred, `pnpm test:live` runner never in CI, no reproduction-files field, M04 writes no evidence or metrics) | 2026-09-26 |
+| M04       | Snapshot base commit | Base commit recorded but excluded from the snapshot hash; base ref stays in the hash; governing wording fixed at five sites; ADR-0055 | 2026-09-26 |
 | —         | Coverage token after the move     | `CODECOV_TOKEN` did not carry over to `steady-orchard/patch-steward`; owner set it as a repository Actions secret there on 2026-09-18 (an organization secret was the first choice)                                                                                                                                                                                                                                                                                                                                                                                  | 2026-09-18 |
 
 ## Events
@@ -124,3 +133,15 @@
 | M03       | evaluated | Brief DoD items 1-15 pass on Windows (50 files, 1020 tests; typecheck negative proof on core and cli tests); Ubuntu only by CI once develop is pushed |
 | M03       | merged | Squash commit 5c505dc on develop; branch deleted; artifacts reduced to brief and ledger (1e419bc); findings citations retargeted (4d247f2) |
 | M03       | verified | Ubuntu CI reproduced locally with act (Docker, catthehacker/ubuntu:act-latest) on an LF clone of develop at e71d23f: build-and-test (install, build, typecheck, 50 files and 1020 tests) and lint-and-format pass; coverage job not run (its Codecov upload publishes externally) |
+| —         | history | Owner rewrote develop: all M03 commits and follow-ups squashed into b3d7582 (Milestones table corrected); earlier M03 SHAs in this table are pre-rewrite |
+| M04       | started | Owner decisions recorded (all recommended options); branch created |
+| M04       | planned | Brief, roadmap (5 phases), ledger at 5a0e21f; owner gate (A-E, I1-I26, snapshot base-commit question) returned needs-human |
+| M04       | escalated | Owner gate answered (all recommended; base commit not hashed); amendment 05dddcc approved the gate and added the snapshot wording scope |
+| M04       | phase 1 done | Core foundations (bounds, globs, path lists and classes, Markdown scan, mapping v1, parser, normalization, claim scope, snapshot, templates, fixtures), 16 steps; phase commit 11d147d |
+| M04       | phase 2 done | Adapters (GitHub client and reads, git diff and merge-base, IP policy, attachment fetcher, archive inspector, GitHub policy source, default checklist, live runner, recordings), 15 steps; one acceptance-check correction (2.13); phase commit 252845f |
+| M04       | phase 3 done | Contract check, intake capture, 43 fixture expectations, invariants 1, 6, 8, never-pass, zero execution, 16 steps; one test gap fixed by the supervisor, one gate check corrected; phase commit d32c529 |
+| M04       | phase 4 done | `steward preflight` deterministic part (auth, args, draft, output, command), 10 steps; phase commit 41f504f |
+| M04       | phase 5 done | ADR-0050 to ADR-0061, architecture, processes, whitepaper, README, CLAUDE.md, user manual, 18 steps; phase commit 96bf4aa |
+| M04       | evaluated | Brief DoD items 1-19 pass on Windows (94 files, 1767 tests; live tier 9 tests; live preflight and temp-repository scenarios S1-S4 exact); Ubuntu only by CI once develop is pushed |
+| M04       | merged | Squash commit eca528e on develop; branch deleted; artifacts reduced to brief and ledger (e95cb9a) |
+| M04       | verified | Ubuntu CI reproduced locally with act 0.2.88 (Docker, catthehacker/ubuntu:act-latest) on an LF clone of develop at 00def43: build-and-test (install, build, typecheck, 94 files and 1767 tests) and lint-and-format pass; coverage job not run (its Codecov upload publishes externally) |

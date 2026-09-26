@@ -1,0 +1,15 @@
+{
+  "sha": "a8c2485882b52f63db71b1ec63b12f5039220e03",
+  "url": "https://api.github.com/repos/example-owner/example-repo/git/trees/a8c2485882b52f63db71b1ec63b12f5039220e03",
+  "tree": [
+    {
+      "path": "policy.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "716098133e97314ccf047f5034cc8f76161d8f0d",
+      "size": 4120,
+      "url": "https://api.github.com/repos/example-owner/example-repo/git/blobs/716098133e97314ccf047f5034cc8f76161d8f0d"
+    }
+  ],
+  "truncated": false
+}

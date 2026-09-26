@@ -1,0 +1,38 @@
+### Expected behavior
+
+`widget parse` accepts an empty file and prints an empty document. This is critical.
+
+### Authoritative basis
+
+docs/format.md, section "Empty input": an empty file is a valid document. Severity: high.
+
+### Actual behavior
+
+`widget parse empty.txt` exits with status 1 and prints `TypeError: cannot read properties of undefined`. P0, critical, severity: high.
+
+### Affected version
+
+1.4.2 (P0)
+
+### Reproduction command
+
+```shell
+touch empty.txt
+widget parse empty.txt
+```
+
+### Expected result
+
+Exit status 0 and the output `[]`. Critical.
+
+### Proposed scope
+
+Handle empty input in the parser entry point only. Severity: high.
+
+### References
+
+Severity: critical (P0).
+
+### Security claim
+
+- [ ] This report claims a security problem

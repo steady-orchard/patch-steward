@@ -35,17 +35,22 @@ quality. Passing checks does not establish project value or authorize merging.
 
 This is a **WORK IN PROGRESS**
 
-Project scaffold, design documentation, and the policy layer. Implemented:
-loading a policy from an explicit git revision or a named local file; strict
-validation against the version-1 schema with hard bounds; the policy revision
-(the git tree id of `.github/patch-steward/`); the resolved policy and its
-public subset; shared vocabularies; version-1 record schemas; a redaction
-module; and the `steward policy` command. The screening pipeline, the other
-CLI commands, the GitHub action and workflows, the browser app, the LLM and
-GitHub adapters, the evidence store, and the sandboxed runner are, however,
-not implemented yet. The probes/ directory holds the platform-assumption
-probe suite and its findings for disposable test-bed repositories; it is not
-product code and never runs in CI.
+Project scaffold, design documentation, the policy layer, and submission intake.
+Implemented: loading a policy from an explicit git revision, the GitHub API, or
+a named local file; strict validation against the version-1 schema with hard
+bounds; the policy revision (the git tree id of `.github/patch-steward/`); the
+resolved policy and its public subset; shared vocabularies; version-1 record
+schemas; a redaction module; the submission module, which parses issue-form and
+pull request template bodies through a versioned field mapping, classifies
+changed paths, applies the attachment rules, hashes the snapshot, and decides
+the deterministic contract result, with a read-only GitHub adapter and git
+reads; the issue forms and PR template; and the `steward policy` command and the
+deterministic part of `steward preflight`. The screening pipeline, the other CLI
+commands, the GitHub action and workflows, the browser app, the LLM adapter,
+GitHub writes, the evidence store, and the sandboxed runner are, however, not
+implemented yet. The probes/ directory holds the platform-assumption probe suite
+and its findings for disposable test-bed repositories; it is not product code
+and never runs in CI.
 
 The [user manual](docs/user-manual/README.md) covers scaffold setup, proposed
 workflows, configuration, and troubleshooting, with explicit documentation gaps.
@@ -95,14 +100,30 @@ Validate a policy with the built CLI (the packages are private, so no global
 node packages/cli/dist/main.js policy --file templates/policy/policy.yml
 ```
 
+Check a draft issue or pull request against a repository's submission contract
+(reads GitHub; the result is unverified):
+
+```sh
+node packages/cli/dist/main.js preflight --issue defect --draft fixtures/submissions/defect-complete.txt --repo steady-orchard/patch-steward-testbed-public
+```
+
+Run the live tier against a public test-bed repository (network; never in CI):
+
+```sh
+GH_TOKEN=$(gh auth token) pnpm test:live
+```
+
 - packages/: workspace packages. core holds the policy module, shared
-  vocabularies, version-1 record schemas, the redaction module, and invariant
-  conformance tests; cli implements `steward policy`; action and web hold
-  toolchain smoke code only.
-- fixtures/: shared corpus for fixture-tier tests, including valid, invalid,
-  and hostile policies.
+  vocabularies, version-1 record schemas, the redaction module, the submission
+  module, the read-only GitHub adapter, git reads, the attachment fetcher, and
+  invariant conformance tests; cli implements `steward policy` and
+  `steward preflight`; action and web hold toolchain smoke code only.
+- fixtures/: shared corpus for fixture-tier tests: valid, invalid, and hostile
+  policies, submission bodies and diffs with expected contract results, and
+  recorded GitHub responses.
 - templates/: files `steward init` is designed to install into target
-  repositories; today the policy template and its editor JSON Schema.
+  repositories: the policy template and its editor JSON Schema, the defect and
+  proposal issue forms, and the PR template.
 - probes/: platform-assumption probes PA01–PA09 (sub-claims PA0N.M) against
   disposable test-bed repositories, with findings in probes/findings.md; not a
   workspace package and never run in CI.
