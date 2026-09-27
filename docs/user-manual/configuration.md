@@ -6,9 +6,11 @@ The policy file format is available: the core loads, validates, and resolves a
 policy, and [`steward policy`](commands.md#steward-policy-available) checks one
 from the command line. The deterministic submission contract check, which
 `steward preflight` runs, reads the trusted and execution-sensitive paths,
-categories, submission settings, modes, and GitHub and attachment limits. No
-screening stage runs yet, so sections marked Proposed describe settings whose
-effects are not implemented. [Policy keys](#policy-keys-available) lists every
+categories, submission settings, modes, and GitHub and attachment limits.
+[`steward screen`](commands.md#steward-screen-available) also applies the
+policy at contract level and writes [local evidence](#local-evidence-and-reports-available).
+No screening stage runs yet, so sections marked Proposed describe settings
+whose effects are not implemented. [Policy keys](#policy-keys-available) lists every
 key.
 
 ## Policy file and revision (Available)
@@ -560,6 +562,14 @@ or closed. Labels do not grant it.
 | `stages.high_impact_paths`               | list of globs                                         |                                                                            |
 | `stages.reproduction_as_before_evidence` | boolean                                               |                                                                            |
 
+Every issue and pull request requires reference verification and claim
+validation, a defect issue also requires reproduction, and a pull request
+requires the stages `stages.per_category` lists for each plausible category
+(every category when none is plausible). A required stage without a result
+ends a run `inconclusive` with cause `stage-incomplete`. No stage is
+implemented yet, so every local run whose contract check passes ends
+`inconclusive`.
+
 ### Escalation
 
 | Key                                 | Value               | Notes |
@@ -603,6 +613,13 @@ their own subsections.
 | `limits.stage_seconds`                     | integer (s)                | template `3600`     |
 | `limits.audit_samples_per_week`            | integer (runs)             | template `5`        |
 
+In a local run, `limits.evidence.run_bytes` bounds all bytes of a run
+directory plus its metrics file; `limits.evidence.write_retries` applies only
+to the future branch or repository store, since local writes never retry;
+`limits.stage_seconds` bounds each phase; `limits.github.*` bound the
+submission reads; `hygiene.max_flagged` also caps the report's flagged items
+(at most 10).
+
 ### Policy change and modes
 
 | Key                             | Value                                       | Notes                                   |
@@ -641,21 +658,43 @@ always replaced.
 | `evidence.publication.private_repository` | boolean                           | Also required, besides `pages`, for a private target repository. |
 | `evidence.publication.exclude`            | list of public subset section ids | See below.                                                       |
 
-Built-in credential detectors are always on: `private-key`, `github-token`,
-`aws-access-key-id`, `provider-api-key`, `jwt`, `authorization-header`,
-`bearer-token`, `url-credentials`; matches are replaced with the marker
-`[REDACTED:<detector id>]`. The safe subset for policy-supplied patterns
-forbids backreferences, lookaround, named groups or other `(?` constructs
-except `(?:`, nested quantifiers, a repeated group containing an alternation,
-and a pattern that matches the empty string; patterns are at most 256
-characters and at most 50 patterns are allowed (`policy.redaction-pattern`).
-Patterns run with flags `gu` in a worker thread under size and time bounds; a
-timeout or oversize input fails closed, so nothing unredacted is stored. A
-policy key or string value that matches a built-in detector is rejected
-(`policy.credential-value`). The public subset section ids for
-`evidence.publication.exclude` are `categories`, `evidence_requirements`,
-`unrequested_change`, `modes`, `attachment_caps`, `dismissal_codes`,
-`supported_versions`, `inference_admission`.
+Built-in credential detectors are always on, in this order: `private-key`,
+`github-token`, `aws-access-key-id`, `provider-api-key`, `jwt`,
+`authorization-header`, `bearer-token`, `url-credentials`, `npm-token`,
+`pypi-token`, `gitlab-token`, `slack-token`, `slack-webhook`, `stripe-key`,
+`stripe-webhook-secret`, `google-api-key`, `google-oauth-client-secret`,
+`google-oauth-access-token`, `huggingface-token`, `docker-hub-token`,
+`sendgrid-key`, `shopify-token`, `digitalocean-token` (23 detectors); matches
+are replaced with the marker `[REDACTED:<detector id>]`. A policy key or
+string value that matches one of them is rejected (`policy.credential-value`).
+The safe subset for policy-supplied patterns forbids backreferences,
+lookaround, named groups or other `(?` constructs except `(?:`, nested
+quantifiers, a repeated group containing an alternation, and a pattern that
+matches the empty string; patterns are at most 256 characters and at most 50
+patterns are allowed (`policy.redaction-pattern`). Patterns run with flags `gu`
+in a worker thread under size and time bounds; a timeout or oversize input
+fails closed, so nothing unredacted is stored.
+
+Besides the built-in detectors and the policy's safe-subset patterns, every
+credential the process resolved (today the GitHub token `steward screen` uses)
+is replaced as `[REDACTED:known-secret]` (detector id `known-secret`) in three
+forms: the raw value, its base64, and the base64 of `x-access-token:<value>`;
+values shorter than 8 characters are skipped. No keyword or entropy heuristics
+are used.
+
+When `steward screen` writes evidence, redaction covers every string value of
+every stored record (including metrics events), `report.md` and the report
+record's rendered report and check summary, every log file, and the manifest,
+in batches under the redaction size and time bounds; every record is validated
+again after redaction. A redaction failure, an oversize input, a timeout, or a
+record a redaction marker invalidates (for example an attachment URL with
+credentials inside the snapshot) fails the evidence write: no run directory,
+no report, exit status 2.
+
+The public subset section ids for `evidence.publication.exclude` are
+`categories`, `evidence_requirements`, `unrequested_change`, `modes`,
+`attachment_caps`, `dismissal_codes`, `supported_versions`,
+`inference_admission`.
 
 > **[NEEDS INPUT]** Retention-pruning mechanics for the evidence store, including whether pruning rewrites history, are not specified.
 
@@ -749,7 +788,117 @@ Sources: [architecture §6.3](../architecture.md#63-adapters),
 [§15](../architecture.md#15-open-implementation-decisions),
 [SP02](../processes.md#sp02-adoption-and-installation).
 
+## Local evidence and reports (Available)
+
+[`steward screen`](commands.md#steward-screen-available) writes a local run
+directory and its report, and [`steward report`](commands.md#steward-report-available)
+reads and verifies one.
+
+### Store location
+
+`--evidence-dir <dir>` overrides the default; otherwise the store lives in the
+user data directory, never inside the checkout by default:
+
+| OS          | Default store root                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Windows     | `%LOCALAPPDATA%\patch-steward\evidence` (or `<home>\AppData\Local\patch-steward\evidence` when `LOCALAPPDATA` is unset or relative). |
+| macOS       | `<home>/Library/Application Support/patch-steward/evidence`.                                                                         |
+| Other (XDG) | `$XDG_DATA_HOME/patch-steward/evidence` when `XDG_DATA_HOME` is absolute, else `<home>/.local/share/patch-steward/evidence`.         |
+
+### Layout
+
+```text
+<store root>/<owner>/<repo>/
+  runs/<pr|issue>-<number>/<run-id>/
+    manifest.json                         written last; its presence marks a complete run directory
+    run.json  submission.json  policy-revision.json  decision.json
+    report.json                           rendered report and check summary
+    report.md                             same text as report.json "rendered"
+    findings/finding-0001.json            one per finding, decision order (absent when none)
+    executions/execution-0001.json        (absent when none; always absent at contract level)
+    maintainer-actions/action-0001.json   (absent when none; always absent in local runs)
+    logs/steward.txt                      redacted, bounded run log
+  metrics/<YYYY-MM>/<run-id>.json         the run's metrics events (UTC month of the run start)
+```
+
+Local run id: `local-<YYYYMMDDTHHMMSSZ>-<8 lowercase hex>`.
+
+### File format and manifest
+
+Every record file is UTF-8 JSON, with keys in RFC 8785 order, two-space
+indentation, LF line endings, and one final LF; parsing and canonicalizing a
+record file yields its content hash. The manifest (`manifest_version` 1) lists
+`run_id`, `run_attempt`, `store_path`, `created_at`, `files` (path, bytes,
+`sha256`, `record_type`, `content_hash`), `metrics` (path, bytes, `sha256`),
+and `redaction` (detector ids, policy pattern ids, number of exact values,
+replacements per id).
+
+### Write protocol and size caps
+
+Files are created exclusively, never overwritten, in `runs/.staging/<run-id>/`;
+the metrics file is created at its final path; the manifest is written last;
+then the staging directory is renamed into place as the commit point. A
+failure before the rename removes the staging directory and the metrics file,
+so no partial run directory remains.
+
+Size caps: logs are truncated first (head and tail kept) to at most 1048576
+bytes per file and at most 16 files; at most 4096 files per run directory;
+records and the report over `limits.evidence.run_bytes` fail the write.
+`steward report` verifies a run directory against its manifest.
+
+### Report layout and report caps
+
+The report has sections in this order: Classification, Blockers, Uncertainties
+for maintainers, Executed commands and results, References, Flagged automated
+activity, What would change the outcome, Provenance, after a header with
+outcome, causes, submission, snapshot, commits, policy revision, run, and
+notices. Every section is a list; an empty section reads `- None.`; values
+from the submission or GitHub appear as code spans.
+
+Report caps are hard-only constants:
+
+| Cap                          | Value                               |
+| ---------------------------- | ----------------------------------- |
+| Report                       | 60000 characters                    |
+| Check-run summary            | 8000 characters                     |
+| Blockers                     | 20 items                            |
+| Uncertainties                | 10 items                            |
+| Executed commands            | 10 items                            |
+| References                   | 20 items                            |
+| Flagged items                | 10 items                            |
+| What-would-change items      | 10 items                            |
+| Classification notes         | 10 items                            |
+| Item header                  | 3000 characters                     |
+| Classification line          | 300 characters                      |
+| Note                         | 300 characters                      |
+| Blocker                      | 1000 characters                     |
+| Uncertainty                  | 800 characters                      |
+| Executed command             | 600 characters                      |
+| Reference                    | 250 characters                      |
+| Flagged item                 | 300 characters                      |
+| What-would-change item       | 500 characters                      |
+| Provenance                   | 1500 characters                     |
+| Overflow line                | 300 characters                      |
+| Derived value per occurrence | 200 characters, then ` (truncated)` |
+| Subjects per item            | 10, then `and <n> more`             |
+
+A longer section ends with
+`- <n> more <items> are recorded in the evidence: <location>.`; a report or
+summary over its maximum fails the run's evidence write instead of being
+truncated.
+
+Sources: [architecture §11](../architecture.md#11-evidence-store-and-publication),
+[§12.1](../architecture.md#121-hard-bounds),
+[SP13](../processes.md#sp13-decision-report-and-admission),
+[SP18](../processes.md#sp18-evidence-retention-and-publication),
+[`steward screen`](commands.md#steward-screen-available),
+[`steward report`](commands.md#steward-report-available).
+
 ## Evidence and visibility (Proposed)
+
+See [Local evidence and reports](#local-evidence-and-reports-available) for the
+local store that exists today; the branch or repository store described below
+is not implemented.
 
 The evidence store is append-only except for retention pruning. It holds run
 records, findings, reports, redacted bounded logs, maintainer actions, and metrics.

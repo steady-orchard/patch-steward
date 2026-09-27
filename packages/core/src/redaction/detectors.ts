@@ -45,6 +45,81 @@ export const BUILT_IN_DETECTORS: readonly CredentialDetector[] = Object.freeze([
     source: String.raw`\b[A-Za-z][A-Za-z0-9+.-]{0,31}://[^\s/?#@:]{1,256}:[^\s/?#@]{1,256}@`,
     flags: 'g',
   }),
+  Object.freeze({
+    id: 'npm-token',
+    source: String.raw`\bnpm_[A-Za-z0-9]{36}\b`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'pypi-token',
+    source: String.raw`\bpypi-AgE[A-Za-z0-9_-]{50,}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'gitlab-token',
+    source: String.raw`\b(?:glpat|gldt|glrt|glptt|glcbt|glimt|glagent|gloas|glsoat|glffct|glft)-[A-Za-z0-9_.-]{20,}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'slack-token',
+    source: String.raw`\b(?:xox[abeoprs]|xapp)-[A-Za-z0-9-]{10,}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'slack-webhook',
+    source: String.raw`\bhttps://hooks\.slack\.com/(?:services|workflows|triggers)/[A-Za-z0-9/_-]{20,}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'stripe-key',
+    source: String.raw`\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'stripe-webhook-secret',
+    source: String.raw`\bwhsec_[A-Za-z0-9]{24,}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'google-api-key',
+    source: String.raw`\bAIza[0-9A-Za-z_-]{35}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'google-oauth-client-secret',
+    source: String.raw`\bGOCSPX-[A-Za-z0-9_-]{28}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'google-oauth-access-token',
+    source: String.raw`\bya29\.[0-9A-Za-z_-]{20,}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'huggingface-token',
+    source: String.raw`\bhf_[A-Za-z]{34}\b`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'docker-hub-token',
+    source: String.raw`\bdckr_pat_[A-Za-z0-9_-]{27,}`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'sendgrid-key',
+    source: String.raw`\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'shopify-token',
+    source: String.raw`\bshp(?:at|ca|pa|ss)_[a-fA-F0-9]{32}\b`,
+    flags: 'g',
+  }),
+  Object.freeze({
+    id: 'digitalocean-token',
+    source: String.raw`\bdo[por]_v1_[a-f0-9]{64}\b`,
+    flags: 'g',
+  }),
 ]);
 
 export function redactionMarker(id: string): string {

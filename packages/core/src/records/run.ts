@@ -5,6 +5,7 @@ import { modeSchema, submissionTypeSchema } from '../vocabulary.js';
 import {
   recordSchemaVersionSchema,
   recordPositiveIntSchema,
+  recordRunIdSchema,
   recordRepositorySchema,
   recordContentHashSchema,
   recordIdentifierSchema,
@@ -17,7 +18,7 @@ import {
 export const runRecordSchema = z.strictObject({
   schema_version: recordSchemaVersionSchema,
   record_type: z.literal('run'),
-  run_id: recordPositiveIntSchema,
+  run_id: recordRunIdSchema,
   run_attempt: recordPositiveIntSchema,
   subject: z.discriminatedUnion('kind', [
     z.strictObject({

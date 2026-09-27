@@ -1,0 +1,51 @@
+## Patch Steward screening report
+
+- Outcome: `inconclusive`
+- Inconclusive causes: `stage-incomplete`
+- Submission: `octo/demo` pull request `12`
+- Snapshot: `sha256:5555555555555555555555555555555555555555555555555555555555555555`
+- Target branch: `main`
+- Head commit: `cccccccccccccccccccccccccccccccccccccccc`
+- Base commit tested: `dddddddddddddddddddddddddddddddddddddddd`
+- Policy revision: `local:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`
+- Run: `local-20260927T101500Z-3f9a1c2e` attempt `1`
+
+> Local run: produced on a maintainer's machine; not the repository's official screening result.
+> Non-authoritative: screened under the local policy file revision `local:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`, not the trusted branch's policy.
+
+### Classification
+
+- Category: `bugfix`. Claim classification: not determined; claim validation did not run.
+
+### Blockers
+
+- None.
+
+### Uncertainties for maintainers
+
+- None.
+
+### Executed commands and results
+
+- None.
+
+### References
+
+- None.
+
+### Flagged automated activity
+
+- None.
+
+### What would change the outcome
+
+- Required work did not complete; the causes below explain what changes this outcome.
+- Required stages produced no result: `references`, `claim`, `fix-verification`, `regression`, `challenge`. A steward version that runs these stages is required; this version checks the submission contract only.
+
+### Provenance
+
+- Policy revision: `local:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee` (local policy file; non-authoritative)
+- Steward version: `0.0.0-golden`
+- Model: no model call in this run
+- Adapter and runtime: none
+- Runner: no execution in this run

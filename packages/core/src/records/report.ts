@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   recordSchemaVersionSchema,
   recordPositiveIntSchema,
+  recordRunIdSchema,
   recordTextSchema,
   recordContentHashSchema,
   recordCommitIdSchema,
@@ -12,7 +13,7 @@ import {
 export const reportRecordSchema = z.strictObject({
   schema_version: recordSchemaVersionSchema,
   record_type: z.literal('report'),
-  run_id: recordPositiveIntSchema,
+  run_id: recordRunIdSchema,
   run_attempt: recordPositiveIntSchema,
   rendered: recordTextSchema,
   check_summary: recordTextSchema,

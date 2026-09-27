@@ -6,6 +6,7 @@ import { admissibilitySchema } from '../vocabulary.js';
 import {
   recordSchemaVersionSchema,
   recordPositiveIntSchema,
+  recordRunIdSchema,
   recordIdentifierSchema,
   recordTextSchema,
   recordCommitIdSchema,
@@ -17,7 +18,7 @@ import {
 export const executionRecordSchema = z.strictObject({
   schema_version: recordSchemaVersionSchema,
   record_type: z.literal('execution-record'),
-  run_id: recordPositiveIntSchema,
+  run_id: recordRunIdSchema,
   run_attempt: recordPositiveIntSchema,
   plan_entry: recordIdentifierSchema,
   command: z.array(recordTextSchema).min(1).max(RECORD_LIST_MAX_ITEMS),

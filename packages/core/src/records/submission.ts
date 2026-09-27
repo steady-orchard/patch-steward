@@ -48,8 +48,12 @@ function coupling(value: z.infer<typeof submissionRecordShape>, ctx: z.Refinemen
       });
     }
   } else {
-    if (value.issue_kind === null) {
-      ctx.addIssue({ code: 'custom', message: 'issue submissions require issue_kind', path: ['issue_kind'] });
+    if (value.issue_kind === null && value.template !== null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'issue submissions require issue_kind unless template is null',
+        path: ['issue_kind'],
+      });
     }
     if (value.target_branch !== null) {
       ctx.addIssue({ code: 'custom', message: 'issue submissions must not carry target_branch', path: ['target_branch'] });

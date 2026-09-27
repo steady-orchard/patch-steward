@@ -49,4 +49,29 @@ describe('record finding', () => {
     const nullCode = { ...validFinding, dismissal_code: null };
     expect(findingRecordSchema.safeParse(nullCode).success).toBe(true);
   });
+
+  it('record finding accepts the optional code, detail, subjects, and request_id keys', () => {
+    const withOptionalKeys = {
+      ...validFinding,
+      code: 'submission.field-missing',
+      detail: null,
+      subjects: ['src/a.ts'],
+      request_id: 'R1',
+    };
+    expect(findingRecordSchema.safeParse(withOptionalKeys).success).toBe(true);
+
+    const withDetail = { ...withOptionalKeys, detail: 'format' };
+    expect(findingRecordSchema.safeParse(withDetail).success).toBe(true);
+  });
+
+  it('record finding rejects malformed optional keys', () => {
+    const withBadRequestId = { ...validFinding, request_id: 'R 1' };
+    expect(findingRecordSchema.safeParse(withBadRequestId).success).toBe(false);
+
+    const withBadSubjects = { ...validFinding, subjects: 'x' };
+    expect(findingRecordSchema.safeParse(withBadSubjects).success).toBe(false);
+
+    const withBadCode = { ...validFinding, code: '' };
+    expect(findingRecordSchema.safeParse(withBadCode).success).toBe(false);
+  });
 });

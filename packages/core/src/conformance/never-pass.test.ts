@@ -548,7 +548,7 @@ const TRIGGERS: { readonly [K in NonContentFailureCode]: Trigger } = {
       body: 'No crash',
       attachments: [],
       authorResponses: [],
-      policyRevision: 'local:' + 'a'.repeat(64),
+      policyRevision: 'HEAD',
     }),
 };
 

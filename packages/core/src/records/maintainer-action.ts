@@ -4,6 +4,7 @@ import {
   recordSchemaVersionSchema,
   recordTextSchema,
   recordPositiveIntSchema,
+  recordRunIdSchema,
   recordLoginSchema,
   recordTimestampSchema,
   recordCommitIdSchema,
@@ -73,7 +74,7 @@ export const maintainerActionRecordSchema = z
   .strictObject({
     schema_version: recordSchemaVersionSchema,
     record_type: z.literal('maintainer-action'),
-    run_id: recordPositiveIntSchema,
+    run_id: recordRunIdSchema,
     run_attempt: recordPositiveIntSchema,
     actor: recordLoginSchema,
     kind: maintainerActionKindSchema,

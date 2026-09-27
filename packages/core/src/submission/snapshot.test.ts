@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildIssueSnapshot, buildPullRequestSnapshot, snapshotHash } from './snapshot.js';
+import { buildIssueSnapshot, buildPullRequestSnapshot, snapshotHash, snapshotSchema } from './snapshot.js';
 import type { IssueSnapshotInput, PullRequestSnapshotInput, Snapshot } from './snapshot.js';
 import type { ContentHash } from '../hash.js';
 
@@ -231,7 +231,7 @@ describe('snapshot', () => {
           ...PR_INPUT,
           attachments: [{ url: 'http://example.com/a.txt', contentHash: null }],
         }),
-      () => buildPullRequestSnapshot({ ...PR_INPUT, policyRevision: `local:${'a'.repeat(64)}` }),
+      () => buildPullRequestSnapshot({ ...PR_INPUT, policyRevision: 'local:abc' }),
       () =>
         buildPullRequestSnapshot({
           ...PR_INPUT,
@@ -272,5 +272,48 @@ describe('snapshot', () => {
     expect(hashResult.ok).toBe(false);
     if (hashResult.ok) return;
     expect(hashResult.failure.code).toBe('snapshot.invalid');
+  });
+
+  it('snapshot accepts a local policy revision', () => {
+    const LOCAL = 'local:' + 'a'.repeat(64);
+
+    const issueResult = buildIssueSnapshot({ ...ISSUE_INPUT, policyRevision: LOCAL });
+    const prResult = buildPullRequestSnapshot({ ...PR_INPUT, policyRevision: LOCAL });
+    expect(issueResult.ok).toBe(true);
+    expect(prResult.ok).toBe(true);
+    if (!issueResult.ok || !prResult.ok) return;
+    expect(issueResult.value.policy_revision).toBe(LOCAL);
+    expect(issueResult.value.snapshot_version).toBe(1);
+    expect(prResult.value.policy_revision).toBe(LOCAL);
+    expect(prResult.value.snapshot_version).toBe(1);
+
+    const gitIssueResult = buildIssueSnapshot(ISSUE_INPUT);
+    const gitPrResult = buildPullRequestSnapshot(PR_INPUT);
+    expect(gitIssueResult.ok).toBe(true);
+    expect(gitPrResult.ok).toBe(true);
+    if (!gitIssueResult.ok || !gitPrResult.ok) return;
+    expect(snapshotHash(issueResult.value)).not.toEqual(snapshotHash(gitIssueResult.value));
+    expect(snapshotHash(prResult.value)).not.toEqual(snapshotHash(gitPrResult.value));
+
+    for (const invalidRevision of ['local:abc', 'HEAD']) {
+      const badIssue = buildIssueSnapshot({ ...ISSUE_INPUT, policyRevision: invalidRevision });
+      const badPr = buildPullRequestSnapshot({ ...PR_INPUT, policyRevision: invalidRevision });
+      expect(badIssue.ok).toBe(false);
+      expect(badPr.ok).toBe(false);
+      if (!badIssue.ok) {
+        expect(badIssue.failure.code).toBe('snapshot.invalid');
+      }
+      if (!badPr.ok) {
+        expect(badPr.failure.code).toBe('snapshot.invalid');
+      }
+    }
+
+    const golden = snapshotHash(gitPrResult.value);
+    expect(golden.ok).toBe(true);
+    if (!golden.ok) return;
+    expect(golden.value).toBe('sha256:c51c7fb289f3d86237aa171fbd7db4424ec96393edebaa923429774e2685021b');
+
+    const schemaResult = snapshotSchema.safeParse(prResult.value);
+    expect(schemaResult.success).toBe(true);
   });
 });

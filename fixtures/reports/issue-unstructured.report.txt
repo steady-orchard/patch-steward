@@ -1,0 +1,48 @@
+## Patch Steward screening report
+
+- Outcome: `needs-changes`
+- Submission: `octo/demo` issue `29`
+- Snapshot: `sha256:5555555555555555555555555555555555555555555555555555555555555555`
+- Policy revision: `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`
+- Run: `local-20260927T101500Z-3f9a1c2e` attempt `1`
+
+> Local run: produced on a maintainer's machine; not the repository's official screening result.
+
+### Classification
+
+- Form: none (unstructured). Claim classification: not determined; claim validation did not run.
+
+### Blockers
+
+1. The issue body does not match a supported issue form.
+   - Location: the issue body
+   - Evidence: `runs/issue-29/local-20260927T101500Z-3f9a1c2e/findings/finding-0001.json`
+   - Request `R1`: Rewrite the issue with one of the repository's issue forms: `https://github.com/octo/demo/issues/new/choose`
+
+### Uncertainties for maintainers
+
+- None.
+
+### Executed commands and results
+
+- None.
+
+### References
+
+- None.
+
+### Flagged automated activity
+
+- None.
+
+### What would change the outcome
+
+- Completing each numbered request changes this outcome.
+
+### Provenance
+
+- Policy revision: `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb` (trusted branch `main` at commit `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`)
+- Steward version: `0.0.0-golden`
+- Model: no model call in this run
+- Adapter and runtime: none
+- Runner: no execution in this run

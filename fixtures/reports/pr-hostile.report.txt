@@ -1,0 +1,59 @@
+## Patch Steward screening report
+
+- Outcome: `needs-changes`
+- Submission: `octo/demo` pull request `12`
+- Snapshot: `sha256:5555555555555555555555555555555555555555555555555555555555555555`
+- Target branch: `main`
+- Head commit: `cccccccccccccccccccccccccccccccccccccccc`
+- Base commit tested: `dddddddddddddddddddddddddddddddddddddddd`
+- Policy revision: `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`
+- Run: `local-20260927T101500Z-3f9a1c2e` attempt `1`
+
+> Local run: produced on a maintainer's machine; not the repository's official screening result.
+
+### Classification
+
+- Category: `bugfix`. Claim classification: not determined; claim validation did not run.
+- Note: Trusted paths changed (`@octocat`, `#1`, `<img src=x onerror=alert(1)>`, `[x](javascript:alert(1))`, ````a```b````, `line\nbreak`, `rtl\u{202E}evil`, `zero\u{200B}width`, `nul\u{0000}byte`, `dir/[REDACTED:github-token]` and 1 more); results from pull-request-controlled CI cannot (truncated)
+
+### Blockers
+
+1. The required "Regression test" section is absent or has no content.
+   - Location: the "Regression test" section of the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0001.json`
+   - Request `R1`: Fill in the "Regression test" section.
+2. The attachment `https://example.com/@octocat/#1/<img src=x onerror=alert(1)>` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0004.json`
+   - Request `R2`: Upload the file as a GitHub attachment instead of linking `https://example.com/@octocat/#1/<img src=x onerror=alert(1)>`.
+
+### Uncertainties for maintainers
+
+1. Execution-sensitive paths changed: `@octocat`, `#1`, `<img src=x onerror=alert(1)>`, `[x](javascript:alert(1))`, ````a```b````, `line\nbreak`, `rtl\u{202E}evil`, `zero\u{200B}width`, `nul\u{0000}byte`, `dir/[REDACTED:github-token]` and 1 more.
+   - Location: `@octocat`, `#1`, `<img src=x onerror=alert(1)>`, `[x](javascript:alert(1))`, ````a```b````, `line\nbreak`, `rtl\u{202E}evil`, `zero\u{200B}width`, `nul\u{0000}byte`, `dir/[REDACTED:github-token]` and 1 more
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0002.json`
+   - Decision needed: review these changes; test results from this pull request cannot be relied on until a maintainer does.
+
+### Executed commands and results
+
+- None.
+
+### References
+
+- None.
+
+### Flagged automated activity
+
+- None.
+
+### What would change the outcome
+
+- Completing each numbered request changes this outcome.
+
+### Provenance
+
+- Policy revision: `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb` (trusted branch `main` at commit `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`)
+- Steward version: `0.0.0-golden`
+- Model: no model call in this run
+- Adapter and runtime: none
+- Runner: no execution in this run

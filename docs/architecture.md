@@ -3,8 +3,11 @@
 **Status:** design document. Apart from the policy module (§8), the submission
 module's intake and deterministic contract check with the GitHub and Git reads it
 uses (§6.2, §6.3), the shared vocabularies and version-1 record schemas (§9), the
-redaction module, and `steward policy` and the deterministic part of
-`steward preflight` (§6.5), nothing described here is implemented. It records
+redaction module, the decision, report, and evidence modules with a local
+evidence store (§6.2, §11), the job phases of §6.4 running in one process for
+local runs, and `steward policy`, the deterministic part of `steward preflight`,
+`steward screen` at contract level, and `steward report` (§6.5), nothing
+described here is implemented. It records
 the architecture selected on September 15, 2026, with the LLM provider
 decisions revised on September 16, 2026 after the retirement of GitHub Models
 on July 30, 2026, for the goals in the
@@ -226,9 +229,9 @@ Logical modules. They are boundaries inside one package, not services.
 | References         | Resolve cited files, symbols, APIs, URLs, issues, PRs, and quoted text at the claimed revision; classify each as verified, unverified, or fabricated.                                                                                                                                                                                                                                                                                               |
 | Stages             | Claim validation, reproduction, fix verification, independent challenge, regression analysis. Each stage consumes typed inputs and emits typed findings and evidence references. The challenge stage never receives author prose.                                                                                                                                                                                                                   |
 | Execution planner  | Translate policy and submission into a bounded list of sandbox executions with expected results (for example, "must fail on base for the claimed reason").                                                                                                                                                                                                                                                                                          |
-| Decision           | Deterministic rules that combine stage results, findings, and evidence into one outcome. The model never decides.                                                                                                                                                                                                                                                                                                                                   |
-| Report             | Compose the single concise report and the check-run summary from typed findings; apply length caps; link evidence.                                                                                                                                                                                                                                                                                                                                  |
-| Evidence           | Typed records for runs, executions, findings, decisions, maintainer actions, and metrics events (§9); redaction before persistence.                                                                                                                                                                                                                                                                                                                 |
+| Decision           | Deterministic rules that combine stage results, findings, and evidence into one outcome. The model never decides. Implemented for local runs: the SP13 decision table in precedence order with waiting states as non-outcomes, `pass` reachable only through its last row, the required-stage plan, and §10's check-conclusion and lifecycle-label mappings as pure rules not used for any write.                                                   |
+| Report             | Compose the single concise report and the check-run summary from typed findings; apply length caps; link evidence. Implemented for local runs: fixed-order report and check-run summary text, report caps, escaping of derived text as code spans, and a wording denylist.                                                                                                                                                                          |
+| Evidence           | Typed records for runs, executions, findings, decisions, maintainer actions, and metrics events (§9); redaction before persistence. Implemented for local runs: record assembly, redaction of every stored string, pretty canonical JSON files, a manifest, a local store with staging and rename, verification of a stored run, metrics events, and bounded logs.                                                                                  |
 | Budget             | Enforce call, retry, timeout, resource, and byte limits; track inference usage across all sessions and stages, honoring provider-specific hard limits or soft caps (§12); evaluate approximate aggregate caps.                                                                                                                                                                                                                                      |
 | Ownership          | Deduplicate before claiming work; create the check when required, then upload the immutable ownership artifact as commitment; detect shared heads; verify freshness and newest committed owner before publication.                                                                                                                                                                                                                                  |
 | Adapter interfaces | LLM, GitHub, Git, Runner, Evidence store, Clock and identifiers.                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -241,8 +244,8 @@ Logical modules. They are boundaries inside one package, not services.
 | GitHub         | REST and GraphQL client                                                                   | Reads: submissions, diffs, files, check runs, workflow runs and attempts, merge-queue metadata, artifacts, collaborator permissions, search. Writes in `gate` and `publish` only: check runs, evidence commits, the report comment, reactions, labels, review requests, ready-for-review. Implemented so far: a read-only REST client on the built-in `fetch`, with no SDK dependency, for `https://api.github.com` only; every response is size-bounded and validated at runtime, pagination and retries are bounded, and every request counts against `limits.github.*` (a fixed budget before a policy is known, as in `steward preflight`). It reads repositories, issues, pull requests and their changed files, the open pull requests for a commit, issue comments, and the policy directory of a branch (ref, contents, tree, blob). GraphQL and every write are not implemented. |
 | Git            | Local git                                                                                 | Fetch by commit id, produce isolated checkouts, compute diffs, identify merge commits. Implemented so far: read-only plumbing through an argument vector with an inert environment: policy reads, changed paths between two commits (rename detection on, external diff and text conversion off, bounded), merge bases, commit parent counts, and discovery of a GitHub `upstream` or `origin` remote. Fetch by commit id and isolated checkouts are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Runner         | Actions container runner; local container runner; unsandboxed local runner                | The unsandboxed runner is selectable only in T2 and marks every result as a claim.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Evidence store | Orphan branch or separate repository                                                      | Append-only. `gate` reads bounded snapshots; `publish` appends official evidence. No mutable orchestration state. Local uploads are attributed and never satisfy official admission or baseline requirements without explicit maintainer action.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Clock and ids  | System clock; the Actions run id and attempt plus the snapshot hash identify a run        | Idempotent reruns and stable evidence paths.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Evidence store | Orphan branch or separate repository                                                      | Append-only. `gate` reads bounded snapshots; `publish` appends official evidence. No mutable orchestration state. Local uploads are attributed and never satisfy official admission or baseline requirements without explicit maintainer action. Implemented so far: a local store writing run directories under a local evidence directory for `steward screen` (§11); the orphan-branch and repository stores are not implemented.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Clock and ids  | System clock; the Actions run id and attempt plus the snapshot hash identify a run        | Idempotent reruns and stable evidence paths. Implemented for local runs: an injectable clock and random source, system clock and cryptographic random bytes by default; local runs are identified by `local-<YYYYMMDDTHHMMSSZ>-<8 lowercase hex>` (UTC start time plus 32 random bits) with attempt 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 LLM adapter contract:
 
@@ -355,6 +358,7 @@ maximum number of round pairs and skips unused rounds; policy can lower that
 maximum. Additional SP12 checks use the same pairs. No model job launches a
 container or executes submitted code. Every handoff carries run, attempt,
 snapshot, round, and remaining cumulative budget; all rounds stay in one run.
+For local runs the core runs these phases in one process and validates every handoff as a strict, versioned record whose size is bounded (§12.1).
 
 | Wrapper                   | Events                                                                                                                               | Purpose                                                                                                                                                                                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -501,11 +505,25 @@ executions start only after the contract gate and the cap check.
 | `steward screen`    | T3       | Run the full pipeline against a PR or issue with a local container sandbox, under the trusted-branch policy or an explicitly named local policy file; optionally post an attributed report comment.                                                                                                                                                        |
 | `steward replay`    | T4       | Run the pipeline over a labeled historical dataset with labels withheld; produce confusion counts, cost, and latency.                                                                                                                                                                                                                                      |
 | `steward policy`    | Any      | Validate a policy and show the revision that would govern a run (syntax and exit status below).                                                                                                                                                                                                                                                            |
-| `steward report`    | Any      | Render a stored run or evidence record locally.                                                                                                                                                                                                                                                                                                            |
+| `steward report`    | Any      | Verify a stored run directory and print its report.                                                                                                                                                                                                                                                                                                        |
 
-`steward policy` and the deterministic part of `steward preflight` are
-implemented; the other commands, and the mandatory commands and self-review of
-`steward preflight`, are not. The `steward policy` syntax:
+`steward policy`, the deterministic part of `steward preflight`, `steward screen`
+at contract level, and `steward report` are implemented; `steward init`,
+`steward replay`, the stages, local container runner, and publication of
+`steward screen`, and the mandatory commands and self-review of
+`steward preflight`, are not.
+
+Every command follows the same conventions: long flags only; `help` and `--help` print the usage, and `-h` is an
+unknown command (usage error); text lines on standard output; with `--json`, exactly one line of compact JSON with
+`schema_version` 1 on standard output, also on failure, and nothing on standard error; in text mode warnings
+`warning <code>: <message>` and errors `error <code> <path or ->: <message>` on standard error. Exit status `0`
+means success, `pass`, or a met contract; `1` `needs-changes`, `uncertain`, or invalid input (an invalid policy or
+policy file, stored evidence that fails verification); `2` a usage, environment, GitHub, or git failure, including
+an evidence write failure, an unreadable run directory, and a missing or invalid published policy for
+`steward screen`; `3` `inconclusive`, in every command. `steward policy` keeps its exit statuses below (it has no
+inconclusive result).
+
+The `steward policy` syntax:
 
 ```text
 steward policy [--ref <ref> | --file <path>] [--json]
@@ -538,10 +556,56 @@ validation errors instead. For `--pr`, the changed paths are the committed chang
 not read and nothing is fetched. The linked issue's existence is read through the GitHub API, attachments are
 checked statically and never fetched, and there is no snapshot and no shared-head check. The contract check is the
 one SP06 uses, and the output, as text lines or with `--json` one JSON object, states that it was produced on the
-contributor's machine and is unverified. Exit status `0` means the contract is met; `1` `needs-changes` or
-`uncertain`; `2` a usage or environment error, a GitHub or git failure, an invalid published policy, or an
-`inconclusive` result. The command writes nothing to GitHub, runs no repository or policy command, and sends no
-telemetry.
+contributor's machine and is unverified. Exit status `0` means the contract is met; `1` `needs-changes` or `uncertain`; `2` a usage or environment error, a GitHub or git failure, or an invalid published policy; `3` an `inconclusive` result. The command writes nothing to GitHub, runs no repository or policy command, and sends no telemetry.
+
+The `steward screen` syntax:
+
+```text
+steward screen (--issue <number> | --pr <number>) [--repo owner/name] [--policy-file <path>] [--evidence-dir <dir>] [--json]
+```
+
+It runs the §6.4 phases in one process at contract level: `gate` loads the policy, captures the submission through
+the GitHub API as SP06 does (issue or pull request, linked issue, attachments, open pull requests sharing the head
+commit), hashes the snapshot, checks the contract, and plans the required stages; `intake`, `execute`, and `assess`
+run no stage, model call, or execution; `publish` decides (SP13 step 1), renders the report and check-run summary
+(step 2), and writes the run directory to the local evidence store (step 3, §11). Upstream is `--repo`, else the
+GitHub repository of the `upstream` remote, else of `origin` (remotes are read only without `--repo`). Without
+`--policy-file`, the policy is the one on the upstream default branch read through the GitHub API (revision the
+git tree id; branch and commit recorded); no published policy exits 2 `screen.policy-missing`; an invalid one exits
+2 `screen.policy-invalid`; the default checklist is never used. With `--policy-file`, that local file governs,
+revision `local:<sha256>`, non-authoritative; an invalid file exits 1 `screen.policy-file-invalid`. A run exists
+once `gate` succeeds; earlier failures write nothing and exit 2 (1 for an invalid policy file). Failures in
+`intake`, `execute`, or `assess` are recorded causes (`inconclusive`, exit 3). A failure inside `publish` writes no
+run directory, prints no report, and exits 2 (`screen.evidence-write-failed`). Because no stage exists yet, a run
+ends `needs-changes` when the contract fails, otherwise `inconclusive` with cause `stage-incomplete`.
+
+The evidence directory is `--evidence-dir`, else the user data directory (`%LOCALAPPDATA%\patch-steward\evidence`
+on Windows, `~/Library/Application Support/patch-steward/evidence` on macOS, `$XDG_DATA_HOME/patch-steward/evidence`
+or `~/.local/share/patch-steward/evidence` elsewhere), never inside the checkout by default; an `--evidence-dir`
+inside the current git work tree draws the warning `screen.evidence-inside-checkout`. Output is text lines, or with
+`--json` one object with `schema_version`, `command`, `local_run`, `authoritative`, `notices`, `repository`,
+`submission`, `policy`, `run`, `outcome`, `causes`, `findings`, `requests`, `warnings`, `errors`. Every output
+states the run is local and not the repository's official result (`local_run` is always true); `authoritative` is
+true exactly when the policy came from the trusted branch, and a local-policy run is labeled non-authoritative in
+the report, the check summary, and the text and JSON output. The command sends GET requests only: nothing is
+written to GitHub, no check is created, and no publication flag exists yet.
+
+The `steward report` syntax:
+
+```text
+steward report <run-dir> [--json]
+```
+
+It verifies the stored run directory before printing anything (the manifest validates; every listed file exists
+with its byte count and SHA-256; no unlisted file exists; every record validates against its schema and matches its
+content hash; `report.md` equals the report record's rendered text; the run's metrics file matches when present,
+and a missing one is the warning `report.metrics-missing`); stored text with a control or format character is
+refused; then it prints `report.md` byte for byte, or with `--json` one object with `schema_version`, `command`,
+`local_run`, `authoritative`, `notices`, `run`, `submission`, `policy`, `outcome`, `causes`, `report`,
+`check_summary`, `integrity`, `warnings`, `errors`. Exit status follows the stored outcome (`0` `pass`; `1`
+`needs-changes`, `uncertain`, `superseded`, or `overridden`, because the version-1 decision record carries no
+effective outcome; `3` `inconclusive`); evidence that fails verification exits 1 (`report.evidence-invalid`); a
+missing or unreadable directory or a usage error exits 2.
 
 The CLI authenticates to GitHub with the user's own token, resolved in this
 order: `GH_TOKEN`, `GITHUB_TOKEN`, then `gh auth token` for `github.com`, run as a
@@ -795,19 +859,19 @@ identifiers are bounded (§12). Schemas evolve by one rule, which also governs
 the policy's `version`: an optional addition keeps the version; a removal,
 rename, or change of meaning increments it; an unknown version is a typed
 failure and never a pass. Before the steward's 1.0 release, an increment needs
-no migration of evidence recorded by test installations.
+no migration of evidence recorded by test installations. Stored records are written one JSON file per record in the layout of §11: UTF-8 without byte-order mark, keys at every level in RFC 8785 key order, two-space indentation, non-empty arrays and objects expanded one member per line and empty ones inline, LF line endings and one final LF, so parsing a file and canonicalizing it yields the record's content hash.
 
-| Entity            | Identity                                                                                                                                                     | Key content                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Policy revision   | git tree id of the policy directory at the trusted commit (`local:<sha256>` for a named local file, never authoritative); trusted commit id and ref recorded | Resolved policy with effective values, authority flag, steward version, load time                                                                                                                                                                                                                                                                                                                                                                                          |
-| Submission        | Repository, type, number, snapshot hash, target branch and head (PRs)                                                                                        | Parsed fields, template form and version, category, linked-evidence hashes, author responses to numbered requests, open PRs sharing the head commit, contract results, trusted/execution-sensitive path flags; optionally the snapshot, including the base commit (recorded, not hashed), policy-change data with the proposed file's validation result, attachments (URL, format, bytes, content hash, whether required, archive entries), and the claim-scope hash (PRs) |
-| Run               | Actions run id and attempt; submission or merge-group snapshot                                                                                               | Base/head or group commit, owned check id, policy revision, steward version, provider, requested and reported model identifiers, adapter version, generation settings, runner identity, mode, timestamps, budget consumption                                                                                                                                                                                                                                               |
-| Execution record  | Run and plan entry                                                                                                                                           | Command, environment identity, exit status, bounded output, declared result files, test identity, commit ids, admissibility (evidence or signal)                                                                                                                                                                                                                                                                                                                           |
-| Finding           | Run and stage                                                                                                                                                | Severity (`blocking`, `uncertain`, `advisory`, `speculative`), scenario, location, evidence, requirement/expectation basis, dismissal code                                                                                                                                                                                                                                                                                                                                 |
-| Decision          | Run                                                                                                                                                          | Outcome, contributing findings, unmet requirements, requests to the contributor                                                                                                                                                                                                                                                                                                                                                                                            |
-| Report            | Run                                                                                                                                                          | Rendered report and check summary, bound identifiers                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Maintainer action | Run and actor                                                                                                                                                | Kind (`override`, `guidance`, `waiver`, `acceptance`, `resolution`, `inference-admission`), reason, actor, time, and immutable scope. Overrides/waivers bind to PR head/target and requirements or issue snapshot. Issue acceptance binds to proposal content hash; PR acceptance binds to repository/PR, target, and canonical claim-scope text hash, excluding implementation commits. Only `/steward accept` records acceptance; labels do not.                         |
-| Metrics event     | Run or submission and timestamp                                                                                                                              | State transition, cost, latency, maintainer resolution, appeal, audit result                                                                                                                                                                                                                                                                                                                                                                                               |
+| Entity            | Identity                                                                                                                                                                          | Key content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Policy revision   | git tree id of the policy directory at the trusted commit (`local:<sha256>` for a named local file, never authoritative); trusted commit id and ref recorded                      | Resolved policy with effective values, authority flag, steward version, load time                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Submission        | Repository, type, number, snapshot hash, target branch and head (PRs)                                                                                                             | Parsed fields, template form and version, category, linked-evidence hashes, author responses to numbered requests, open PRs sharing the head commit, contract results, trusted/execution-sensitive path flags; optionally the snapshot, including the base commit (recorded, not hashed), policy-change data with the proposed file's validation result, attachments (URL, format, bytes, content hash, whether required, archive entries), and the claim-scope hash (PRs); an unstructured issue, which matched no issue form, records no template and no issue kind |
+| Run               | Actions run id and attempt, or a local run id `local-<YYYYMMDDTHHMMSSZ>-<8 lowercase hex>` (UTC start time and 32 random bits) with attempt 1; submission or merge-group snapshot | Base/head or group commit, owned check id, policy revision, steward version, provider, requested and reported model identifiers, adapter version, generation settings, runner identity, mode, timestamps, budget consumption                                                                                                                                                                                                                                                                                                                                          |
+| Execution record  | Run and plan entry                                                                                                                                                                | Command, environment identity, exit status, bounded output, declared result files, test identity, commit ids, admissibility (evidence or signal)                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Finding           | Run and stage; finding ids are `finding-<4-digit sequence>` in decision order                                                                                                     | Severity (`blocking`, `uncertain`, `advisory`, `speculative`), scenario, location, evidence, requirement/expectation basis, dismissal code, optionally the finding code and detail, the subjects it names (paths, URLs, pull request numbers), and the `request_id` of the request it produced                                                                                                                                                                                                                                                                        |
+| Decision          | Run                                                                                                                                                                               | Outcome, contributing findings, unmet requirements, requests to the contributor, optionally the recorded causes (cause, code, message, subjects) of an `inconclusive` outcome                                                                                                                                                                                                                                                                                                                                                                                         |
+| Report            | Run                                                                                                                                                                               | Rendered report and check summary, bound identifiers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Maintainer action | Run and actor                                                                                                                                                                     | Kind (`override`, `guidance`, `waiver`, `acceptance`, `resolution`, `inference-admission`), reason, actor, time, and immutable scope. Overrides/waivers bind to PR head/target and requirements or issue snapshot. Issue acceptance binds to proposal content hash; PR acceptance binds to repository/PR, target, and canonical claim-scope text hash, excluding implementation commits. Only `/steward accept` records acceptance; labels do not.                                                                                                                    |
+| Metrics event     | Run or submission and timestamp                                                                                                                                                   | State transition, cost, latency, maintainer resolution, appeal, audit result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 Findings name a concrete scenario, a code or submission-field location, and
 evidence references. `uncertain` means a required decision remains unresolved;
@@ -832,10 +896,10 @@ The snapshot is a strict, versioned object (`snapshot_version: 1`). An issue
 snapshot holds the repository, type, number, issue content hash, attachments
 (URL and content hash, or null when an optional fetch failed), author responses
 (request id, comment id, and content hash, or null for a deleted comment), and
-the policy revision. A PR snapshot holds the repository, type, number, target
+the policy revision (a git tree id, or `local:<sha256>` for a named local policy file). A PR snapshot holds the repository, type, number, target
 branch (base ref), head commit, base commit, body hash, linked issue
 (repository, number, content hash), attachments, author responses, the numbers
-of the other open PRs sharing the head commit, and the policy revision. The
+of the other open PRs sharing the head commit, and the policy revision (a git tree id, or `local:<sha256>` for a named local policy file; a run under a local policy file binds that revision). The
 snapshot hash is the SHA-256 of the RFC 8785 canonical JSON of the snapshot
 without its base commit, written `sha256:<64 hex>`; freshness compares hashes
 only, so the base commit, like the trusted-branch commit, never supersedes a run
@@ -895,7 +959,7 @@ that the previous certification still stands. GitHub API writes are not
 atomic with user edits: a check certifies the recorded snapshot, and event
 delivery or API outages can delay supersession.
 
-Check disposition takes precedence over ordinary mode mapping. Queued and
+Check disposition takes precedence over ordinary mode mapping. The check-conclusion and lifecycle-label mappings of this section are implemented in the decision module as pure rules, blocking exceptions first, and no GitHub write uses them yet. Queued and
 awaiting-approval runs keep any check `in_progress`; superseded runs may
 complete only their own still-pending check as `cancelled`, never `neutral`
 or `skipped`, and do not touch reports or labels. If cleanup cannot run,
@@ -954,9 +1018,40 @@ push restriction is unavailable: an accepted limitation, like enforcement
 and the merge-queue relay (§10). `steward init` and the SP02 step 4
 precondition detect the refusal and report that the control is unavailable.
 
-Layout concept: one directory per run holding the run record, execution
-records, findings, the rendered report, redacted bounded logs, and maintainer
-actions; monthly metrics events; a generated index. The store is append-only:
+Layout, the subtree the branch or repository store holds at its root:
+
+```text
+<evidence-dir>/<owner>/<repo>/            (the subtree the branch or repository store holds at its root)
+  runs/<pr|issue>-<number>/<run-id>/
+    manifest.json          written last; its presence marks a complete run directory
+    run.json, submission.json, policy-revision.json, decision.json
+    report.json            rendered report and check summary
+    report.md              identical to the report record's rendered text
+    findings/finding-0001.json            one finding per file, in decision order
+    executions/execution-0001.json        (directory absent when empty)
+    maintainer-actions/action-0001.json   (directory absent when empty)
+    logs/steward.txt       redacted, bounded run log
+  metrics/<YYYY-MM>/<run-id>.json   JSON array of the run's metrics events; UTC month of the run start
+```
+
+Run id: `<run_id>-<run_attempt>` for Actions runs, the local run id for local runs. Metrics events per run: a state
+transition to `screening` when `gate` completes, one latency event per executed phase, one cost event, and a state
+transition to the outcome at `publish`. Manifest (`manifest_version` 1): `run_id`, `run_attempt`, `store_path`,
+`created_at`, `files` (every file except the manifest, sorted by path with POSIX separators, each with `bytes`, the
+`sha256` of its raw bytes, and for records `record_type` and the RFC 8785 `content_hash`, else null), `metrics` (`path`,
+`bytes`, `sha256`), and `redaction` (built-in detector ids, policy pattern ids, the number of exact values, replacement
+counts per id). Write protocol: every file is written with exclusive create into `runs/.staging/<run-id>/`, never
+overwriting; the metrics file is created exclusively at its final path; the manifest is written last; renaming the
+staging directory to its final path is the commit point and fails if the target exists; on any failure before the
+rename the staging directory and the metrics file are removed and the write fails, so a final run directory never
+exists without its manifest. Size caps: the run directory plus metrics file stay within `limits.evidence.run_bytes`;
+logs are truncated first (head and tail kept with a marker line), each log file at most 1048576 bytes and at most 16
+log files; at most 4096 files per run directory; records and report alone over the limit fail the write.
+`limits.evidence.write_retries` applies only to the branch or repository store; local writes do not retry. Implemented
+so far: the local store, used by `steward screen` (§6.5); `steward report` verifies a run directory against its
+manifest.
+
+The store is append-only:
 supersession and maintainer-action events are appended, retention pruning is
 the only deletion, and writes retry a bounded number of times on
 non-fast-forward pushes. The store holds no reservations, leases, or other
@@ -970,7 +1065,15 @@ Publication: the maintenance workflow regenerates the index, metrics rollups,
 queues, and the public policy subset, combines them with the pinned web bundle,
 and deploys to GitHub Pages. Redaction runs before evidence is written: the
 built-in credential detectors always run, followed by the policy's safe-subset patterns (§8), and a redaction
-timeout fails closed. The public subset holds at most the §6.6 sections, minus those the policy excludes.
+timeout fails closed. Coverage: besides the built-in detectors (23: the eight credential formats plus fifteen
+prefixed token formats such as npm, PyPI, GitLab, Slack, Stripe, Google, Hugging Face, Docker Hub, SendGrid,
+Shopify, and DigitalOcean tokens) and the policy's safe-subset patterns, every credential the process resolved
+(the CLI's GitHub token now) is replaced as an exact value in three forms (the raw value, its base64, and the
+base64 of `x-access-token:<value>`), values shorter than 8 characters excepted; redaction covers every string of
+every record, the rendered report and check summary, every log, and the manifest, in batches under the redaction
+bounds; every record is validated again after redaction, and a record that a redaction marker invalidates (for
+example a snapshot whose attachment URL carries credentials) fails the write, as do a redaction failure, an
+oversize input, and a timeout: no run directory and no report. The public subset holds at most the §6.6 sections, minus those the policy excludes.
 Private target repositories are supported, but no subset is published for them unless the policy sets both
 `evidence.publication.pages` and `evidence.publication.private_repository` to `true`; with `pages: false` no
 repository publishes one. The private evidence records and Actions
@@ -1041,7 +1144,7 @@ summaries remain the maintainer view when no public dashboard is permitted.
 - Failure classes and outcomes: infrastructure failure, model unavailable or
   retired, missing or unusable model credential, capability mismatch, model
   refusal, malformed structured output after bounded repair attempts, budget
-  exhausted, and environment unavailable end as `inconclusive` when
+  exhausted, environment unavailable, and a required stage that produced no result (`stage-incomplete`) end as `inconclusive` when
   required work cannot complete. Control-path changes prevent reliance on PR
   CI; execution-sensitive path changes require maintainer triage (`uncertain`
   until resolved). Missing contributor evidence (a required field, reference,
@@ -1123,54 +1226,65 @@ credits of each run's allowance are not spendable (PA08.5).
 
 Hard-only constants, which no policy can set:
 
-| Constant                                   | Value            |
-| ------------------------------------------ | ---------------- |
-| Policy file size                           | 262144 bytes     |
-| Policy YAML nesting depth                  | 32               |
-| Policy YAML node count                     | 20000            |
-| Policy string length                       | 16384 characters |
-| Repository path, glob, and base URL length | 512 characters   |
-| Id and dismissal-code length               | 64 characters    |
-| Policy list length                         | 1000 items       |
-| Project dismissal codes                    | 100              |
-| Dismissal-code definition length           | 300 characters   |
-| Label name length                          | 50 characters    |
-| Label description length                   | 100 characters   |
-| Policy redaction patterns                  | 50               |
-| Redaction pattern length                   | 256 characters   |
-| Redaction input per call                   | 8388608 bytes    |
-| Redaction time per call                    | 2000 ms          |
-| Git subprocess timeout                     | 30000 ms         |
-| Git text output                            | 1048576 bytes    |
-| Validation errors reported                 | 100              |
-| Excerpt of an offending value              | 80 characters    |
-| Record text field length                   | 65536 characters |
-| Record list length                         | 1000 items       |
-| Record identifier length                   | 256 characters   |
-| Submission body and field text             | 65536 characters |
-| Preflight draft file size                  | 262144 bytes     |
-| Submission title (read, never parsed)      | 1024 characters  |
-| Changed paths per diff                     | 3000             |
-| Changed path length                        | 4096 bytes       |
-| GitHub response body                       | 5242880 bytes    |
-| GitHub request timeout                     | 30000 ms         |
-| GitHub page size                           | 100 items        |
-| GitHub pages per listing                   | 30               |
-| GitHub retry wait honored                  | 60 s             |
-| Preflight GitHub requests                  | 20               |
-| Preflight GitHub retries per request       | 2                |
-| Open PRs sharing a head commit listed      | 100              |
-| Attachment URL length                      | 2048 characters  |
-| Archive entries                            | 1000             |
-| Archive entry name length                  | 512 bytes        |
-| `gh auth token` timeout                    | 10000 ms         |
-| `gh auth token` output                     | 4096 bytes       |
-| Linked issues per pull request             | 1                |
-| Author responses per snapshot              | 1000             |
-| Supported policy version                   | 1                |
-| Record schema version                      | 1                |
+| Constant                                   | Value                                                                                                                                                                                                           |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Policy file size                           | 262144 bytes                                                                                                                                                                                                    |
+| Policy YAML nesting depth                  | 32                                                                                                                                                                                                              |
+| Policy YAML node count                     | 20000                                                                                                                                                                                                           |
+| Policy string length                       | 16384 characters                                                                                                                                                                                                |
+| Repository path, glob, and base URL length | 512 characters                                                                                                                                                                                                  |
+| Id and dismissal-code length               | 64 characters                                                                                                                                                                                                   |
+| Policy list length                         | 1000 items                                                                                                                                                                                                      |
+| Project dismissal codes                    | 100                                                                                                                                                                                                             |
+| Dismissal-code definition length           | 300 characters                                                                                                                                                                                                  |
+| Label name length                          | 50 characters                                                                                                                                                                                                   |
+| Label description length                   | 100 characters                                                                                                                                                                                                  |
+| Policy redaction patterns                  | 50                                                                                                                                                                                                              |
+| Redaction pattern length                   | 256 characters                                                                                                                                                                                                  |
+| Redaction input per call                   | 8388608 bytes                                                                                                                                                                                                   |
+| Redaction time per call                    | 2000 ms                                                                                                                                                                                                         |
+| Git subprocess timeout                     | 30000 ms                                                                                                                                                                                                        |
+| Git text output                            | 1048576 bytes                                                                                                                                                                                                   |
+| Validation errors reported                 | 100                                                                                                                                                                                                             |
+| Excerpt of an offending value              | 80 characters                                                                                                                                                                                                   |
+| Record text field length                   | 65536 characters                                                                                                                                                                                                |
+| Record list length                         | 1000 items                                                                                                                                                                                                      |
+| Record identifier length                   | 256 characters                                                                                                                                                                                                  |
+| Submission body and field text             | 65536 characters                                                                                                                                                                                                |
+| Preflight draft file size                  | 262144 bytes                                                                                                                                                                                                    |
+| Submission title (read, never parsed)      | 1024 characters                                                                                                                                                                                                 |
+| Changed paths per diff                     | 3000                                                                                                                                                                                                            |
+| Changed path length                        | 4096 bytes                                                                                                                                                                                                      |
+| GitHub response body                       | 5242880 bytes                                                                                                                                                                                                   |
+| GitHub request timeout                     | 30000 ms                                                                                                                                                                                                        |
+| GitHub page size                           | 100 items                                                                                                                                                                                                       |
+| GitHub pages per listing                   | 30                                                                                                                                                                                                              |
+| GitHub retry wait honored                  | 60 s                                                                                                                                                                                                            |
+| Preflight GitHub requests                  | 20                                                                                                                                                                                                              |
+| Preflight GitHub retries per request       | 2                                                                                                                                                                                                               |
+| Open PRs sharing a head commit listed      | 100                                                                                                                                                                                                             |
+| Attachment URL length                      | 2048 characters                                                                                                                                                                                                 |
+| Archive entries                            | 1000                                                                                                                                                                                                            |
+| Archive entry name length                  | 512 bytes                                                                                                                                                                                                       |
+| `gh auth token` timeout                    | 10000 ms                                                                                                                                                                                                        |
+| `gh auth token` output                     | 4096 bytes                                                                                                                                                                                                      |
+| Linked issues per pull request             | 1                                                                                                                                                                                                               |
+| Author responses per snapshot              | 1000                                                                                                                                                                                                            |
+| Report maximum                             | 60000 characters                                                                                                                                                                                                |
+| Check-run summary maximum                  | 8000 characters                                                                                                                                                                                                 |
+| Report items per section                   | Blockers 20; uncertainties 10; executed commands 10; references 20; flagged items 10; what-would-change items 10; classification notes 10                                                                       |
+| Report item length                         | Header 3000; classification line 300; note 300; blocker 1000; uncertainty 800; executed command 600; reference 250; flagged item 300; what-would-change item 500; provenance 1500; overflow line 300 characters |
+| Derived value per report occurrence        | 200 characters                                                                                                                                                                                                  |
+| Subjects listed per report item            | 10                                                                                                                                                                                                              |
+| Evidence log file                          | 1048576 bytes                                                                                                                                                                                                   |
+| Evidence log files per run                 | 16                                                                                                                                                                                                              |
+| Exact-value credential minimum length      | 8 characters                                                                                                                                                                                                    |
+| Files per run directory                    | 4096                                                                                                                                                                                                            |
+| Handoff record (canonical JSON)            | 8388608 bytes                                                                                                                                                                                                   |
+| Supported policy version                   | 1                                                                                                                                                                                                               |
+| Record schema version                      | 1                                                                                                                                                                                                               |
 
-Every constant is a maximum except the two versions, which are the only accepted values.
+Every constant is a maximum except the exact-value credential minimum length, which is a minimum, and the two versions, which are the only accepted values. Report lengths count UTF-16 code units, flagged items are also limited by `hygiene.max_flagged`, and a rendered report or summary over its maximum fails publication rather than being truncated.
 
 The submission body, draft, and title bounds are GitHub's own limits used as
 input-safety bounds: a body from GitHub over the limit is a malformed response
@@ -1198,7 +1312,7 @@ over the changed-path bound cannot be classified and is
 | Model failure or refusal                                             | `inconclusive`, bounded retries, reported plainly.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Shared model blind spots                                             | Independent challenge with a clean context; validate expectations against trusted requirements, then execute counterexamples. Non-executable quality concerns are advisory; agreement is not proof.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Attachment fetch aimed at internal hosts or used to leak credentials | Only `https` URLs whose host is an approved destination, with no user information or explicit port; every resolved address must be public (private, loopback, link-local, shared, benchmarking, multicast, and reserved IPv4 and IPv6 ranges, including IPv4-mapped forms, are refused) and the connection uses the checked address; every redirect hop is checked again and counted; requests carry no `Authorization` header, cookie, token, or proxy credential and ignore proxy settings; time, bytes, and redirects are bounded, and bytes are hashed as received; archives are inspected under entry and decompression bounds and never extracted; images are never decoded. |
-| Credential leakage in logs                                           | Bounded capture and redaction before artifact upload and evidence write.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Credential leakage in logs                                           | Bounded capture and redaction before artifact upload and evidence write, including exact-value redaction of every credential the process resolved and prefixed token formats (§11).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Compromised steward release                                          | Pin reusable workflows/actions by immutable commit SHA; review updates through protected policy/wrapper paths where the repository's plan and visibility offer rulesets (§7 "Rulesets"); the Copilot CLI runtime is the bundled, lockfile-pinned package with auto-update disabled and no path override in Actions.                                                                                                                                                                                                                                                                                                                                                                |
 | Model credential exposure                                            | The provider key or Copilot-scoped token exists only in `intake` and `assess`, which hold no App key; injected credential values and recognizable token patterns are redacted from artifacts, logs, and evidence; the credential never enters model context.                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Copilot runtime reads instruction files or uses tools                | The adapter starts the runtime in an empty working directory outside any checkout with a fresh `COPILOT_HOME`, no custom-instruction directories, no MCP servers, every built-in tool excluded, and a deny-all permission handler; prepared context travels only in the message. Whether read-only built-in tools consult the handler is unconfirmed (§15), so the empty directory is the primary control.                                                                                                                                                                                                                                                                         |
@@ -1230,7 +1344,6 @@ over the changed-path bound cannot be classified and is
 
 ## 15. Open implementation decisions
 
-- The evidence store's run-directory layout and stored-record file format.
 - Container image strategy: project-provided image, generated image from
   policy-declared toolchains, or both; image build caching.
 - Network policy for dependency installation inside the sandbox.

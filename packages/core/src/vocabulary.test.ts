@@ -24,6 +24,8 @@ import {
   modeSchema,
   OUTCOMES,
   outcomeSchema,
+  PIPELINE_STAGES,
+  pipelineStageSchema,
   PR_CLAIM_CLASSIFICATIONS,
   prClaimClassificationSchema,
   REFERENCE_STATUSES,
@@ -89,6 +91,12 @@ const vocabularies: ReadonlyArray<{
   },
   { name: 'MODES', tuple: MODES, schema: modeSchema, expected: ['observe', 'advise', 'enforce'] },
   { name: 'STAGE_IDS', tuple: STAGE_IDS, schema: stageIdSchema, expected: ['fix-verification', 'regression', 'challenge'] },
+  {
+    name: 'PIPELINE_STAGES',
+    tuple: PIPELINE_STAGES,
+    schema: pipelineStageSchema,
+    expected: ['references', 'claim', 'reproduction', 'fix-verification', 'regression', 'challenge'],
+  },
   { name: 'SUBMISSION_TYPES', tuple: SUBMISSION_TYPES, schema: submissionTypeSchema, expected: ['issue', 'pull_request'] },
   { name: 'ISSUE_KINDS', tuple: ISSUE_KINDS, schema: issueKindSchema, expected: ['defect', 'proposal'] },
   {
@@ -128,6 +136,7 @@ const vocabularies: ReadonlyArray<{
       'llm-not-configured',
       'cancelled',
       'steward-defect',
+      'stage-incomplete',
     ],
   },
   {
@@ -176,8 +185,16 @@ describe('vocabularies', () => {
     }
   });
 
-  it('FAILURE_CAUSES has 19 entries', () => {
-    expect(FAILURE_CAUSES.length).toBe(19);
+  it('FAILURE_CAUSES has 20 entries ending with stage-incomplete', () => {
+    expect(FAILURE_CAUSES.length).toBe(20);
+    expect(FAILURE_CAUSES[19]).toBe('stage-incomplete');
+  });
+
+  it('every stage id is a pipeline stage', () => {
+    const pipelineStageSet = new Set<string>(PIPELINE_STAGES);
+    for (const value of STAGE_IDS) {
+      expect(pipelineStageSet.has(value)).toBe(true);
+    }
   });
 
   it('BUILT_IN_DISMISSAL_CODES has 9 entries', () => {

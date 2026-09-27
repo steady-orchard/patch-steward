@@ -517,7 +517,7 @@ describe('runPreflightCommand', () => {
       env: { GH_TOKEN: 'token-a' },
       fetch: routed(routes, seen),
     });
-    expect(r.exit).toBe(2);
+    expect(r.exit).toBe(3);
     const parsed = JSON.parse(r.stdout) as { contract: { disposition: string; inconclusive: { code: string }[] } };
     expect(parsed.contract.disposition).toBe('inconclusive');
     expect(parsed.contract.inconclusive[0]?.code).toBe('github.unexpected-status');

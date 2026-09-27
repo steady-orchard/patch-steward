@@ -7,6 +7,7 @@ import {
   recordCommitIdSchema,
   recordIdentifierSchema,
   recordList,
+  policyRevisionIdSchema,
 } from '../records/common.js';
 import { ATTACHMENT_URL_MAX_LENGTH, SHARED_HEAD_PULL_REQUESTS_MAX, LINKED_ISSUES_PER_PULL_REQUEST } from '../policy/bounds.js';
 import { contentHash, canonicalJsonHash } from '../hash.js';
@@ -82,7 +83,7 @@ const issueSnapshotShape = z.strictObject({
   content_hash: recordContentHashSchema,
   attachments: recordList(attachmentSchema),
   author_responses: recordList(authorResponseSchema),
-  policy_revision: recordCommitIdSchema,
+  policy_revision: policyRevisionIdSchema,
 });
 
 export const issueSnapshotSchema = issueSnapshotShape.superRefine(checkOrder);
@@ -100,7 +101,7 @@ const pullRequestSnapshotShape = z.strictObject({
   attachments: recordList(attachmentSchema),
   author_responses: recordList(authorResponseSchema),
   shared_head_pull_requests: z.array(recordPositiveIntSchema).max(SHARED_HEAD_PULL_REQUESTS_MAX),
-  policy_revision: recordCommitIdSchema,
+  policy_revision: policyRevisionIdSchema,
 });
 
 export const pullRequestSnapshotSchema = pullRequestSnapshotShape.superRefine((value, ctx) => {

@@ -533,7 +533,7 @@ describe('preflight command fixture corpus', () => {
           fetch: fetchFor(testbedRoutes(), { [`${TESTBED_REPO_PATH}/issues/29`]: 422 }),
         },
       );
-      expect(inconclusive.exit).toBe(2);
+      expect(inconclusive.exit).toBe(3);
       const inconclusiveReport = JSON.parse(inconclusive.stdout) as JsonReport;
       expect(inconclusiveReport.contract?.disposition).toBe('inconclusive');
       expect(inconclusiveReport.contract?.inconclusive[0]?.code).toBe('github.unexpected-status');

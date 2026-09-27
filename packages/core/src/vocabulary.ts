@@ -44,6 +44,10 @@ export const STAGE_IDS = ['fix-verification', 'regression', 'challenge'] as cons
 export const stageIdSchema = z.enum(STAGE_IDS);
 export type StageId = z.infer<typeof stageIdSchema>;
 
+export const PIPELINE_STAGES = ['references', 'claim', 'reproduction', 'fix-verification', 'regression', 'challenge'] as const;
+export const pipelineStageSchema = z.enum(PIPELINE_STAGES);
+export type PipelineStage = z.infer<typeof pipelineStageSchema>;
+
 export const SUBMISSION_TYPES = ['issue', 'pull_request'] as const;
 export const submissionTypeSchema = z.enum(SUBMISSION_TYPES);
 export type SubmissionType = z.infer<typeof submissionTypeSchema>;
@@ -91,6 +95,7 @@ export const FAILURE_CAUSES = [
   'llm-not-configured',
   'cancelled',
   'steward-defect',
+  'stage-incomplete',
 ] as const;
 export const failureCauseSchema = z.enum(FAILURE_CAUSES);
 export type FailureCause = z.infer<typeof failureCauseSchema>;

@@ -1,0 +1,230 @@
+{
+  "cases": [
+    {
+      "name": "issue-defect-complete",
+      "repository": "testbed",
+      "submission": { "type": "issue", "number": 29 },
+      "body": "defect-complete.txt",
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": {
+        "exit_status": 3,
+        "run_directory": true,
+        "outcome": "inconclusive",
+        "finding_codes": [],
+        "contributing_codes": [],
+        "causes": ["stage-incomplete"],
+        "authoritative": false,
+        "policy_revision": "local"
+      }
+    },
+    {
+      "name": "issue-unstructured",
+      "repository": "testbed",
+      "submission": { "type": "issue", "number": 29 },
+      "body": null,
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": {
+        "exit_status": 1,
+        "run_directory": true,
+        "outcome": "needs-changes",
+        "finding_codes": ["submission.unstructured"],
+        "contributing_codes": ["submission.unstructured"],
+        "causes": [],
+        "authoritative": false,
+        "policy_revision": "local"
+      }
+    },
+    {
+      "name": "pr-bugfix-complete",
+      "repository": "testbed",
+      "submission": { "type": "pull_request", "number": 26 },
+      "body": "pr-bugfix-complete.txt",
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": {
+        "exit_status": 3,
+        "run_directory": true,
+        "outcome": "inconclusive",
+        "finding_codes": [],
+        "contributing_codes": [],
+        "causes": ["stage-incomplete"],
+        "authoritative": false,
+        "policy_revision": "local"
+      }
+    },
+    {
+      "name": "pr-field-missing",
+      "repository": "testbed",
+      "submission": { "type": "pull_request", "number": 26 },
+      "body": "pr-bugfix-complete.txt",
+      "replace": [{ "from": "`src/parse.test.ts`, test `parses an empty file`", "to": "<!-- none -->" }],
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": {
+        "exit_status": 1,
+        "run_directory": true,
+        "outcome": "needs-changes",
+        "finding_codes": ["submission.field-missing"],
+        "contributing_codes": ["submission.field-missing"],
+        "causes": [],
+        "authoritative": false,
+        "policy_revision": "local"
+      }
+    },
+    {
+      "name": "pr-execution-sensitive",
+      "repository": "testbed",
+      "submission": { "type": "pull_request", "number": 26 },
+      "body": "pr-chore.txt",
+      "files": "diffs/package-json.json",
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": {
+        "exit_status": 3,
+        "run_directory": true,
+        "outcome": "inconclusive",
+        "finding_codes": ["submission.execution-sensitive-change"],
+        "contributing_codes": ["submission.execution-sensitive-change"],
+        "causes": ["stage-incomplete"],
+        "authoritative": false,
+        "policy_revision": "local"
+      }
+    },
+    {
+      "name": "pr-shared-head",
+      "repository": "testbed",
+      "submission": { "type": "pull_request", "number": 26 },
+      "body": "pr-bugfix-complete.txt",
+      "shared_head": [27],
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": {
+        "exit_status": 1,
+        "run_directory": true,
+        "outcome": "needs-changes",
+        "finding_codes": ["submission.shared-head"],
+        "contributing_codes": ["submission.shared-head"],
+        "causes": [],
+        "authoritative": false,
+        "policy_revision": "local"
+      }
+    },
+    {
+      "name": "issue-required-attachment-unavailable",
+      "repository": "testbed",
+      "submission": { "type": "issue", "number": 29 },
+      "body": "defect-complete.txt",
+      "replace": [
+        {
+          "from": "prints `TypeError: cannot read properties of undefined`.",
+          "to": "prints `TypeError: cannot read properties of undefined`. Log: [log.txt](https://github.com/user-attachments/files/1000011/log.txt)"
+        }
+      ],
+      "attachments": "error",
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": {
+        "exit_status": 3,
+        "run_directory": true,
+        "outcome": "inconclusive",
+        "finding_codes": [],
+        "contributing_codes": [],
+        "causes": ["attachment-fetch-failed", "stage-incomplete"],
+        "authoritative": false,
+        "policy_revision": "local"
+      }
+    },
+    {
+      "name": "pr-linked-issue-unavailable",
+      "repository": "testbed",
+      "submission": { "type": "pull_request", "number": 26 },
+      "body": "pr-bugfix-complete.txt",
+      "linked_issue": "unavailable",
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": {
+        "exit_status": 3,
+        "run_directory": true,
+        "outcome": "inconclusive",
+        "finding_codes": [],
+        "contributing_codes": [],
+        "causes": ["github-unavailable", "stage-incomplete"],
+        "authoritative": false,
+        "policy_revision": "local"
+      }
+    },
+    {
+      "name": "synthetic-published-policy",
+      "repository": "synthetic",
+      "submission": { "type": "issue", "number": 29 },
+      "body": "defect-complete.txt",
+      "policy": { "source": "trusted-branch" },
+      "expect": {
+        "exit_status": 3,
+        "run_directory": true,
+        "outcome": "inconclusive",
+        "finding_codes": [],
+        "contributing_codes": [],
+        "causes": ["stage-incomplete"],
+        "authoritative": true,
+        "policy_revision": "a8c2485882b52f63db71b1ec63b12f5039220e03"
+      }
+    },
+    {
+      "name": "synthetic-local-policy-file",
+      "repository": "synthetic",
+      "submission": { "type": "issue", "number": 29 },
+      "body": "defect-complete.txt",
+      "policy": { "source": "local-file", "path": "fixtures/policies/valid/minimal-no-llm.yml" },
+      "expect": {
+        "exit_status": 3,
+        "run_directory": true,
+        "outcome": "inconclusive",
+        "finding_codes": [],
+        "contributing_codes": [],
+        "causes": ["stage-incomplete"],
+        "authoritative": false,
+        "policy_revision": "local"
+      }
+    },
+    {
+      "name": "testbed-no-published-policy",
+      "repository": "testbed",
+      "submission": { "type": "issue", "number": 29 },
+      "body": null,
+      "policy": { "source": "trusted-branch" },
+      "expect": { "exit_status": 2, "run_directory": false, "error_code": "screen.policy-missing" }
+    },
+    {
+      "name": "invalid-policy-file",
+      "repository": "testbed",
+      "submission": { "type": "issue", "number": 29 },
+      "body": null,
+      "policy": { "source": "local-file", "path": "fixtures/policies/invalid/unknown-key.txt" },
+      "expect": { "exit_status": 1, "run_directory": false, "error_code": "screen.policy-file-invalid" }
+    },
+    {
+      "name": "unwritable-evidence-directory",
+      "repository": "testbed",
+      "submission": { "type": "issue", "number": 29 },
+      "body": null,
+      "evidence_dir": "file",
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": { "exit_status": 2, "run_directory": false, "error_code": "screen.evidence-write-failed" }
+    },
+    {
+      "name": "sentinel-token",
+      "repository": "testbed",
+      "submission": { "type": "pull_request", "number": 26 },
+      "body": "pr-bugfix-complete.txt",
+      "replace": [{ "from": "docs/format.md", "to": "docs/format.md {token} {token-base64} {token-basic-auth-base64}" }],
+      "token": "sentinel",
+      "policy": { "source": "local-file", "path": "templates/policy/policy.yml" },
+      "expect": {
+        "exit_status": 3,
+        "run_directory": true,
+        "outcome": "inconclusive",
+        "finding_codes": [],
+        "contributing_codes": [],
+        "causes": ["stage-incomplete"],
+        "authoritative": false,
+        "policy_revision": "local",
+        "token_absent": true
+      }
+    }
+  ]
+}

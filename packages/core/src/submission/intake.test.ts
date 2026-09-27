@@ -297,6 +297,32 @@ describe('submission intake', () => {
     expect(result.value.record).toBeNull();
   });
 
+  it('an unstructured issue builds a valid submission record', async () => {
+    const routes: RouteMap = {
+      '/repos/octo/demo': () => jsonResponse(repoResponse()),
+      '/repos/octo/demo/issues/6': () => jsonResponse(issueResponse(6, readFixture('unstructured.txt'))),
+    };
+    const context = makeContext(routedFetch(routes));
+    const result = await captureIssue(context, 6);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const recordResult = buildSubmissionRecord({
+      snapshot: result.value.snapshot,
+      issueKind: null,
+      body: result.value.body,
+      contract: result.value.contract,
+      attachments: result.value.attachments,
+      claimScopeHash: null,
+    });
+    expect(recordResult.ok).toBe(true);
+    if (!recordResult.ok) return;
+    const record = recordResult.value;
+    expect(record.issue_kind).toBeNull();
+    expect(record.template).toBeNull();
+    expect(record.fields).toEqual({});
+    expect(submissionRecordSchema.safeParse(record).success).toBe(true);
+  });
+
   it('capture reads a pull request into a contract result, snapshot, and record', async () => {
     const linkedIssueBody = 'The parser crashes on empty input.';
     const routes: RouteMap = {
@@ -521,10 +547,10 @@ describe('submission intake', () => {
   it('submission record builder rejects an invalid record', async () => {
     const routes: RouteMap = {
       '/repos/octo/demo': () => jsonResponse(repoResponse()),
-      '/repos/octo/demo/issues/6': () => jsonResponse(issueResponse(6, readFixture('unstructured.txt'))),
+      '/repos/octo/demo/issues/5': () => jsonResponse(issueResponse(5, defectBody())),
     };
     const context = makeContext(routedFetch(routes));
-    const captured = await captureIssue(context, 6);
+    const captured = await captureIssue(context, 5);
     expect(captured.ok).toBe(true);
     if (!captured.ok) return;
     const contract = checkContract({
@@ -532,12 +558,13 @@ describe('submission intake', () => {
       repository: { fullName: 'octo/demo', defaultBranch: 'main' },
       policy: context.policy,
       body: captured.value.body,
-      requestedKind: null,
+      requestedKind: 'defect',
       attachments: captured.value.attachments,
     });
+    // A defect-form template with a mismatched issueKind fails the template/issue_kind coupling check.
     const result = buildSubmissionRecord({
       snapshot: captured.value.snapshot,
-      issueKind: null,
+      issueKind: 'proposal',
       body: captured.value.body,
       contract,
       attachments: captured.value.attachments,

@@ -4,11 +4,16 @@ Patch Steward is a work in progress. This repository contains a development
 scaffold, design documents, the policy module (loading, validation, revision
 identity, defaults, and the public subset), shared vocabularies, version-1
 record schemas, a redaction module, the submission module with its
-deterministic contract check, a read-only GitHub adapter, the issue forms and PR
-template, and the `steward policy` and `steward preflight` commands; preflight
-covers its deterministic checks only. The screening pipeline, the other CLI
-commands, the GitHub action and screening workflows, the browser app, the LLM
-adapters, GitHub writes, and the sandboxed runner are not implemented.
+deterministic contract check, a read-only GitHub adapter, the decision, report,
+and evidence modules with a local evidence store, the issue forms and PR
+template, and the `steward policy`, `steward preflight`, `steward screen`, and
+`steward report` commands; preflight covers its deterministic checks only, and
+`steward screen` runs at contract level only (it checks the submission contract
+and records a local report and evidence, with no screening stage, container,
+model call, or publication). Not implemented: screening stages, the GitHub
+action and screening workflows, the browser app, the LLM adapters, GitHub
+writes, the evidence branch or repository store, the sandboxed runner,
+`steward init`, and `steward replay`.
 
 The installation guide covers the runnable scaffold. Sections marked
 **Available** describe what runs today; sections marked **Proposed** describe
@@ -34,12 +39,16 @@ the documented product design, not available functionality.
    - [Submit a pull request](usage.md#submit-a-pull-request-proposed)
    - [Read a report and respond](usage.md#read-a-report-and-respond-proposed)
    - [Maintainer triage](usage.md#maintainer-triage-proposed)
-   - [Local screening and replay](usage.md#local-screening-and-replay-proposed)
+   - [Local screening](usage.md#local-screening-available)
+   - [Historical replay](usage.md#historical-replay-proposed)
    - [Calibrate enforcement](usage.md#calibrate-enforcement-proposed)
 4. [Command reference](commands.md)
    - [Development commands](commands.md#development-commands-available)
+   - [CLI conventions](commands.md#cli-conventions-available)
    - [`steward policy`](commands.md#steward-policy-available)
    - [`steward preflight`](commands.md#steward-preflight-available)
+   - [`steward screen`](commands.md#steward-screen-available)
+   - [`steward report`](commands.md#steward-report-available)
    - [CLI commands](commands.md#cli-commands-proposed)
    - [GitHub conversation commands](commands.md#github-conversation-commands-proposed)
 5. [Configuration](configuration.md)
@@ -47,6 +56,7 @@ the documented product design, not available functionality.
    - [Policy validation](configuration.md#policy-validation-available)
    - [Policy keys](configuration.md#policy-keys-available)
    - [Credentials and deployment](configuration.md#credentials-and-deployment-proposed)
+   - [Local evidence and reports](configuration.md#local-evidence-and-reports-available)
    - [Evidence and visibility](configuration.md#evidence-and-visibility-proposed)
    - [Scaffold configuration](configuration.md#scaffold-configuration-available)
 6. [Troubleshooting](troubleshooting.md)

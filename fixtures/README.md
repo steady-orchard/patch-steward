@@ -44,3 +44,16 @@ Current entries:
 - `github/policy-directory/` — hand-built responses for a synthetic repository whose policy directory holds one
   `policy.yml` (a copy of `policies/valid/minimal-no-llm.yml`); tests check that the published-policy revision
   equals the git tree id.
+- `reports/` — golden screening reports and check-run summaries as byte-exact `.txt`, one pair per case listed in
+  `reports/cases.json`: an unstructured issue, a complete defect issue, a pull request with a missing field and an attachment
+  violation, an execution-sensitive change, a shared head commit, a run under a local policy file, more blockers than a
+  report lists, and hostile derived text. The fixture-tier test builds each run in a temporary directory with a fixed
+  clock, random source, and steward version and compares after CRLF-to-LF normalization; control and format characters
+  and credential samples are generated in test code, and no run directory is committed.
+- `screen/expectations.json` — local screening scenarios run end to end through the core screening path: each case
+  names the recorded test-bed responses or a synthetic repository whose published policy comes from
+  `github/policy-directory/`, an optional body from `submissions/` with literal replacements, changed files,
+  shared-head and linked-issue variations, failing attachment fetches, the policy source, a resolved token, and the
+  evidence directory, and pins the exit status, outcome, finding codes, causes, and whether a run directory exists;
+  the fixture-tier test checks it both ways, builds responses in test code, writes runs only to temporary
+  directories, and never commits a run directory.

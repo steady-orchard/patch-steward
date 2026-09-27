@@ -13,6 +13,7 @@ import {
   readPolicyTreeId,
   resolveCommit,
 } from '@patch-steward/core';
+import { errorLine, renderJsonLine, writeTextDiagnostics } from './conventions.js';
 
 export const DEFAULT_POLICY_REF = 'origin/HEAD';
 
@@ -128,7 +129,7 @@ function mapFailureToErrors(failure: StewardFailure<PolicyLoadFailureCode>): Pol
 
 function writeReport(io: CommandIo, report: PolicyCommandReport, json: boolean, exit: PolicyCommandExitCode): void {
   if (json) {
-    io.stdout(`${JSON.stringify(report)}\n`);
+    io.stdout(renderJsonLine(report));
     return;
   }
 
@@ -156,18 +157,19 @@ function writeReport(io: CommandIo, report: PolicyCommandReport, json: boolean, 
     io.stdout(`notice: ${report.notice}\n`);
   }
 
-  for (const error of report.errors) {
-    const location = error.line !== null && error.column !== null ? ` (line ${error.line}, column ${error.column})` : '';
-    io.stdout(`error ${error.code} ${error.path === '' ? '-' : error.path} ${error.message}${location}\n`);
-  }
-
   if (!report.valid) {
     io.stdout('outcome: inconclusive; no default was substituted\n');
   }
 
-  for (const warning of report.warnings) {
-    io.stderr(`warning ${warning.code} ${warning.path} ${warning.message}\n`);
-  }
+  writeTextDiagnostics(
+    io,
+    report.warnings.map((w) => ({ code: w.code, message: w.message })),
+    report.errors.map((e) => ({
+      code: e.code,
+      path: e.path,
+      message: e.line !== null && e.column !== null ? `${e.message} (line ${e.line}, column ${e.column})` : e.message,
+    })),
+  );
 }
 
 async function statLocalRevisionId(absolute: string): Promise<string | null> {
@@ -321,8 +323,6 @@ export async function runPolicyCommand(argv: readonly string[], context: PolicyC
     const err = error as NodeJS.ErrnoException;
     const code = err.code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION' ? 'usage.unknown-option' : 'usage.invalid-arguments';
     const message = err.message;
-    context.io.stderr(`error ${code} ${message}\n`);
-    context.io.stderr(`${POLICY_USAGE}\n`);
     if (json) {
       const report: PolicyCommandReport = {
         schema_version: 1,
@@ -334,15 +334,16 @@ export async function runPolicyCommand(argv: readonly string[], context: PolicyC
         errors: [{ code, path: '', message, line: null, column: null }],
         warnings: [],
       };
-      context.io.stdout(`${JSON.stringify(report)}\n`);
+      context.io.stdout(renderJsonLine(report));
+    } else {
+      context.io.stderr(errorLine({ code, path: '', message }));
+      context.io.stderr(`${POLICY_USAGE}\n`);
     }
     return 2;
   }
 
   if (values.ref !== undefined && values.file !== undefined) {
     const message = '--ref and --file cannot be used together';
-    context.io.stderr(`error usage.conflicting-options ${message}\n`);
-    context.io.stderr(`${POLICY_USAGE}\n`);
     if (json) {
       const report: PolicyCommandReport = {
         schema_version: 1,
@@ -354,7 +355,10 @@ export async function runPolicyCommand(argv: readonly string[], context: PolicyC
         errors: [{ code: 'usage.conflicting-options', path: '', message, line: null, column: null }],
         warnings: [],
       };
-      context.io.stdout(`${JSON.stringify(report)}\n`);
+      context.io.stdout(renderJsonLine(report));
+    } else {
+      context.io.stderr(errorLine({ code: 'usage.conflicting-options', path: '', message }));
+      context.io.stderr(`${POLICY_USAGE}\n`);
     }
     return 2;
   }

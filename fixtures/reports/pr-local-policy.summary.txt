@@ -1,0 +1,10 @@
+**Outcome:** `inconclusive`
+
+Certifies `octo/demo` pull request `12` at head commit `cccccccccccccccccccccccccccccccccccccccc` (snapshot `sha256:5555555555555555555555555555555555555555555555555555555555555555`) under policy revision `local:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`.
+Blockers: 0. Uncertainties for maintainers: 0.
+
+Local run: produced on a maintainer's machine; not the repository's official screening result.
+
+Non-authoritative: screened under the local policy file revision `local:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee`, not the trusted branch's policy.
+
+Report and evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e`

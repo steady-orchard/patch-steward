@@ -160,7 +160,7 @@ describe('policy command: git and file sources', { timeout: 60000 }, () => {
     const code = await runPolicyCommand(['--ref', 'refs/heads/does-not-exist'], { cwd: repo.dir, io: cap.io });
     expect(code).toBe(2);
     expect(cap.stdout()).toContain('policy: unavailable');
-    expect(cap.stdout()).toContain('git.ref-unresolvable');
+    expect(cap.stderr()).toContain('error git.ref-unresolvable ');
   });
 
   it('policy command: not a git repository exits 2', async () => {
@@ -169,7 +169,7 @@ describe('policy command: git and file sources', { timeout: 60000 }, () => {
     const cap = capture();
     const code = await runPolicyCommand(['--ref', 'HEAD'], { cwd: dir, io: cap.io });
     expect(code).toBe(2);
-    expect(cap.stdout()).toContain('git.not-a-repository');
+    expect(cap.stderr()).toContain('error git.not-a-repository ');
   });
 
   it('policy command: missing policy directory exits 1', async () => {
@@ -177,7 +177,7 @@ describe('policy command: git and file sources', { timeout: 60000 }, () => {
     const cap = capture();
     const code = await runPolicyCommand(['--ref', 'HEAD'], { cwd: repo.dir, io: cap.io });
     expect(code).toBe(1);
-    expect(cap.stdout()).toContain('git.policy-directory-missing');
+    expect(cap.stderr()).toContain('error git.policy-directory-missing ');
     expect(cap.stdout()).toContain('revision: none');
   });
 
@@ -197,7 +197,8 @@ describe('policy command: git and file sources', { timeout: 60000 }, () => {
     const capHuman = capture();
     const codeHuman = await runPolicyCommand(['--file', p], { cwd: process.cwd(), io: capHuman.io });
     expect(codeHuman).toBe(1);
-    expect(capHuman.stdout()).toContain('error policy.unknown-key');
+    expect(capHuman.stderr()).toContain('error policy.unknown-key ');
+    expect(capHuman.stdout()).not.toContain('error ');
     expect(capHuman.stdout()).toContain('outcome: inconclusive; no default was substituted');
   });
 
@@ -274,7 +275,7 @@ describe('policy command: git and file sources', { timeout: 60000 }, () => {
       .split('\n')
       .filter((l) => l.length > 0);
     expect(stderrLines).toHaveLength(1);
-    expect(stderrLines[0]?.startsWith('warning policy.llm-model-placeholder llm.model ')).toBe(true);
+    expect(stderrLines[0]?.startsWith('warning policy.llm-model-placeholder: llm.model is the template placeholder')).toBe(true);
   });
 
   it('policy command: non-placeholder model prints no warning', async () => {
@@ -307,7 +308,12 @@ describe('policy command: git and file sources', { timeout: 60000 }, () => {
     const capHuman = capture();
     const codeHuman = await runPolicyCommand(['--file', p], { cwd: process.cwd(), io: capHuman.io });
     expect(codeHuman).toBe(1);
-    expect(capHuman.stderr()).toBe('');
+    expect(
+      capHuman
+        .stderr()
+        .split('\n')
+        .some((line) => line.startsWith('warning ')),
+    ).toBe(false);
 
     const capJson = capture();
     const codeJson = await runPolicyCommand(['--file', p, '--json'], { cwd: process.cwd(), io: capJson.io });
@@ -321,7 +327,7 @@ describe('policy command: git and file sources', { timeout: 60000 }, () => {
     const capBefore = capture();
     const codeBefore = await runPolicyCommand([], { cwd: repo.dir, io: capBefore.io });
     expect(codeBefore).toBe(2);
-    expect(capBefore.stdout()).toContain('git.ref-unresolvable');
+    expect(capBefore.stderr()).toContain('git.ref-unresolvable');
     expect(capBefore.stdout()).toContain(`source: ref ${DEFAULT_POLICY_REF}`);
 
     runGit(repo.dir, repo.env, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
@@ -339,7 +345,7 @@ describe('policy command: git and file sources', { timeout: 60000 }, () => {
     const cap = capture();
     const code = await runPolicyCommand(['--file', path.join(dir, 'does-not-exist.yml')], { cwd: process.cwd(), io: cap.io });
     expect(code).toBe(2);
-    expect(cap.stdout()).toContain('file.not-found');
+    expect(cap.stderr()).toContain('file.not-found');
     expect(cap.stdout()).toContain('revision: none');
   });
 
@@ -372,7 +378,63 @@ describe('policy command: git and file sources', { timeout: 60000 }, () => {
       },
     });
     expect(code).toBe(2);
-    expect(cap.stdout()).toContain('steward.internal-error');
+    expect(cap.stderr()).toContain('steward.internal-error');
+  });
+});
+
+describe('policy command: uniform conventions', () => {
+  it('policy command: text usage errors use the uniform format', async () => {
+    const cap = capture();
+    const code = await runPolicyCommand(['--ref', 'HEAD', '--file', 'x.yml'], { cwd: process.cwd(), io: cap.io });
+    expect(code).toBe(2);
+    expect(cap.stdout()).toBe('');
+    expect(cap.stderr()).toBe(`error usage.conflicting-options -: --ref and --file cannot be used together\n${POLICY_USAGE}\n`);
+  });
+
+  it('policy command: json usage errors write nothing to stderr', async () => {
+    const capBogus = capture();
+    const codeBogus = await runPolicyCommand(['--bogus', '--json'], { cwd: process.cwd(), io: capBogus.io });
+    expect(codeBogus).toBe(2);
+    expect(capBogus.stderr()).toBe('');
+    const stdoutLines = capBogus
+      .stdout()
+      .split('\n')
+      .filter((l) => l.length > 0);
+    expect(stdoutLines).toHaveLength(1);
+    const reportBogus = JSON.parse(capBogus.stdout()) as { errors: readonly { code: string }[] };
+    expect(reportBogus.errors[0]?.code).toBe('usage.unknown-option');
+
+    const capConflict = capture();
+    const codeConflict = await runPolicyCommand(['--ref', 'a', '--file', 'b', '--json'], {
+      cwd: process.cwd(),
+      io: capConflict.io,
+    });
+    expect(codeConflict).toBe(2);
+    expect(capConflict.stderr()).toBe('');
+    const reportConflict = JSON.parse(capConflict.stdout()) as { errors: readonly { code: string }[] };
+    expect(reportConflict.errors[0]?.code).toBe('usage.conflicting-options');
+  });
+
+  it('policy command: text errors go to stderr in the uniform format', async () => {
+    const bytes = mutatedVariant((variant) => {
+      variant.extra = 1;
+    });
+    const p = writeTempFile(bytes, 'policy.yml');
+
+    const cap = capture();
+    const code = await runPolicyCommand(['--file', p], { cwd: process.cwd(), io: cap.io });
+    expect(code).toBe(1);
+    const stdoutLines = cap.stdout().split('\n');
+    const nonEmptyStdout = stdoutLines.filter((l) => l.length > 0);
+    expect(nonEmptyStdout[0]).toBe('policy: invalid');
+    expect(nonEmptyStdout[nonEmptyStdout.length - 1]).toBe('outcome: inconclusive; no default was substituted');
+    expect(stdoutLines.some((l) => l.startsWith('error '))).toBe(false);
+    const nonEmptyStderr = cap
+      .stderr()
+      .split('\n')
+      .filter((l) => l.length > 0);
+    expect(nonEmptyStderr.every((l) => l.startsWith('error '))).toBe(true);
+    expect(nonEmptyStderr[0]).toMatch(/^error policy\.unknown-key \S+: \S/);
   });
 });
 

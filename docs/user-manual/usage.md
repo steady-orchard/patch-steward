@@ -80,7 +80,8 @@ Sources: [package scripts](../../package.json), [repository commands](../../CLAU
    published, checks the draft and, for a pull request, the committed changes
    against the submission contract, and prints each finding with a numbered
    request. Exit status `0` means the contract is met, `1` that the draft needs
-   changes or a maintainer decision, and `2` that the check could not run. It
+   changes or a maintainer decision, `2` that the check could not run, and
+   `3` that the result is `inconclusive` because a required read failed. It
    needs no inference account and writes nothing to GitHub.
 
 4. Address the requests. You may include the preflight summary in your
@@ -267,20 +268,55 @@ snapshot freshness, run ownership, durable evidence, or the shared-head rule.
 
 Source: [SP15](../processes.md#sp15-maintainer-triage-override-and-appeal).
 
-## Local screening and replay (Proposed)
+## Local screening (Available)
 
-For maintainer local screening, the proposed entry points are:
+1. Build the CLI: `pnpm build`.
+2. Run `steward screen` with `--pr <number>` or `--issue <number>`, and
+   optionally `--repo owner/name` and `--policy-file <path>` to test a proposed
+   policy against an existing submission before merging it.
+3. Read the printed local-run and non-authoritative lines, the outcome, any
+   numbered requests, and the run directory.
+4. Run `steward report <run directory>` to verify and print the stored report.
+5. Act on the requests, or on the causes when the outcome is `inconclusive`.
 
-```text
-steward screen
-steward report
+```sh
+pnpm build
+node packages/cli/dist/main.js screen --issue 29 --repo steady-orchard/patch-steward-testbed-public --policy-file templates/policy/policy.yml
+node packages/cli/dist/main.js report <run directory printed by screen>
 ```
 
-The design uses the maintainer's GitHub and inference credentials, a local
-container, and the trusted-branch policy unless an explicit local policy is named.
-It writes a local report and evidence. Optional publication requires an explicit
-flag and produces an attributed comment; it never creates the required App check.
-A local-policy experiment is marked non-authoritative.
+Against a public test-bed repository without a published policy, the first
+command prints the local-run and non-authoritative lines, `outcome:
+needs-changes`, request `R1`, and the run directory, then exits 1; the second
+prints the stored report and exits 1.
+
+`steward screen` reads the submission through the GitHub API (read-only) and
+loads the trusted-branch policy, or a local policy file with `--policy-file`;
+a repository without a published policy needs `--policy-file`, otherwise the
+command exits 2 with `screen.policy-missing`. It checks the submission
+contract, decides the outcome, and writes a report and evidence to a local run
+directory. No stage, container, or model runs yet, so the outcome is
+`needs-changes` when the contract fails and otherwise `inconclusive` with
+cause `stage-incomplete`; the report's "What would change the outcome" names
+the missing stages. Every run is a local run, not the repository's official
+screening result; it creates no check, comment, or label. `steward report`
+verifies a stored run directory's manifest, sizes, hashes, and record schemas;
+tampered or incomplete evidence exits 1 with `report.evidence-invalid`. See
+[`steward screen`](commands.md#steward-screen-available) and
+[`steward report`](commands.md#steward-report-available) for exit statuses and
+options.
+
+Proposed and not yet implemented for local screening: the local container and
+stages, use of the maintainer's own inference credential, and optional
+attributed publication.
+
+> **[NEEDS INPUT]** The explicit publication flag of SP20, which would post an attributed report comment, is not named.
+
+Sources: [SP20](../processes.md#sp20-maintainer-initiated-local-screening),
+[`steward screen`](commands.md#steward-screen-available),
+[`steward report`](commands.md#steward-report-available).
+
+## Historical replay (Proposed)
 
 For historical evaluation, the proposed entry point is:
 
@@ -294,12 +330,9 @@ It reports invalid admissions, valid contributions blocked, inconclusive items,
 stage attribution, cost, and latency. Unavailable historical context remains
 unavailable rather than being replaced with current information.
 
-> **[NEEDS INPUT]** The sources omit submission-reference arguments, local-policy
-> selection syntax, the publication flag, report/evidence paths, dataset schema,
-> and replay arguments. These command names cannot yet form runnable examples.
+> **[NEEDS INPUT]** The sources omit the dataset schema and the replay arguments, so `steward replay` cannot yet form a runnable example.
 
-Sources: [SP20](../processes.md#sp20-maintainer-initiated-local-screening),
-[SP04](../processes.md#sp04-evaluation-replay).
+Sources: [SP04](../processes.md#sp04-evaluation-replay).
 
 ## Calibrate enforcement (Proposed)
 

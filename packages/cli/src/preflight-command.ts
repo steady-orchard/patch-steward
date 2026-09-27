@@ -9,8 +9,6 @@ import type {
 } from '@patch-steward/core';
 import {
   DEFAULT_CHECKLIST_POLICY,
-  GIT_OUTPUT_MAX_BYTES,
-  GIT_TIMEOUT_MS,
   assessAttachmentsStatically,
   checkContract,
   contentHash,
@@ -20,7 +18,6 @@ import {
   changedPathSet,
   effectiveIssueBody,
   findMergeBase,
-  findUpstreamRemote,
   githubBudgetForPreflight,
   linkedIssueReference,
   listChangedPaths,
@@ -32,6 +29,7 @@ import {
 } from '@patch-steward/core';
 
 import type { PolicyCommandContext } from './policy-command.js';
+import { cliGitOptions, resolveUpstream } from './upstream.js';
 import type { GitHubAuthFailureCode } from './github-auth.js';
 import { GITHUB_AUTH_FAILURE_CODES, resolveGitHubAuth } from './github-auth.js';
 import type { PreflightUsageCode } from './preflight-args.js';
@@ -47,7 +45,7 @@ export interface PreflightCommandContext extends PolicyCommandContext {
   readonly ghBinary?: string;
 }
 
-export type PreflightExitCode = 0 | 1 | 2;
+export type PreflightExitCode = 0 | 1 | 2 | 3;
 
 export const PREFLIGHT_COMMAND_FAILURE_CODES = [
   'preflight.no-upstream',
@@ -75,7 +73,7 @@ export const PREFLIGHT_EXIT_BY_DISPOSITION: { readonly [K in ContractDisposition
   met: 0,
   'needs-changes': 1,
   uncertain: 1,
-  inconclusive: 2,
+  inconclusive: 3,
 });
 
 export const PREFLIGHT_UNAUTHENTICATED_WARNING =
@@ -160,26 +158,15 @@ export async function runPreflightCommand(argv: readonly string[], context: Pref
     }
     const draft = draftResult.draft;
 
-    const gitOptions = {
-      repoDir: context.cwd,
-      timeoutMs: GIT_TIMEOUT_MS,
-      maxOutputBytes: GIT_OUTPUT_MAX_BYTES,
-      ...(context.gitBinary !== undefined ? { gitBinary: context.gitBinary } : {}),
-      ...(context.runner !== undefined ? { runner: context.runner } : {}),
-    };
+    const gitOptions = cliGitOptions(context);
 
-    let remote: { readonly remote: string; readonly owner: string; readonly name: string } | null = null;
-    if (args.repository === null || (isPullRequest && args.base === null)) {
-      const remoteResult = await findUpstreamRemote(gitOptions);
-      if (!remoteResult.ok) {
-        return fail(context, state, json, singleError(remoteResult.failure.code, remoteResult.failure.message));
+    const upstream = await resolveUpstream(args.repository, gitOptions, {
+      readRemote: isPullRequest && args.base === null,
+    });
+    if (!upstream.ok) {
+      if (upstream.reason === 'git-failure') {
+        return fail(context, state, json, singleError(upstream.code, upstream.message));
       }
-      remote = remoteResult.value;
-    }
-
-    const ref: GitHubRepositoryRef | null =
-      args.repository ?? (remote !== null ? { owner: remote.owner, name: remote.name } : null);
-    if (ref === null) {
       return fail(
         context,
         state,
@@ -187,15 +174,10 @@ export async function runPreflightCommand(argv: readonly string[], context: Pref
         singleError('preflight.no-upstream', 'No GitHub remote named upstream or origin was found; pass --repo owner/name.'),
       );
     }
+    const ref: GitHubRepositoryRef = upstream.repository;
     state.repository = `${ref.owner}/${ref.name}`;
     const refValue: GitHubRepositoryRef = ref;
-
-    const trackingRemote =
-      remote !== null &&
-      remote.owner.toLowerCase() === ref.owner.toLowerCase() &&
-      remote.name.toLowerCase() === ref.name.toLowerCase()
-        ? remote
-        : null;
+    const trackingRemote = upstream.trackingRemote;
 
     let head: string | null = null;
     if (isPullRequest) {

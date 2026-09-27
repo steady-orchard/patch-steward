@@ -4,8 +4,10 @@
 
 **Status:** Product behavior on this page is proposed. The development
 scaffold, the policy module, the submission contract check, the `steward policy`
-command, and the deterministic part of `steward preflight` exist; screening does
-not.
+command, and the deterministic part of `steward preflight` exist, along with
+`steward screen`, which screens an issue or pull request locally at contract
+level, and `steward report`, which prints a stored run; full screening does
+not exist.
 
 ## Purpose and scope
 
@@ -77,19 +79,23 @@ security isolation. Containers protect hosts and credentials; they do not make
 submitted tests or result files trustworthy. T2 is limited to the contributor's
 own code and labels all results as claims.
 
+Available today, `steward screen` runs the maintainer local screening option
+at contract level only, with no container or model, and writes local
+evidence; see [Local screening](usage.md#local-screening-available).
+
 Sources: [architecture §5](../architecture.md#5-runtime-topologies),
 [sandbox process SP17](../processes.md#sp17-sandboxed-execution).
 
 ## Outcomes and waiting states (Proposed)
 
-| Outcome         | Meaning                                                                                                  | Response                                                                                    |
-| --------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `pass`          | Required checks satisfied; only nonblocking findings remain.                                             | Continue to ordinary maintainer review or the relevant issue backlog.                       |
-| `needs-changes` | Submission contract failure, missing contributor evidence, or an evidence-backed blocker.                | Address the report's specific requests.                                                     |
-| `uncertain`     | A required maintainer decision remains unresolved.                                                       | Maintainer triage.                                                                          |
-| `inconclusive`  | Required steward work could not finish because of infrastructure, model, environment, or budget failure. | Investigate the recorded cause; transient failures receive one automatic rerun within caps. |
-| `overridden`    | A maintainer supplied a scoped override with an effective outcome.                                       | Read the reason and waived or remaining requirements.                                       |
-| `superseded`    | Inputs changed or a newer committed run owns publication.                                                | Consult the replacement run.                                                                |
+| Outcome         | Meaning                                                                                                                                          | Response                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `pass`          | Required checks satisfied; only nonblocking findings remain.                                                                                     | Continue to ordinary maintainer review or the relevant issue backlog.                       |
+| `needs-changes` | Submission contract failure, missing contributor evidence, or an evidence-backed blocker.                                                        | Address the report's specific requests.                                                     |
+| `uncertain`     | A required maintainer decision remains unresolved.                                                                                               | Maintainer triage.                                                                          |
+| `inconclusive`  | Required steward work could not finish because of infrastructure, model, environment, or budget failure, or a required stage produced no result. | Investigate the recorded cause; transient failures receive one automatic rerun within caps. |
+| `overridden`    | A maintainer supplied a scoped override with an effective outcome.                                                                               | Read the reason and waived or remaining requirements.                                       |
+| `superseded`    | Inputs changed or a newer committed run owns publication.                                                                                        | Consult the replacement run.                                                                |
 
 `queued` and `awaiting-approval` are waiting states, not outcomes. They represent
 capacity limits and an inference-admission hold, respectively. Any check remains

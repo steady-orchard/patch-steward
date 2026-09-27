@@ -35,22 +35,32 @@ quality. Passing checks does not establish project value or authorize merging.
 
 This is a **WORK IN PROGRESS**
 
-Project scaffold, design documentation, the policy layer, and submission intake.
-Implemented: loading a policy from an explicit git revision, the GitHub API, or
-a named local file; strict validation against the version-1 schema with hard
-bounds; the policy revision (the git tree id of `.github/patch-steward/`); the
-resolved policy and its public subset; shared vocabularies; version-1 record
-schemas; a redaction module; the submission module, which parses issue-form and
-pull request template bodies through a versioned field mapping, classifies
-changed paths, applies the attachment rules, hashes the snapshot, and decides
-the deterministic contract result, with a read-only GitHub adapter and git
-reads; the issue forms and PR template; and the `steward policy` command and the
-deterministic part of `steward preflight`. The screening pipeline, the other CLI
-commands, the GitHub action and workflows, the browser app, the LLM adapter,
-GitHub writes, the evidence store, and the sandboxed runner are, however, not
-implemented yet. The probes/ directory holds the platform-assumption probe suite
-and its findings for disposable test-bed repositories; it is not product code
-and never runs in CI.
+Project scaffold, design documentation, the policy layer, submission intake,
+and a local screening skeleton. Implemented: loading a policy from an explicit
+git revision, the GitHub API, or a named local file; strict validation against
+the version-1 schema with hard bounds; the policy revision (the git tree id of
+`.github/patch-steward/`); the resolved policy and its public subset; shared
+vocabularies; version-1 record schemas; a redaction module; the submission
+module, which parses issue-form and pull request template bodies through a
+versioned field mapping, classifies changed paths, applies the attachment
+rules, hashes the snapshot, and decides the deterministic contract result,
+with a read-only GitHub adapter and git reads; the issue forms and PR
+template; the decision module, which applies the required-stage plan and the
+label mappings as pure rules; the report module, which builds a fixed-order
+report and check-run summary within report caps; the evidence module, which
+assembles, redacts, and stores records in a local evidence store; the phase
+sequence (gate, intake, execute, assess, rounds, publish), run in one process
+with intake, execute, and assess as pass-throughs; and the `steward policy`
+command, the deterministic part of `steward preflight`, `steward report`, and
+`steward screen` at contract level. Screening stages (reference
+verification, claim validation, reproduction, fix verification, regression,
+challenge), the local container runner, model calls and LLM adapters,
+publication of local results, GitHub writes, the evidence branch or
+repository store, workflows, the GitHub action, the browser app, `steward
+init`, `steward replay`, and preflight's mandatory commands and self-review
+are, however, not implemented yet. The probes/ directory holds the
+platform-assumption probe suite and its findings for disposable test-bed
+repositories; it is not product code and never runs in CI.
 
 The [user manual](docs/user-manual/README.md) covers scaffold setup, proposed
 workflows, configuration, and troubleshooting, with explicit documentation gaps.
@@ -107,6 +117,15 @@ Check a draft issue or pull request against a repository's submission contract
 node packages/cli/dist/main.js preflight --issue defect --draft fixtures/submissions/defect-complete.txt --repo steady-orchard/patch-steward-testbed-public
 ```
 
+Screen an issue or pull request locally at contract level (reads GitHub,
+writes a run directory under the user data directory, never the official
+result), then verify and print the stored run:
+
+```sh
+node packages/cli/dist/main.js screen --issue 29 --repo steady-orchard/patch-steward-testbed-public --policy-file templates/policy/policy.yml
+node packages/cli/dist/main.js report <run directory printed by screen>
+```
+
 Run the live tier against a public test-bed repository (network; never in CI):
 
 ```sh
@@ -115,12 +134,15 @@ GH_TOKEN=$(gh auth token) pnpm test:live
 
 - packages/: workspace packages. core holds the policy module, shared
   vocabularies, version-1 record schemas, the redaction module, the submission
-  module, the read-only GitHub adapter, git reads, the attachment fetcher, and
-  invariant conformance tests; cli implements `steward policy` and
-  `steward preflight`; action and web hold toolchain smoke code only.
+  module, the read-only GitHub adapter, git reads, the attachment fetcher, the
+  decision module, the report module, the evidence module, the phase sequence,
+  and invariant conformance tests; cli implements `steward policy`,
+  `steward preflight`, `steward screen`, and `steward report`; action and web
+  hold toolchain smoke code only.
 - fixtures/: shared corpus for fixture-tier tests: valid, invalid, and hostile
-  policies, submission bodies and diffs with expected contract results, and
-  recorded GitHub responses.
+  policies, submission bodies and diffs with expected contract results,
+  recorded GitHub responses, golden reports and check summaries, and local
+  screening scenarios.
 - templates/: files `steward init` is designed to install into target
   repositories: the policy template and its editor JSON Schema, the defect and
   proposal issue forms, and the PR template.

@@ -2,9 +2,13 @@
 
 **Status:** design document. Apart from policy loading and validation and the
 `steward policy` command (SP01), the deterministic part of `steward preflight`
-(SP05 CLI steps 1–2), and the deterministic contract check of SP06 steps 3–7
+(SP05 CLI steps 1–2), the deterministic contract check of SP06 steps 3–7
 with the submission capture it needs (without the merge-group branch,
-stored-validation reuse, or the author-response ledger), which no workflow runs
+stored-validation reuse, or the author-response ledger), SP13 steps 1-3 and
+SP18 step 1 for local runs, the never-pass rule of SP19 step 8 including its
+`stage-incomplete` cause, and `steward screen` at contract level with
+`steward report` (SP20 steps 1-3, without stages, a container, or
+publication), which no workflow runs
 yet, nothing described here is implemented. Each
 process below runs on the components defined in
 [architecture.md](architecture.md) and addresses numbered issues from the
@@ -506,8 +510,9 @@ CLI steps:
    reviewer would ask, so the contributor can answer them in the submission
    (P06). Steps 1 to 3 need no inference account.
 5. Print the preflight report marked as produced on the contributor's machine
-   and unverified, with exit status `0` when the contract is met and `1` for
-   `needs-changes` or `uncertain`. The contributor may paste its summary into the
+   and unverified, with exit status `0` when the contract is met, `1` for
+   `needs-changes` or `uncertain`, and `3` for an `inconclusive` contract result.
+   The contributor may paste its summary into the
    submission; the steward treats it as a claim.
 
 Controls: no writes to GitHub; the GitHub token, resolved from `GH_TOKEN`,
@@ -520,9 +525,9 @@ Failure handling: a project without a published policy gets the default
 checklist from the steward template. A published but invalid policy is never
 replaced by the default: the CLI exits with status `2` and prints the validation
 errors. Usage errors, an unreadable or oversize draft, a missing upstream remote,
-an unresolvable base, GitHub or git failures, and an `inconclusive` contract
-result also exit with status `2`; reading a missing or private repository without
-a token asks for one.
+an unresolvable base, and GitHub or git failures also exit with status `2`;
+an `inconclusive` contract result exits with status `3`; reading a missing or
+private repository without a token asks for one.
 
 Measures: none collected client-side; the contract pass rate at first
 submission (SP06) indicates preflight effectiveness.
@@ -1090,7 +1095,7 @@ Steps:
    | Deterministic submission contract fails before spending                                                                                                                               | `needs-changes`; specific author corrections                                                                                 |
    | Capacity cap reached                                                                                                                                                                  | `queued` lifecycle state, no terminal outcome; keep any check `in_progress`, persist restart record                          |
    | Inference admission required                                                                                                                                                          | `awaiting-approval` lifecycle state, no terminal outcome; keep any check `in_progress`, persist approval item                |
-   | Required steward work unavailable through infrastructure/model failure, malformed output, or exhausted budget                                                                         | `inconclusive`; retain any independently established findings                                                                |
+   | Required steward work unavailable through infrastructure/model failure, malformed output, exhausted budget, or a required stage without a result (`stage-incomplete`)                 | `inconclusive`; retain any independently established findings                                                                |
    | Required maintainer decision unresolved: a PR's missing intent decision under `unrequested_change: triage`, execution-sensitive changes, ambiguous category                           | `uncertain`; triage                                                                                                          |
    | Required contributor evidence missing, or a validated actionable blocker such as duplicate/intended behavior, `proposal-required` under `propose-first`, or a demonstrated regression | `needs-changes`; specific author requests                                                                                    |
    | All required checks satisfied; only `advisory`/`speculative` findings remain, including a well-formed `proposal-pending` issue                                                        | `pass`                                                                                                                       |
@@ -1104,19 +1109,43 @@ Steps:
    the remedy is a distinct commit or closing the other PRs (architecture
    §10).
 
+   The decision module holds a required-stage plan: every issue and pull
+   request requires reference verification (`references`, SP07) and claim
+   validation (`claim`, SP08); a defect issue adds reproduction
+   (`reproduction`, SP09); a pull request adds the stages
+   `stages.per_category` lists (`fix-verification`, `regression`,
+   `challenge`) for every category its contract check found plausible, or for
+   every category when none is plausible. A required stage without a result
+   (not run, skipped, or not available in this steward version) adds the
+   cause `stage-incomplete` and yields `inconclusive` by the row above, while
+   every independently established finding is retained. Causes are recorded
+   only for `inconclusive`.
+
 2. Compose the report in a fixed order with length caps: outcome and bound
    identifiers; classification; blockers, each with scenario, location,
    evidence link, dismissal code, and the specific request; uncertainties for
    maintainers; executed commands and results with environment identity and
-   exit status; the reference table; flagged automated activity (SP16); what
+   exit status; the references; flagged automated activity (SP16); what
    would change the outcome; policy revision, steward version, provider,
    requested/reported model ids, adapter/runtime versions, and runner identity. The report contains no statement about the severity of the
    reported problem, no authorship statement, and no praise, and uses neutral
    wording. Finding severities are internal decision inputs and appear only
-   as the report's blocker and uncertainty sections.
+   as the report's blocker and uncertainty sections. The report uses Markdown
+   lists only, never tables; every section heading is always present, and an
+   empty section renders `- None.`; advisory and speculative findings appear
+   only as notes in the classification section. These report caps are
+   hard-only constants (architecture §12.1): at most 60000 characters for the report
+   and 8000 for the check-run summary, item counts per section, a length per
+   item, and 200 characters per derived value; a section over its item count
+   ends with one line stating the remaining count and linking the evidence.
+   Every value derived from the submission or GitHub renders as a code span
+   with control and invisible characters escaped. Fixed wording comes from
+   core templates, kept free of severity, authorship, AI, and praise terms;
+   local runs and runs under a local policy file carry fixed notices.
 3. Persist the decision, records, report, and metrics through SP18. Obtain and
    verify the durable evidence commit before posting a report or completing
-   any check.
+   any check. For a local run, the committed run directory (SP18 step 1) is
+   the durable evidence, and a failed evidence write yields no report.
 4. Verify ownership and freshness after persistence: recompute the live
    snapshot and compare it with the ownership record; list the ownership
    artifacts for this submission or group commit and confirm none was created
@@ -1422,7 +1451,18 @@ Steps:
 
 1. Before SP13 publication, write the run directory with redaction and size caps and commit it to the
    evidence branch or repository through the App token, retrying bounded
-   times on non-fast-forward pushes.
+   times on non-fast-forward pushes. For local runs, the run directory layout
+   follows architecture §11 (`runs/<pr|issue>-<number>/<run-id>/` with one
+   JSON file per record, `report.md`, `logs/steward.txt`, `manifest.json`
+   written last, and `metrics/<YYYY-MM>/<run-id>.json`); every file is
+   written with exclusive create into `runs/.staging/<run-id>/`, and the
+   staging directory is renamed into place as the commit point; on failure
+   the staging directory and metrics file are removed. Redaction covers
+   every string of every record, the rendered report and summary, logs, and
+   the manifest, including exact values of the credentials the process
+   resolved; records are re-validated after redaction. A redaction failure or
+   timeout, an invalidated record, or a size-cap breach
+   (`limits.evidence.run_bytes`) fails the write and no report exists.
 2. Store baselines under their full base/policy/platform/command/environment
    key (SP12), with origin and writer provenance. Local uploads remain
    attributed records; they cannot silently populate official baseline caches.
@@ -1533,7 +1573,7 @@ Steps:
    on an identical input hash, which includes the provider, requested model
    identifier, adapter version, generation settings, and policy revision.
 8. The decision module enforces the never-pass rule for any missing required
-   evidence.
+   evidence and for any required stage without a result (`stage-incomplete`).
 9. Cost per run is recorded in evidence and shown on the dashboard, not in
    the report body.
 10. Inference admission: under `llm.admission: maintainer-approved`, authors
@@ -1603,8 +1643,9 @@ Recorded causes form a closed vocabulary, each mapping to `inconclusive`: `infra
 `github-unavailable`, `model-unavailable`, `model-retired`, `credential-unusable` (a missing or unusable
 credential, including a disabled Copilot policy), `capability-mismatch`, `model-refusal`, `malformed-output`,
 `rate-limited`, `budget-exhausted`, `environment-unavailable`, `baseline-unavailable`, `coverage-missing`,
-`attachment-fetch-failed`, `policy-unavailable`, `policy-invalid`, `llm-not-configured`, `cancelled`, and
-`steward-defect`.
+`attachment-fetch-failed`, `policy-unavailable`, `policy-invalid`, `llm-not-configured`, `cancelled`,
+`steward-defect`, and `stage-incomplete` (a required stage produced no result: not run, skipped,
+or not available in this steward version).
 
 Measures: budget utilization and soft-cap overshoot; cancellations; queued
 and awaiting-approval ages, admission rates, and abandoned holds; `inconclusive`
@@ -1623,15 +1664,34 @@ counts by cause.
 
 Steps:
 
-1. Authenticate with the maintainer's token; fetch the submission and commits.
+1. Authenticate with the maintainer's token; fetch the submission and commits
+   through the GitHub API. `steward screen` syntax:
+
+   ```text
+   steward screen (--issue <number> | --pr <number>) [--repo owner/name] [--policy-file <path>] [--evidence-dir <dir>] [--json]
+   ```
+
 2. Run SP06 through SP13 with the local container runner and the maintainer's
    own inference credential for the policy's adapter: the Copilot login for
-   `github-token`, or the adapter's environment variable for `env`. The policy comes from the trusted branch unless a
-   local file is named explicitly, which is useful for testing a proposed
-   policy against existing submissions before merging it.
-3. Write the report and evidence locally; `steward report` renders them. With
+   `github-token`, or the adapter's environment variable for `env`. The policy comes from the trusted branch through
+   the GitHub API (never the default checklist; a missing or invalid published
+   policy stops the command before any run), unless a
+   local file is named explicitly with `--policy-file` (non-authoritative,
+   revision `local:<sha256>`), which is useful for testing a proposed
+   policy against existing submissions before merging it. The current
+   implementation runs at contract level only (SP06 capture and the
+   deterministic contract check, then SP13 steps 1-3), with no stage,
+   container, or model call, so a run ends `needs-changes` or `inconclusive`
+   (cause `stage-incomplete`).
+3. Write the report and evidence locally, to `--evidence-dir` or the user
+   data directory, never the checkout; `steward report <run-dir> [--json]`
+   verifies and prints the stored run. Every output is labeled a local run
+   and not the official result, and a run under a local policy file is
+   labeled non-authoritative in the report, the check summary, and the
+   command output. With
    an explicit publish flag, post a report comment attributed to the
-   maintainer and the policy revision used, and optionally upload evidence. A
+   maintainer and the policy revision used, and optionally upload evidence;
+   this explicit publish flag is not implemented yet. A
    local run never creates the required check run; a maintainer may follow
    with `/steward override` citing it.
 

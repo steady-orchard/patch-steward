@@ -36,4 +36,51 @@ describe('record decision', () => {
     const unknownOutcome = { ...validDecision, outcome: 'approved' };
     expect(decisionRecordSchema.safeParse(unknownOutcome).success).toBe(false);
   });
+
+  it('record decision accepts optional causes', () => {
+    const withCauses = {
+      ...validDecision,
+      causes: [
+        {
+          cause: 'attachment-fetch-failed',
+          code: 'attachment.fetch-failed',
+          message: 'A required attachment could not be fetched.',
+          subjects: ['https://github.com/user-attachments/files/1/a.zip'],
+        },
+      ],
+    };
+    expect(decisionRecordSchema.safeParse(withCauses).success).toBe(true);
+
+    const withEmptyCauses = { ...validDecision, causes: [] };
+    expect(decisionRecordSchema.safeParse(withEmptyCauses).success).toBe(true);
+  });
+
+  it('record decision rejects an unknown cause or cause key', () => {
+    const withUnknownCause = {
+      ...validDecision,
+      causes: [
+        {
+          cause: 'not-a-cause',
+          code: 'attachment.fetch-failed',
+          message: 'A required attachment could not be fetched.',
+          subjects: [],
+        },
+      ],
+    };
+    expect(decisionRecordSchema.safeParse(withUnknownCause).success).toBe(false);
+
+    const withExtraCauseKey = {
+      ...validDecision,
+      causes: [
+        {
+          cause: 'attachment-fetch-failed',
+          code: 'attachment.fetch-failed',
+          message: 'A required attachment could not be fetched.',
+          subjects: [],
+          extra: 'nope',
+        },
+      ],
+    };
+    expect(decisionRecordSchema.safeParse(withExtraCauseKey).success).toBe(false);
+  });
 });

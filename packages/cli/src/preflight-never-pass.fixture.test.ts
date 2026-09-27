@@ -237,7 +237,7 @@ describe('preflight never-pass conformance', () => {
   });
 
   it.each([...CONTRACT_DISPOSITIONS])('contract disposition %s maps to its preflight exit status', (disposition) => {
-    const expected = { met: 0, 'needs-changes': 1, uncertain: 1, inconclusive: 2 } as const;
+    const expected = { met: 0, 'needs-changes': 1, uncertain: 1, inconclusive: 3 } as const;
     expect(PREFLIGHT_EXIT_BY_DISPOSITION[disposition]).toBe(expected[disposition]);
     expect(CONTRACT_DISPOSITIONS).not.toContain('pass');
     expect([...Object.keys(TRIGGERS)].sort()).toEqual([...PREFLIGHT_FAILURE_CODES].sort());

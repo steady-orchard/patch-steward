@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   recordSchemaVersionSchema,
   recordPositiveIntSchema,
+  recordRunIdSchema,
   recordIdentifierSchema,
   recordRepositorySchema,
   recordTimestampSchema,
@@ -29,7 +30,7 @@ const base = z.strictObject({
   subject: z.discriminatedUnion('kind', [
     z.strictObject({
       kind: z.literal('run'),
-      run_id: recordPositiveIntSchema,
+      run_id: recordRunIdSchema,
       run_attempt: recordPositiveIntSchema,
     }),
     z.strictObject({

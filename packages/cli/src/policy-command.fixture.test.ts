@@ -57,7 +57,7 @@ describe('policy command fixture corpus', () => {
       .split('\n')
       .filter((line) => line.length > 0);
     expect(stderrLines).toHaveLength(1);
-    expect(stderrLines[0]).toMatch(/^warning policy\.llm-model-placeholder llm\.model /);
+    expect(stderrLines[0]).toMatch(/^warning policy\.llm-model-placeholder: llm\.model is /);
   });
 
   it('policy command reports no warnings for fixture valid/copilot.yml', async () => {

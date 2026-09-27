@@ -1,3 +1,7 @@
+import { readFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 
 import { createGitHubClient } from '../github/client.js';
@@ -8,6 +12,7 @@ import { DEFAULT_CHECKLIST_POLICY } from '../submission/default-checklist.js';
 import { parseIssueBody, parsePullRequestBody } from '../submission/parse.js';
 import { checkContract } from '../submission/contract.js';
 import type { IssueContractInput, PullRequestContractInput } from '../submission/contract.js';
+import { CONTRACT_FINDING_MESSAGES } from '../submission/contract.js';
 import { assessAttachmentsStatically } from '../submission/attachments.js';
 import type { CaptureContext } from '../submission/intake.js';
 import { captureIssue, capturePullRequest } from '../submission/intake.js';
@@ -18,6 +23,26 @@ import type {
   AttachmentTransportResponse,
 } from '../net/attachment-fetch.js';
 import { contentHash } from '../hash.js';
+import { fixedClock, fixedRandom } from '../clock.js';
+import { screenSubmission } from '../pipeline/screen.js';
+import { reportDenylistMatches, maskCodeSpans } from '../report/denylist.js';
+import {
+  REPORT_TITLE,
+  REPORT_SECTION_HEADINGS,
+  REPORT_EMPTY_SECTION_LINE,
+  REPORT_OVERFLOW_NOUNS,
+  REPORT_OVERFLOW_TEMPLATE,
+  REPORT_LOCAL_RUN_NOTICE,
+  REPORT_NON_AUTHORITATIVE_NOTICE_TEMPLATE,
+  REPORT_HEADER_TEMPLATES,
+  CLASSIFICATION_TEMPLATES,
+  OUTCOME_CHANGE_LINES,
+  CAUSE_TEMPLATES,
+  REPORT_ITEM_TEMPLATES,
+  PROVENANCE_TEMPLATES,
+  CHECK_SUMMARY_TEMPLATES,
+} from '../report/templates.js';
+import { FINDING_TEMPLATES } from '../report/finding-templates.js';
 
 const HEAD_SHA = 'a'.repeat(40);
 const BASE_SHA = 'b'.repeat(40);
@@ -420,5 +445,171 @@ describe('invariant 6 conformance', () => {
       'sharedHeads',
       'type',
     ]);
+  });
+});
+
+function collectStringLeaves(value: unknown, out: string[]): void {
+  if (typeof value === 'string') {
+    out.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStringLeaves(item, out);
+    }
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const item of Object.values(value)) {
+      collectStringLeaves(item, out);
+    }
+  }
+}
+
+function localPolicyPath(): string {
+  return fileURLToPath(new URL('../../../../fixtures/policies/valid/minimal-no-llm.yml', import.meta.url));
+}
+
+function reportsDir(): URL {
+  return new URL('../../../../fixtures/reports/', import.meta.url);
+}
+
+function authorshipRoutes(user: FakeUser, association: string, issueBody: string, prBody_: string): RouteMap {
+  return {
+    '/repos/octo/demo': () => jsonResponse(repoResponse()),
+    '/repos/octo/demo/issues/5': () => jsonResponse(issueResponse(5, issueBody, user, association)),
+    '/repos/octo/demo/pulls/40': () => jsonResponse(pullRequestResponse({ number: 40, body: prBody_, user, association })),
+    '/repos/octo/demo/pulls/40/files': () => jsonResponse([fileEntry('src/parse.ts')]),
+    '/repos/octo/demo/issues/29': () => jsonResponse(issueResponse(29, 'The parser crashes on empty input.', user, association)),
+    [`/repos/octo/demo/commits/${HEAD_SHA}/pulls`]: () => jsonResponse([]),
+  };
+}
+
+describe('invariant 6: report wording and authorship', { timeout: 60000 }, () => {
+  it('report wording has no severity, authorship, or praise term', () => {
+    const templateObjects = [
+      REPORT_TITLE,
+      REPORT_SECTION_HEADINGS,
+      REPORT_EMPTY_SECTION_LINE,
+      REPORT_OVERFLOW_NOUNS,
+      REPORT_OVERFLOW_TEMPLATE,
+      REPORT_LOCAL_RUN_NOTICE,
+      REPORT_NON_AUTHORITATIVE_NOTICE_TEMPLATE,
+      REPORT_HEADER_TEMPLATES,
+      CLASSIFICATION_TEMPLATES,
+      OUTCOME_CHANGE_LINES,
+      CAUSE_TEMPLATES,
+      REPORT_ITEM_TEMPLATES,
+      PROVENANCE_TEMPLATES,
+      CHECK_SUMMARY_TEMPLATES,
+      FINDING_TEMPLATES,
+      CONTRACT_FINDING_MESSAGES,
+    ];
+
+    const strings: string[] = [];
+    collectStringLeaves(templateObjects, strings);
+    expect(strings.length).toBeGreaterThan(50);
+    for (const text of strings) {
+      expect(reportDenylistMatches(text)).toEqual([]);
+    }
+
+    const dir = fileURLToPath(reportsDir());
+    const files = readdirSync(dir).filter((name) => name.endsWith('.txt'));
+    expect(files.length).toBe(16);
+    for (const file of files) {
+      const text = readFileSync(join(dir, file), 'utf8').replace(/\r\n/g, '\n');
+      expect(reportDenylistMatches(maskCodeSpans(text))).toEqual([]);
+    }
+  });
+
+  it('report ignores authorship', async () => {
+    const submissions: readonly {
+      readonly submission: { readonly type: 'issue' | 'pull_request'; readonly number: number };
+      readonly issueBody: (overrides?: Partial<Record<string, string>>) => string;
+      readonly prBodyFn: (overrides?: Partial<Record<string, string>>) => string;
+    }[] = [
+      { submission: { type: 'issue', number: 5 }, issueBody: defectBody, prBodyFn: prBody },
+      { submission: { type: 'pull_request', number: 40 }, issueBody: defectBody, prBodyFn: prBody },
+    ];
+
+    const tmpDirs: string[] = [];
+    try {
+      for (const { submission, issueBody, prBodyFn } of submissions) {
+        const baseIssueBody = issueBody();
+        const basePrBody = prBodyFn();
+        const disclosedIssueBodyText = issueBody({
+          'Actual behavior':
+            '`widget parse empty.txt` exits with status 1 and prints `TypeError: cannot read properties of undefined`. Generated with an AI assistant.',
+        });
+        const disclosedPrBodyText = prBodyFn({
+          Problem: '`widget parse` exits with status 1 on an empty file. Generated with an AI assistant.',
+        });
+
+        async function runOne(
+          user: FakeUser,
+          association: string,
+          useDisclosed: boolean,
+        ): Promise<import('../pipeline/screen.js').ScreenResult> {
+          const dir = mkdtempSync(join(tmpdir(), 'm5-inv6-'));
+          tmpDirs.push(dir);
+          const routes = authorshipRoutes(
+            user,
+            association,
+            useDisclosed ? disclosedIssueBodyText : baseIssueBody,
+            useDisclosed ? disclosedPrBodyText : basePrBody,
+          );
+          return screenSubmission({
+            repository: REPO,
+            submission,
+            policySource: { kind: 'local-file', path: localPolicyPath() },
+            token: null,
+            evidenceDir: dir,
+            fetch: routedFetch(routes),
+            sleep: async () => undefined,
+            attachmentResolver: fakeResolver(),
+            attachmentTransport: fakeTransport(),
+            clock: fixedClock('2026-09-27T10:15:00.000Z'),
+            random: fixedRandom('3f9a1c2e'),
+          });
+        }
+
+        const runA = await runOne(FIRST_TIME_USER, 'FIRST_TIME_CONTRIBUTOR', false);
+        const runB = await runOne(MAINTAINER_USER, 'OWNER', false);
+        const runC = await runOne(FIRST_TIME_USER, 'FIRST_TIME_CONTRIBUTOR', true);
+
+        expect(runA.kind).toBe('completed');
+        expect(runB.kind).toBe('completed');
+        expect(runC.kind).toBe('completed');
+        if (runA.kind !== 'completed' || runB.kind !== 'completed' || runC.kind !== 'completed') {
+          continue;
+        }
+
+        expect(runA.published.report).toBe(runB.published.report);
+        expect(runA.published.checkSummary).toBe(runB.published.checkSummary);
+
+        function normalize(snapshotHash: string, text: string): string {
+          return text.split(snapshotHash).join('SNAPSHOT');
+        }
+
+        const normalizedAReport = normalize(runA.published.submission.snapshot_hash, runA.published.report);
+        const normalizedASummary = normalize(runA.published.submission.snapshot_hash, runA.published.checkSummary);
+        const normalizedCReport = normalize(runC.published.submission.snapshot_hash, runC.published.report);
+        const normalizedCSummary = normalize(runC.published.submission.snapshot_hash, runC.published.checkSummary);
+
+        expect(normalizedCReport).toBe(normalizedAReport);
+        expect(normalizedCSummary).toBe(normalizedASummary);
+
+        expect(runA.decision.outcome).toBe(runB.decision.outcome);
+        expect(runB.decision.outcome).toBe(runC.decision.outcome);
+
+        for (const run of [runA, runB, runC]) {
+          expect(reportDenylistMatches(maskCodeSpans(run.published.report))).toEqual([]);
+        }
+      }
+    } finally {
+      for (const dir of tmpDirs) {
+        rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      }
+    }
   });
 });

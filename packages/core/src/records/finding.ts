@@ -8,6 +8,7 @@ import { findingSeveritySchema } from '../vocabulary.js';
 import {
   recordSchemaVersionSchema,
   recordPositiveIntSchema,
+  recordRunIdSchema,
   recordIdentifierSchema,
   recordTextSchema,
   recordList,
@@ -16,7 +17,7 @@ import {
 export const findingRecordSchema = z.strictObject({
   schema_version: recordSchemaVersionSchema,
   record_type: z.literal('finding'),
-  run_id: recordPositiveIntSchema,
+  run_id: recordRunIdSchema,
   run_attempt: recordPositiveIntSchema,
   finding_id: recordIdentifierSchema,
   stage: recordIdentifierSchema,
@@ -30,6 +31,10 @@ export const findingRecordSchema = z.strictObject({
   evidence: recordList(recordIdentifierSchema),
   basis: recordTextSchema,
   dismissal_code: z.string().max(POLICY_ID_MAX_LENGTH).regex(DISMISSAL_CODE_PATTERN).nullable(),
+  code: recordIdentifierSchema.optional(),
+  detail: recordIdentifierSchema.nullable().optional(),
+  subjects: recordList(recordTextSchema).optional(),
+  request_id: recordIdentifierSchema.nullable().optional(),
 });
 
 export type FindingRecord = z.output<typeof findingRecordSchema>;

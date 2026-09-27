@@ -52,6 +52,12 @@ export const policyRevisionIdSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f
 
 export const recordPositiveIntSchema = z.int().min(1);
 
+export const LOCAL_RUN_ID_PATTERN = /^local-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$/;
+
+export const recordRunIdSchema = z.union([recordPositiveIntSchema, z.string().regex(LOCAL_RUN_ID_PATTERN)]);
+
+export type RecordRunId = z.infer<typeof recordRunIdSchema>;
+
 export const recordCountSchema = z.int().min(0);
 
 export function recordList<T extends z.ZodType>(item: T) {

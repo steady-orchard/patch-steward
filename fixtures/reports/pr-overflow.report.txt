@@ -1,0 +1,128 @@
+## Patch Steward screening report
+
+- Outcome: `needs-changes`
+- Submission: `octo/demo` pull request `12`
+- Snapshot: `sha256:5555555555555555555555555555555555555555555555555555555555555555`
+- Target branch: `main`
+- Head commit: `cccccccccccccccccccccccccccccccccccccccc`
+- Base commit tested: `dddddddddddddddddddddddddddddddddddddddd`
+- Policy revision: `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`
+- Run: `local-20260927T101500Z-3f9a1c2e` attempt `1`
+
+> Local run: produced on a maintainer's machine; not the repository's official screening result.
+
+### Classification
+
+- Category: `bugfix`. Claim classification: not determined; claim validation did not run.
+
+### Blockers
+
+1. The attachment `https://example.com/file-01.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0001.json`
+   - Request `R1`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-01.txt`.
+2. The attachment `https://example.com/file-02.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0002.json`
+   - Request `R2`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-02.txt`.
+3. The attachment `https://example.com/file-03.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0003.json`
+   - Request `R3`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-03.txt`.
+4. The attachment `https://example.com/file-04.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0004.json`
+   - Request `R4`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-04.txt`.
+5. The attachment `https://example.com/file-05.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0005.json`
+   - Request `R5`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-05.txt`.
+6. The attachment `https://example.com/file-06.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0006.json`
+   - Request `R6`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-06.txt`.
+7. The attachment `https://example.com/file-07.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0007.json`
+   - Request `R7`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-07.txt`.
+8. The attachment `https://example.com/file-08.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0008.json`
+   - Request `R8`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-08.txt`.
+9. The attachment `https://example.com/file-09.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0009.json`
+   - Request `R9`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-09.txt`.
+10. The attachment `https://example.com/file-10.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0010.json`
+   - Request `R10`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-10.txt`.
+11. The attachment `https://example.com/file-11.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0011.json`
+   - Request `R11`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-11.txt`.
+12. The attachment `https://example.com/file-12.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0012.json`
+   - Request `R12`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-12.txt`.
+13. The attachment `https://example.com/file-13.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0013.json`
+   - Request `R13`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-13.txt`.
+14. The attachment `https://example.com/file-14.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0014.json`
+   - Request `R14`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-14.txt`.
+15. The attachment `https://example.com/file-15.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0015.json`
+   - Request `R15`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-15.txt`.
+16. The attachment `https://example.com/file-16.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0016.json`
+   - Request `R16`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-16.txt`.
+17. The attachment `https://example.com/file-17.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0017.json`
+   - Request `R17`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-17.txt`.
+18. The attachment `https://example.com/file-18.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0018.json`
+   - Request `R18`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-18.txt`.
+19. The attachment `https://example.com/file-19.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0019.json`
+   - Request `R19`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-19.txt`.
+20. The attachment `https://example.com/file-20.txt` is not on an approved attachment host.
+   - Location: the pull request description
+   - Evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e/findings/finding-0020.json`
+   - Request `R20`: Upload the file as a GitHub attachment instead of linking `https://example.com/file-20.txt`.
+- 3 more blockers are recorded in the evidence: `runs/pr-12/local-20260927T101500Z-3f9a1c2e`.
+
+### Uncertainties for maintainers
+
+- None.
+
+### Executed commands and results
+
+- None.
+
+### References
+
+- None.
+
+### Flagged automated activity
+
+- None.
+
+### What would change the outcome
+
+- Completing each numbered request changes this outcome.
+
+### Provenance
+
+- Policy revision: `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb` (trusted branch `main` at commit `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`)
+- Steward version: `0.0.0-golden`
+- Model: no model call in this run
+- Adapter and runtime: none
+- Runner: no execution in this run

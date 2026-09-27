@@ -129,6 +129,92 @@ describe('package root exports', () => {
     'buildSubmissionRecord',
     'captureIssue',
     'capturePullRequest',
+    'stewardVersion',
+    'parseStewardVersion',
+    'fixedClock',
+    'steppingClock',
+    'fixedRandom',
+    'prettyJson',
+    'exactValueForms',
+    'planRedactionBatches',
+    'applyRedactionRulesBatch',
+    'redactTexts',
+    'reportDenylistMatches',
+    'maskCodeSpans',
+    'mapCheck',
+    'mapLabel',
+    'requiredStages',
+    'missingRequiredStages',
+    'stageIncompleteCause',
+    'decideOutcome',
+    'escapeReportValue',
+    'reportCodeSpan',
+    'reportSubjectList',
+    'repositoryWebUrl',
+    'fillReportTemplate',
+    'reportFixedTextViolations',
+    'reportCharacterViolations',
+    'flaggedItemLimit',
+    'reportStaticBudget',
+    'nonAuthoritativeNotice',
+    'reportHeaderLines',
+    'classificationLine',
+    'causeLine',
+    'overflowLine',
+    'provenanceLines',
+    'reportFieldLabel',
+    'findingTemplateKey',
+    'findingTexts',
+    'initialBudget',
+    'budgetNotIncreased',
+    'expectedNextHandoff',
+    'validateHandoff',
+    'fitReportLine',
+    'fitReportItem',
+    'renderReport',
+    'renderCheckSummary',
+    'localRunId',
+    'runDirectoryName',
+    'findingId',
+    'findingFilePath',
+    'executionFilePath',
+    'maintainerActionFilePath',
+    'runStorePath',
+    'stagingStorePath',
+    'metricsStorePath',
+    'recordTypeForPath',
+    'repositoryStoreRoot',
+    'storePathToPlatform',
+    'localEvidenceLocation',
+    'buildRunMetricsEvents',
+    'renderLogText',
+    'truncateLogText',
+    'mapStringLeaves',
+    'redactEvidenceStrings',
+    'mergeRedactionCounts',
+    'buildEvidenceManifest',
+    'writeRunDirectory',
+    'prepareFindings',
+    'decisionFindings',
+    'assembleRunRecords',
+    'findingTemplateContext',
+    'paddedSubjects',
+    'buildReportInput',
+    'buildCheckSummaryInput',
+    'publishRunEvidence',
+    'verifyRunDirectory',
+    'runWithPhaseTimeout',
+    'pipelineCause',
+    'acceptGateHandoff',
+    'phaseLabel',
+    'runPhaseSequence',
+    'runGate',
+    'localDecisionInput',
+    'publishLocalRun',
+    'screenPolicyInfo',
+    'screenPreRunExitStatus',
+    'screenPublishFailure',
+    'screenSubmission',
   ] as const;
 
   it.each(functionExports)('exports %s as a function', (name) => {
@@ -184,6 +270,16 @@ describe('package root exports', () => {
     'PROPOSED_POLICY_STATUSES',
     'CONTRACT_FINDING_CODES',
     'CONTRACT_DISPOSITIONS',
+    'PIPELINE_STAGES',
+    'CHECK_CONCLUSIONS',
+    'REPORT_SECTIONS',
+    'PIPELINE_PHASES',
+    'HANDOFF_PHASES',
+    'HANDOFF_EARLY_EXITS',
+    'SEQUENCE_PHASES',
+    'PIPELINE_FAILURE_CODES',
+    'SCREEN_POLICY_FAILURE_CODES',
+    'SCREEN_FAILURE_CODES',
   ] as const;
 
   it.each(tupleExports)('exports %s as a tuple', (name) => {
@@ -244,6 +340,15 @@ describe('package root exports', () => {
     'githubTreeResponseSchema',
     'githubBlobResponseSchema',
     'githubRefResponseSchema',
+    'pipelineStageSchema',
+    'recordRunIdSchema',
+    'recordCauseSchema',
+    'stageResultSchema',
+    'budgetRemainingSchema',
+    'handoffFindingSchema',
+    'handoffRecordSchema',
+    'evidenceManifestSchema',
+    'metricsFileSchema',
   ] as const;
 
   it.each(schemaExports)('exports %s as an object', (name) => {
@@ -265,6 +370,28 @@ describe('package root exports', () => {
     'DEFAULT_CHECKLIST_POLICY',
     'CONTRACT_FINDING_SEVERITIES',
     'CONTRACT_FINDING_MESSAGES',
+    'systemClock',
+    'systemRandom',
+    'REPORT_DENYLIST',
+    'REPORT_SECTION_ITEM_LIMITS',
+    'REPORT_ITEM_MAX_LENGTHS',
+    'REPORT_SECTION_HEADINGS',
+    'REPORT_OVERFLOW_NOUNS',
+    'REPORT_HEADER_TEMPLATES',
+    'CLASSIFICATION_TEMPLATES',
+    'OUTCOME_CHANGE_LINES',
+    'CAUSE_TEMPLATES',
+    'REPORT_ITEM_TEMPLATES',
+    'PROVENANCE_TEMPLATES',
+    'CHECK_SUMMARY_TEMPLATES',
+    'FINDING_TEMPLATES',
+    'LOCAL_RUN_ID_PATTERN',
+    'RUN_FILES',
+    'nodeEvidenceFs',
+    'LOCAL_PHASES',
+    'PIPELINE_FAILURE_CAUSES',
+    'PIPELINE_FAILURE_MESSAGES',
+    'SCREEN_EXIT_BY_OUTCOME',
   ] as const;
 
   it.each(recordExports)('exports %s as an object', (name) => {
@@ -312,5 +439,46 @@ describe('package root exports', () => {
     expect(core.CONTRACT_DISPOSITIONS).toEqual(['met', 'needs-changes', 'uncertain', 'inconclusive']);
     expect(core.SUBMISSION_ATTACHMENT_RULES).toHaveLength(10);
     expect(core.DEFAULT_ATTACHMENT_DESTINATIONS).toHaveLength(5);
+  });
+
+  it('exports the report, evidence, and handoff constants', () => {
+    expect(core.REPORT_MAX_LENGTH).toBe(60000);
+    expect(core.CHECK_SUMMARY_MAX_LENGTH).toBe(8000);
+    expect(core.REPORT_DERIVED_VALUE_MAX_LENGTH).toBe(200);
+    expect(core.REPORT_SUBJECTS_PER_ITEM).toBe(10);
+    expect(core.EVIDENCE_LOG_FILE_MAX_BYTES).toBe(1048576);
+    expect(core.EVIDENCE_LOG_FILES_MAX).toBe(16);
+    expect(core.EXACT_VALUE_MIN_LENGTH).toBe(8);
+    expect(core.EVIDENCE_RUN_FILES_MAX).toBe(4096);
+    expect(core.HANDOFF_MAX_BYTES).toBe(8388608);
+    expect(core.HANDOFF_VERSION).toBe(1);
+    expect(core.STAGE_INCOMPLETE_CODE).toBe('pipeline.stage-incomplete');
+    expect(core.DECISION_CONTRACT_STAGE).toBe('contract');
+    expect(core.REPORT_TITLE).toBe('## Patch Steward screening report');
+    expect(core.REPORT_EMPTY_SECTION_LINE).toBe('- None.');
+    expect(core.REPORT_HEADING_MAX_LENGTH).toBe(60);
+    expect(core.REPORT_HEADINGS_COUNT).toBe(9);
+    expect(core.REPORT_SEPARATOR_LINES_MAX).toBe(40);
+    expect(core.REPORT_TRUNCATION_SUFFIX).toBe(' (truncated)');
+    expect(typeof core.REPORT_OVERFLOW_TEMPLATE).toBe('string');
+    expect(typeof core.REPORT_LOCAL_RUN_NOTICE).toBe('string');
+    expect(typeof core.REPORT_NON_AUTHORITATIVE_NOTICE_TEMPLATE).toBe('string');
+    expect(core.FAILURE_CAUSES).toHaveLength(20);
+    expect(core.BUILT_IN_DETECTORS).toHaveLength(23);
+    expect(core.PIPELINE_STAGES).toHaveLength(6);
+    expect(core.RECORD_SCHEMA_VERSION).toBe(1);
+    expect(core.POLICY_LIMITS).toHaveLength(41);
+  });
+
+  it('exports the pipeline and evidence constants', () => {
+    expect(core.RUN_MANIFEST_FILE).toBe('manifest.json');
+    expect(core.RUNS_DIRECTORY).toBe('runs');
+    expect(core.STAGING_DIRECTORY_NAME).toBe('.staging');
+    expect(core.METRICS_DIRECTORY).toBe('metrics');
+    expect(core.EVIDENCE_MANIFEST_VERSION).toBe(1);
+    expect(core.PHASE_TIMEOUT_MAX_MS).toBe(2147483647);
+    expect(core.PIPELINE_FAILURE_CODES).toHaveLength(6);
+    expect(core.SCREEN_EXIT_BY_OUTCOME.inconclusive).toBe(3);
+    expect(core.SEQUENCE_PHASES).toEqual(['intake', 'execute', 'assess']);
   });
 });

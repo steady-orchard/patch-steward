@@ -1,0 +1,18 @@
+[
+  { "case": "issue-unstructured", "report": "issue-unstructured.report.txt", "summary": "issue-unstructured.summary.txt" },
+  { "case": "issue-defect-complete", "report": "issue-defect-complete.report.txt", "summary": "issue-defect-complete.summary.txt" },
+  {
+    "case": "pr-field-missing-attachment",
+    "report": "pr-field-missing-attachment.report.txt",
+    "summary": "pr-field-missing-attachment.summary.txt"
+  },
+  {
+    "case": "pr-execution-sensitive",
+    "report": "pr-execution-sensitive.report.txt",
+    "summary": "pr-execution-sensitive.summary.txt"
+  },
+  { "case": "pr-shared-head", "report": "pr-shared-head.report.txt", "summary": "pr-shared-head.summary.txt" },
+  { "case": "pr-local-policy", "report": "pr-local-policy.report.txt", "summary": "pr-local-policy.summary.txt" },
+  { "case": "pr-overflow", "report": "pr-overflow.report.txt", "summary": "pr-overflow.summary.txt" },
+  { "case": "pr-hostile", "report": "pr-hostile.report.txt", "summary": "pr-hostile.summary.txt" }
+]

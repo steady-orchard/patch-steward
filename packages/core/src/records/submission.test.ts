@@ -64,6 +64,44 @@ describe('record submission', () => {
     expect(submissionRecordSchema.safeParse(issue).success).toBe(false);
   });
 
+  it('record submission accepts an unstructured issue record', () => {
+    const issue = {
+      ...validSubmission,
+      type: 'issue',
+      issue_kind: null,
+      template: null,
+      category: null,
+      fields: {},
+      target_branch: null,
+      head_commit: null,
+      trusted_paths_changed: null,
+      execution_sensitive_paths_changed: null,
+      shared_head_pull_requests: [],
+    };
+    expect(submissionRecordSchema.safeParse(issue).success).toBe(true);
+  });
+
+  it('record submission rejects a null issue_kind unless template is null', () => {
+    const base = {
+      ...validSubmission,
+      type: 'issue',
+      issue_kind: null,
+      category: null,
+      fields: {},
+      target_branch: null,
+      head_commit: null,
+      trusted_paths_changed: null,
+      execution_sensitive_paths_changed: null,
+      shared_head_pull_requests: [],
+    } as Record<string, unknown>;
+    const withoutTemplate = { ...base };
+    delete withoutTemplate.template;
+    expect(submissionRecordSchema.safeParse(withoutTemplate).success).toBe(false);
+
+    const withTemplate = { ...base, template: { form: 'defect', version: 1 } };
+    expect(submissionRecordSchema.safeParse(withTemplate).success).toBe(false);
+  });
+
   it('record submission rejects an unknown field id', () => {
     const bad = { ...validSubmission, fields: { 'not-a-field': 'x' } };
     expect(submissionRecordSchema.safeParse(bad).success).toBe(false);

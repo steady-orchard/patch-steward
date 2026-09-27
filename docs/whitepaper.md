@@ -381,7 +381,7 @@ questions. Queued and awaiting-approval are waiting states, not outcomes.
 A screening report has a fixed order and length caps: outcome and bound
 identifiers, classification, blockers with scenario, location, evidence link,
 dismissal code, and the specific request, uncertainties for maintainers,
-executed commands and results, the reference table, flagged automated
+executed commands and results, the references, flagged automated
 activity, what would change the outcome, and the policy revision, steward
 version, and model identity. It contains no statement about the severity of
 the reported problem, no authorship statement, and no praise. The steward
@@ -681,16 +681,18 @@ and freshness checks, not cancellation, prevent superseded runs from
 publishing. Baselines are cached by
 base commit, policy, platform, command/harness, and environment;
 execution output is captured with bounds and redacted before storage.
-Built-in credential detectors always run before storage; project redaction
+Built-in credential detectors always run before storage; every credential the
+steward resolved is also redacted as an exact value; project redaction
 patterns are limited to a safe regular-expression subset under size and time
-bounds, and a timeout fails closed. Daily run
+bounds, and a timeout fails closed. Redaction covers every stored record,
+report, and log before a record is written. Daily run
 caps and per-author concurrency caps limit steward cost without judging identity
 (O01). Existing project CI is independent and outside those cost guarantees.
 
 Infrastructure failure, model unavailability or retirement, a missing or
 unusable model credential, a capability mismatch, model refusal, malformed
 structured output after bounded repair, budget exhaustion, environment
-unavailability all end as inconclusive when required work cannot complete.
+unavailability, and a required stage that produced no result all end as inconclusive when required work cannot complete.
 Trusted-path changes disqualify PR-controlled CI; missing replacement coverage
 is inconclusive, while execution-sensitive changes require maintainer triage. Missing contributor evidence ends as needs-changes. None produce a
 pass. The threat table in architecture §13 lists mitigations for workflow and
@@ -782,14 +784,24 @@ field mapping and parsing, category and path classification with built-in
 trusted and execution-sensitive lists, attachment rules with a bounded fetcher
 and archive inspector, the policy-change flag, snapshot and claim-scope
 hashing, the deterministic contract check, and issue and PR capture), a
-read-only GitHub REST adapter, git diff, merge-base, and remote reads,
-conformance tests for invariants 1, 2, 5, 6, 7, and 8, the `steward policy`
-command and the deterministic part of `steward preflight` in `cli`, the policy
-template and its editor schema, the issue forms, and the PR template in
-`templates`, and policy, submission, and recorded GitHub response fixture
-corpora. The `action` and `web` packages hold toolchain smoke code only. No
-screening stage, workflow, provider integration, GitHub write, or browser app is
-claimed.
+read-only GitHub REST adapter, git diff, merge-base, and remote reads, the
+decision module (SP13's table in precedence order, the required-stage plan,
+and the architecture §10 check and label mappings as rules), the report
+module (a fixed-order report and check-run summary within report caps,
+escaping of derived text, and a wording denylist), the evidence module with a
+local store (one directory per run, one JSON file per record, a manifest, and
+redaction at persistence with 23 built-in detectors and exact-value redaction
+of resolved credentials), the job phases running in one process with
+validated handoff records, conformance tests for invariants 1, 2, 4, 5, 6, 7, and 8, the `steward policy` command, the
+deterministic part of `steward preflight`, the `steward screen` command at contract level, and `steward
+report` under uniform CLI conventions with exit status 3 for `inconclusive`
+in every command, in `cli`, the policy template and its editor schema, the
+issue forms, and the PR template in `templates`, and policy, submission, and
+recorded GitHub response fixture corpora, now with golden reports and
+screening scenarios. The `action` and `web` packages hold toolchain smoke
+code only. No screening stage, container, model call, provider integration,
+publication, GitHub write, evidence branch or repository store, workflow, or
+browser app is claimed.
 
 Decisions recorded on September 15, 2026 and revised on September 16, 2026
 (ADR-0001–ADR-0016 in `docs/adr`) settle the browser code's role, the absence of browser
@@ -822,8 +834,16 @@ claim-scope text; the deterministic contract result; a GitHub read adapter
 without an SDK dependency; CLI GitHub authentication; the `steward preflight`
 command; and the live-probe test runner.
 
+Decisions recorded on September 27, 2026 (ADR-0062–ADR-0070 in `docs/adr`)
+settle report caps as hard-only constants; report wording, escaping, and the
+denylist; the evidence run directory, record files, and the local store;
+redaction at persistence of resolved credentials and prefixed token formats;
+uniform CLI conventions and exit statuses, which supersede the exit-status
+rule of the `steward preflight` record; the `steward screen` and `steward
+report` commands; local run identity; that required stages never pass
+incomplete; and phase handoff records.
+
 Decisions still to be made are implementation details (architecture §15): the
-evidence store's run-directory layout and stored-record file format; the
 container image strategy and the network policy for dependency installation;
 the default model per shipped adapter and prompt and repair design; the
 context selection strategy and its token budget; test result parsing; the

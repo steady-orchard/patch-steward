@@ -135,7 +135,14 @@ describe('invariant 5 conformance', () => {
     const names = Object.keys(core)
       .filter((name) => /^(load|validate|resolve)/.test(name) && typeof (core as Record<string, unknown>)[name] === 'function')
       .sort();
-    expect(names).toEqual(['loadPolicy', 'resolveCommit', 'resolvePolicy', 'validatePolicy', 'validatePolicyBytes']);
+    expect(names).toEqual([
+      'loadPolicy',
+      'resolveCommit',
+      'resolvePolicy',
+      'validateHandoff',
+      'validatePolicy',
+      'validatePolicyBytes',
+    ]);
 
     const results: unknown[] = [];
 
@@ -159,6 +166,7 @@ describe('invariant 5 conformance', () => {
 
     const gitOptions = { repoDir: os.tmpdir(), timeoutMs: 1000, maxOutputBytes: 1000 };
     results.push(await core.resolveCommit(gitOptions, '-x'));
+    results.push(core.validateHandoff(null, { previous: null, gate: null, maxRounds: 1 }));
 
     const versionRunner: ProcessRunner = async (_binary, args) => {
       if (args[0] === 'rev-parse' && args[1] === '--git-dir') {
@@ -210,10 +218,12 @@ describe('invariant 5 conformance', () => {
       'parseIssueBody',
       'parseLinkedIssueValue',
       'parsePullRequestBody',
+      'parseStewardVersion',
       'parseStrictYaml',
       'parseStrictYamlDocument',
       'resolveCommit',
       'resolvePolicy',
+      'validateHandoff',
       'validatePolicy',
       'validatePolicyBytes',
     ]);
@@ -236,6 +246,8 @@ describe('invariant 5 conformance', () => {
     expectResultRejection(core.resolvePolicy({ dismissal_codes: [] } as unknown as core.Policy));
     const gitOptions = { repoDir: os.tmpdir(), timeoutMs: 1000, maxOutputBytes: 1000 };
     expectResultRejection(await core.resolveCommit(gitOptions, '-x'));
+    expectResultRejection(core.validateHandoff(null, { previous: null, gate: null, maxRounds: 1 }), 'pipeline.handoff-invalid');
+    expectResultRejection(core.parseStewardVersion('not json'), 'steward.version-unavailable');
 
     // parseCategoryValue / parseLinkedIssueValue: invalid status, not a Result.
     expect(core.parseCategoryValue('bugfix feature')).toEqual({ status: 'invalid' });

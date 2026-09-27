@@ -1,6 +1,6 @@
 # ADR-0060: `steward preflight` command
 
-- Status: accepted
+- Status: superseded by ADR-0066
 - Date: 2026-09-26
 - Deciders: project owner
 - Source: `docs/architecture.md` §6.5; `docs/processes.md` SP05; `docs/user-manual/commands.md` "`steward preflight`"
