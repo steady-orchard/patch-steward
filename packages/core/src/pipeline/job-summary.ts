@@ -1,10 +1,13 @@
 import { reportCodeSpan } from '../report/escape.js';
 import { JOB_SUMMARY_MAX_LENGTH, OWNERSHIP_RETENTION_DAYS } from '../policy/bounds.js';
-import type { GateDisposition, Outcome, SubmissionType, WaitingState } from '../vocabulary.js';
+import type { GateDisposition, Outcome, SubmissionType, SupersessionReason, WaitingState } from '../vocabulary.js';
 
 export type JobSummaryJob = 'gate' | 'publish';
 export type JobSummaryStatus = GateDisposition | Outcome | WaitingState | 'failed';
-export type JobSummaryFreshness = 'confirmed' | 'superseded' | 'unknown';
+export type JobSummaryFreshness =
+  | { readonly state: 'current' }
+  | { readonly state: 'superseded'; readonly reason: SupersessionReason }
+  | { readonly state: 'unknown' };
 
 export interface JobSummaryInput {
   readonly job: JobSummaryJob;
@@ -63,7 +66,11 @@ export function renderJobSummary(input: JobSummaryInput): string {
     lines.push('- Evidence: commit ' + S(input.evidence.commit) + ' at ' + S(input.evidence.location));
   }
   if (input.freshness !== null) {
-    lines.push('- Freshness: ' + S(input.freshness));
+    if (input.freshness.state === 'superseded') {
+      lines.push('- Freshness: ' + S('superseded') + ' (' + S(input.freshness.reason) + ')');
+    } else {
+      lines.push('- Freshness: ' + S(input.freshness.state));
+    }
   }
   if (input.retentionDays !== null) {
     const flag = input.retentionDays < OWNERSHIP_RETENTION_DAYS ? ' (shorter than requested)' : '';

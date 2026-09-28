@@ -58,7 +58,7 @@ describe('job summary', () => {
       subjectType: 'issue',
       status: 'pass',
       evidence: { commit, location },
-      freshness: 'confirmed',
+      freshness: { state: 'current' },
     };
     const expected =
       [
@@ -68,9 +68,16 @@ describe('job summary', () => {
         '- Run: `123-1`',
         '- Status: `pass`',
         '- Evidence: commit `' + commit + '` at `' + location + '`',
-        '- Freshness: `confirmed`',
+        '- Freshness: `current`',
       ].join('\n') + '\n';
     expect(renderJobSummary(input)).toBe(expected);
+  });
+
+  it('superseded freshness names its reason', () => {
+    const superseded = renderJobSummary({ ...baseInput, freshness: { state: 'superseded', reason: 'newer-owner' } });
+    expect(superseded).toContain('- Freshness: `superseded` (`newer-owner`)');
+    const unknown = renderJobSummary({ ...baseInput, freshness: { state: 'unknown' } });
+    expect(unknown).toContain('- Freshness: `unknown`');
   });
 
   it('absent fields are omitted', () => {
