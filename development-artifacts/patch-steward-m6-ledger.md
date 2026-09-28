@@ -137,11 +137,11 @@ updates Steps and appends Revisions.
 | 4.16 | 4 | done | packages/core/src/github/github.live.test.ts, packages/cli/src/steward-commands.live.test.ts, development-artifacts/patch-steward-m6-4.16-report.md | ebf4e7ba2e96e7a93c80d80745d8bbbf2bec4ff6 |
 | 4.17 | 4 | done | development-artifacts/patch-steward-m6-4.17-report.md | 2da1d63c0e876d6fb32fa5f64d49a63d650fd809 |
 | 4.18 | 4 | done | development-artifacts/patch-steward-m6-4.18-report.md | 9ef8fb1bfe46764c3626c33d694796b5e04880b9 |
-| 5.1 | 5 | pending | scenarios/tools/run-log.sh, scenarios/tools/await-runs.sh, scenarios/tools/find-runs.sh, development-artifacts/patch-steward-m6-5.1-report.md | |
-| 5.2 | 5 | pending | scenarios/tools/run-records.sh, scenarios/tools/evidence.sh, development-artifacts/patch-steward-m6-5.2-report.md | |
-| 5.3 | 5 | pending | scenarios/workflows/scenario-app-edit.yml, scenarios/tools/app-edit.sh, development-artifacts/patch-steward-m6-5.3-report.md | |
-| 5.4 | 5 | pending | scenarios/tools/pins.sh, scenarios/tools/results-check.sh, development-artifacts/patch-steward-m6-5.4-report.md | |
-| 5.5 | 5 | pending | scenarios/fixtures/policies/invalid-limit.yml, scenarios/fixtures/policies/unwritable-store.yml, scenarios/fixtures/policies/caps-daily.yml, scenarios/fixtures/policies/caps-author.yml, scenarios/fixtures/pull-requests/steward-pr-modified.yml, development-artifacts/patch-steward-m6-5.5-report.md | |
+| 5.1 | 5 | done | scenarios/tools/run-log.sh, scenarios/tools/await-runs.sh, scenarios/tools/find-runs.sh, development-artifacts/patch-steward-m6-5.1-report.md | 8d6e7e0ca682969b65dd98662553c5273d6c7cb3 |
+| 5.2 | 5 | done | scenarios/tools/run-records.sh, scenarios/tools/evidence.sh, development-artifacts/patch-steward-m6-5.2-report.md | d48f2a9e26cf49fc89d54bcddc830c50fdb61e64 |
+| 5.3 | 5 | done | scenarios/workflows/scenario-app-edit.yml, scenarios/tools/app-edit.sh, development-artifacts/patch-steward-m6-5.3-report.md | d7e3407a5c1789e94a82fe13099d98af67c0fef7 |
+| 5.4 | 5 | done | scenarios/tools/pins.sh, scenarios/tools/results-check.sh, development-artifacts/patch-steward-m6-5.4-report.md | 43b378b4ac0419d20b4b7bd4124ac494b312f2bd |
+| 5.5 | 5 | done | scenarios/fixtures/policies/invalid-limit.yml, scenarios/fixtures/policies/unwritable-store.yml, scenarios/fixtures/policies/caps-daily.yml, scenarios/fixtures/policies/caps-author.yml, scenarios/fixtures/pull-requests/steward-pr-modified.yml, development-artifacts/patch-steward-m6-5.5-report.md | 4b42502ff55a68ae49ddc5c94e920225efc18c8a |
 | 5.6 | 5 | pending | scenarios/README.md, development-artifacts/patch-steward-m6-5.6-report.md | |
 | 5.7 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.7-report.md | |
 | 5.8 | 5 | pending | scenarios/results/personal.md, development-artifacts/patch-steward-m6-5.8-report.md | |
