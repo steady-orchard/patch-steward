@@ -226,8 +226,10 @@ describe('steward workflows', () => {
     const build = jobOf(W, 'build');
     const gate = jobOf(W, 'gate');
     const publish = jobOf(W, 'publish');
-    expect(gate['environment']).toBe('steward-publication');
-    expect(publish['environment']).toBe('steward-publication');
+    for (const job of [gate, publish]) {
+      expect(job['environment']).toEqual({ name: 'steward-publication', deployment: false });
+      expect(Object.keys(record(job['environment'], 'environment')).sort()).toEqual(['deployment', 'name']);
+    }
     expect('environment' in build).toBe(false);
 
     for (const wrapper of [P, I]) {
