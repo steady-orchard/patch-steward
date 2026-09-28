@@ -122,7 +122,7 @@ Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the
 - **Depends on:** Phase 4. Owner actions (all reported done 2026-09-27; OA1 and OA2 verified; OA3 and OA4 unproved until S16 and S15),
   each re-verified with the brief's command before the first scenario that needs it (a failing verify returns `RESULT: needs-human`
   naming the action): OA1 on personal before S15 and S17 there; OA1 on org-private before S16 and S17 there; OA2 before S16; OA3 by the
-  S16 run (store token minted for the evidence repository; a token-mint or installation-lookup failure there returns `needs-human`
+  S16 run (gate `store-read` and publish store tokens minted for the evidence repository, signals in the brief's OA3 Verify cell; a token-mint or installation-lookup failure there returns `needs-human`
   naming OA3); OA4 by the S15 run (publish to the personal `steward-evidence`; a token-mint failure or HTTP 403 there returns
   `needs-human` naming OA4). Scenarios on org-public (S01–S14, S17) need only OA1 on org-public, re-verified at the start of the phase.
 - **Definition of Done (phase):** each result file lists S01–S17 as applicable with result `pass` and evidence (run URLs, artifact
