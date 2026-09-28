@@ -92,7 +92,7 @@ updates Steps and appends Revisions.
 | 2.9 | 2 | done | packages/core/src/evidence/git-store.ts, packages/core/src/evidence/git-store.test.ts, development-artifacts/patch-steward-m6-2.9-report.md | 7b5aa475b9c2118259349ef7792a1eeaa09baa10 |
 | 2.10 | 2 | done | packages/core/src/evidence/store-readback.ts, packages/core/src/evidence/store-readback.test.ts, development-artifacts/patch-steward-m6-2.10-report.md | 5a6d3c9f86191b84e20729b95f3780badeeec0d3 |
 | 2.11 | 2 | done | packages/core/src/github/hosted-responses.fixture.test.ts, development-artifacts/patch-steward-m6-2.11-report.md | c5bfad5ff9302766b80cdeb4e2dc8f2feafe57e0 |
-| 2.12 | 2 | pending | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-2.12-report.md |  |
+| 2.12 | 2 | done | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-2.12-report.md | 194d1270f9f327292764350e720d0fd788c23472 |
 | 2.13 | 2 | pending | development-artifacts/patch-steward-m6-2.13-report.md |  |
 
 ### Phase 1 notes
