@@ -4,6 +4,7 @@ import { err, ok } from '../result.js';
 import type { Err, FailureDetail, Result } from '../result.js';
 import type { GitHubBudget } from './budget.js';
 import {
+  ATTACHMENT_URL_MAX_LENGTH,
   GITHUB_PAGES_MAX,
   GITHUB_PAGE_SIZE,
   GITHUB_REQUEST_TIMEOUT_MS,
@@ -81,6 +82,12 @@ export interface GitHubClientOptions {
   readonly now?: () => number;
 }
 
+export interface GitHubListPage<T> {
+  readonly items: readonly T[];
+  readonly totalCount: number;
+  readonly complete: boolean;
+}
+
 export interface GitHubClient {
   getJson<T>(path: string, schema: z.ZodType<T>, query?: GitHubQuery): Promise<Result<T, GitHubFailureCode>>;
   getPaginated<T>(
@@ -89,6 +96,14 @@ export interface GitHubClient {
     query?: GitHubQuery,
     maxPages?: number,
   ): Promise<Result<readonly T[], GitHubFailureCode>>;
+  getPaginatedList<T>(
+    path: string,
+    listKey: string,
+    itemSchema: z.ZodType<T>,
+    query?: GitHubQuery,
+    maxPages?: number,
+  ): Promise<Result<GitHubListPage<T>, GitHubFailureCode>>;
+  getRedirectLocation(path: string, query?: GitHubQuery): Promise<Result<string, GitHubFailureCode>>;
 }
 
 const TOKEN_PATTERN = /^[\x21-\x7e]{1,4096}$/;
@@ -140,10 +155,14 @@ function buildHeaders(token: string | null): Record<string, string> {
   return headers;
 }
 
+type AttemptMode = 'json' | 'redirect';
+
 type AttemptOutcome =
   | { readonly kind: 'ok'; readonly value: unknown; readonly linkHeader: string | null }
   | { readonly kind: 'retry'; readonly waitMs: number; readonly failure: Err<GitHubFailureCode> }
   | { readonly kind: 'final'; readonly failure: Err<GitHubFailureCode> };
+
+const REDIRECT_STATUSES: readonly number[] = [301, 302, 303, 307, 308];
 
 type BodyReadOutcome =
   | { readonly kind: 'ok'; readonly bytes: Uint8Array }
@@ -257,7 +276,7 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
     }
   }
 
-  async function attempt(url: URL, retriesUsed: number): Promise<AttemptOutcome> {
+  async function attempt(url: URL, retriesUsed: number, mode: AttemptMode = 'json'): Promise<AttemptOutcome> {
     const headers = buildHeaders(token);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -282,7 +301,35 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
     }
     try {
       const status = response.status;
+      if (mode === 'redirect' && REDIRECT_STATUSES.includes(status)) {
+        void response.body?.cancel().catch(() => undefined);
+        const location = response.headers.get('location');
+        const malformed = (): AttemptOutcome => ({
+          kind: 'final',
+          failure: githubFailure('github.malformed-response', 'The redirect location is not valid.'),
+        });
+        if (location === null || location.length > ATTACHMENT_URL_MAX_LENGTH) {
+          return malformed();
+        }
+        let parsedLocation: URL;
+        try {
+          parsedLocation = new URL(location);
+        } catch {
+          return malformed();
+        }
+        if (parsedLocation.protocol !== 'https:' && parsedLocation.protocol !== 'http:') {
+          return malformed();
+        }
+        return { kind: 'ok', value: parsedLocation.href, linkHeader: null };
+      }
       if (status >= 200 && status <= 299) {
+        if (mode === 'redirect') {
+          void response.body?.cancel().catch(() => undefined);
+          return {
+            kind: 'final',
+            failure: githubFailure('github.unexpected-status', 'The GitHub API did not answer with a redirect.'),
+          };
+        }
         const bodyResult = await readBoundedBody(response, controller.signal);
         if (bodyResult.kind === 'too-large') {
           return {
@@ -393,13 +440,13 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
     readonly linkHeader: string | null;
   }
 
-  async function requestOnce(url: URL): Promise<Result<PageResponse, GitHubFailureCode>> {
+  async function requestOnce(url: URL, mode: AttemptMode = 'json'): Promise<Result<PageResponse, GitHubFailureCode>> {
     let retriesUsed = 0;
     for (;;) {
       if (!budget.tryCharge()) {
         return githubFailure('github.budget-exhausted', 'The GitHub request budget for this run is exhausted.');
       }
-      const outcome = await attempt(url, retriesUsed);
+      const outcome = await attempt(url, retriesUsed, mode);
       if (outcome.kind === 'ok') {
         return ok({ value: outcome.value, linkHeader: outcome.linkHeader });
       }
@@ -494,5 +541,99 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
     return ok(items);
   }
 
-  return { getJson, getPaginated };
+  const LIST_KEY_PATTERN = /^[a-z_]{1,64}$/;
+
+  async function getPaginatedList<T>(
+    path: string,
+    listKey: string,
+    itemSchema: z.ZodType<T>,
+    query?: GitHubQuery,
+    maxPages?: number,
+  ): Promise<Result<GitHubListPage<T>, GitHubFailureCode>> {
+    if (!tokenIsValid()) {
+      return githubFailure('github.invalid-request', 'The GitHub token is not a valid header value.');
+    }
+    if (!LIST_KEY_PATTERN.test(listKey)) {
+      return githubFailure('github.invalid-request', `The GitHub list key "${listKey}" is not valid.`);
+    }
+    const limit = Math.min(Math.max(maxPages ?? GITHUB_PAGES_MAX, 1), GITHUB_PAGES_MAX);
+    const firstUrl = buildUrl(path, { ...(query ?? {}), per_page: String(GITHUB_PAGE_SIZE) });
+    if (firstUrl === null) {
+      return githubFailure('github.invalid-request', `The GitHub request path "${path}" is not valid.`);
+    }
+    const items: T[] = [];
+    const arraySchema = z.array(itemSchema);
+    const schemaMismatch = (details?: readonly FailureDetail[]): Err<GitHubFailureCode> =>
+      githubFailure('github.schema-mismatch', 'The GitHub API response did not match the expected schema.', details);
+    let currentUrl: URL | null = firstUrl;
+    let pageNumber = 0;
+    let totalCount = 0;
+    let totalCountSet = false;
+    while (currentUrl !== null) {
+      pageNumber += 1;
+      const result = await requestOnce(currentUrl);
+      if (!result.ok) return result;
+      const value = result.value.value;
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return schemaMismatch();
+      }
+      const record = value as Record<string, unknown>;
+      const rawTotal = record['total_count'];
+      if (typeof rawTotal !== 'number' || !Number.isSafeInteger(rawTotal) || rawTotal < 0) {
+        return schemaMismatch();
+      }
+      const rawList = record[listKey];
+      if (!Array.isArray(rawList)) {
+        return schemaMismatch();
+      }
+      const parsed = arraySchema.safeParse(rawList);
+      if (!parsed.success) {
+        const details: FailureDetail[] = parsed.error.issues.slice(0, 10).map((issue) => ({
+          code: 'github.schema-mismatch',
+          path: issue.path.join('.'),
+          message: issue.message,
+          line: null,
+          column: null,
+        }));
+        return schemaMismatch(details);
+      }
+      if (!totalCountSet) {
+        totalCount = rawTotal;
+        totalCountSet = true;
+      }
+      items.push(...parsed.data);
+
+      const linkResult = parseLinkHeader(result.value.linkHeader);
+      if (!linkResult.ok) return linkResult;
+      if (linkResult.value.nextUrl === null) {
+        currentUrl = null;
+      } else if (pageNumber >= limit) {
+        return ok({ items, totalCount, complete: false });
+      } else {
+        let parsedNext: URL;
+        try {
+          parsedNext = new URL(linkResult.value.nextUrl);
+        } catch {
+          return githubFailure('github.pagination-invalid', 'The next page link is not a valid URL.');
+        }
+        currentUrl = parsedNext;
+      }
+    }
+    return ok({ items, totalCount, complete: true });
+  }
+
+  async function getRedirectLocation(path: string, query?: GitHubQuery): Promise<Result<string, GitHubFailureCode>> {
+    if (!tokenIsValid()) {
+      return githubFailure('github.invalid-request', 'The GitHub token is not a valid header value.');
+    }
+    const url = buildUrl(path, query);
+    if (url === null) {
+      return githubFailure('github.invalid-request', `The GitHub request path "${path}" is not valid.`);
+    }
+    const result = await requestOnce(url, 'redirect');
+    if (!result.ok) return result;
+    return ok(result.value.value as string);
+  }
+
+  return { getJson, getPaginated, getPaginatedList, getRedirectLocation };
 }
