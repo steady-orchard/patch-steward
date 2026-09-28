@@ -127,9 +127,9 @@ updates Steps and appends Revisions.
 | 4.6 | 4 | done | scenarios/tools/deploy-steward.sh, scenarios/tools/environment-check.sh, scenarios/tools/steady-state.sh, development-artifacts/patch-steward-m6-4.6-report.md | df8fde31f2913f78846a7e89e05d92ed7eca73b2 |
 | 4.7 | 4 | done | scenarios/tools/find-runs.sh, scenarios/tools/artifacts.sh, scenarios/tools/audit.sh, development-artifacts/patch-steward-m6-4.7-report.md | b6135e84f3a45046f8c3cc39ac96a1645b95b894 |
 | 4.8 | 4 | done | scenarios/tools/evidence.sh, development-artifacts/patch-steward-m6-4.8-report.md | ac9df0d8a3ae37c6038788670fa6f9e03ccf7e95 |
-| 4.9 | 4 | pending | scenarios/workflows/scenario-secret-scope.yml, scenarios/workflows/scenario-secret-scope-called.yml, scenarios/tools/secret-scope.sh, development-artifacts/patch-steward-m6-4.9-report.md | |
-| 4.10 | 4 | pending | packages/core/src/conformance/workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.10-report.md | |
-| 4.11 | 4 | pending | packages/core/src/conformance/invariant-1-workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.11-report.md | |
+| 4.9 | 4 | done | scenarios/workflows/scenario-secret-scope.yml, scenarios/workflows/scenario-secret-scope-called.yml, scenarios/tools/secret-scope.sh, development-artifacts/patch-steward-m6-4.9-report.md | fef718036b64332041a2af31cdb63ee47ceb3ff8 |
+| 4.10 | 4 | done | packages/core/src/conformance/workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.10-report.md | 7b81cc01629381131a729ff5f24f8a6956ddde30 |
+| 4.11 | 4 | done | packages/core/src/conformance/invariant-1-workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.11-report.md | fae847ef43661e6c95d32411db478829d12b912d |
 | 4.12 | 4 | pending | scenarios/README.md, development-artifacts/patch-steward-m6-4.12-report.md | |
 | 4.13 | 4 | pending | development-artifacts/patch-steward-m6-4.13-report.md | |
 | 4.14 | 4 | pending | scenarios/workflows/steward-pr.yml, scenarios/workflows/steward-issues.yml, development-artifacts/patch-steward-m6-4.14-report.md | |
