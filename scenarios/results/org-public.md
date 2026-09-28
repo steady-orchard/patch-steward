@@ -161,3 +161,129 @@ EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=pr-33 runs=1
 ```
 
 Result: pass
+
+## S01 unstructured pull request
+
+Date (UTC): 2026-09-28. Opened an unstructured pull request whose body follows no pull request template against
+`steady-orchard/patch-steward-testbed-public`: https://github.com/steady-orchard/patch-steward-testbed-public/pull/34.
+Run: https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36412442107.
+
+```text
+$ bash probes/smoke/tools/deploy.sh steady-orchard/patch-steward-testbed-public scenario-s01-head "scenario: S01 pull request change" scenarios/fixtures/submissions/unstructured.txt:scenario-s01.txt
+DEPLOY repo=steady-orchard/patch-steward-testbed-public branch=scenario-s01-head existed=no
+DEPLOY commit=1c00bc2cbcac33be01a05a5c63302e7467d600ac message=scenario: S01 pull request change
+DEPLOY push=ok attempt=1 head=1c00bc2cbcac33be01a05a5c63302e7467d600ac
+DEPLOY identical dest=scenario-s01.txt blob=416033bb79d1631d231a6d86791ea321223f1a5c
+```
+
+```text
+$ A=$(gh api "repos/steady-orchard/patch-steward-testbed-public/actions/runs?per_page=1" --jq '.workflow_runs[0].id // 0'); echo "A=$A"
+A=36411709793
+$ gh pr create -R steady-orchard/patch-steward-testbed-public --base master --head scenario-s01-head --title "[scenario S01] unstructured pull request" --body-file scenarios/fixtures/submissions/unstructured.txt
+https://github.com/steady-orchard/patch-steward-testbed-public/pull/34
+$ bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-pr.yml "steward pr 34 author 2095171 event pull_request_target opened sender 2095171 User" 36411709793 1
+RUN id=36412442107 attempt=1 event=pull_request_target status=completed conclusion=success created_at=2026-09-28T10:54:17Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36412442107 title=steward pr 34 author 2095171 event pull_request_target opened sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-pr.yml after=36411709793 count=1 completed=1 result=complete
+```
+
+```text
+$ gh run view 36412442107 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36412442107 1 gate | grep -E 'text=(event |policy |listing |dedup |disposition |- )'
+LOG job=gate ts=2026-09-28T10:54:53.9599979Z text=event pull_request_target opened pr 34 sender User
+LOG job=gate ts=2026-09-28T10:54:53.9601049Z text=policy trusted-branch revision d997b1e362c75af03942da0e7a1e8902ca5dbe51
+LOG job=gate ts=2026-09-28T10:54:53.9601776Z text=listing none
+LOG job=gate ts=2026-09-28T10:54:53.9602283Z text=dedup commit no-owner
+LOG job=gate ts=2026-09-28T10:54:53.9602834Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T10:54:53.9733413Z text=- Submission: `steady-orchard/patch-steward-testbed-public` pull request `34`
+LOG job=gate ts=2026-09-28T10:54:53.9735045Z text=- Run: `36412442107-1`
+LOG job=gate ts=2026-09-28T10:54:53.9736591Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T10:54:53.9737493Z text=- Snapshot: `sha256:42947737e5cd63d5d6451df8952195498eab7d2d9f795b90b9cbfe7ad8bba4c1`
+LOG job=gate ts=2026-09-28T10:54:53.9738447Z text=- Policy revision: `d997b1e362c75af03942da0e7a1e8902ca5dbe51`
+LOG job=gate ts=2026-09-28T10:54:53.9739213Z text=- Owner: committed `36412442107-1`
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36412442107 1 publish | grep -E 'text=(policy |ownership |evidence commit |freshness |steward job summary:|- )'
+LOG job=publish ts=2026-09-28T10:55:16.0895393Z text=policy revision d997b1e362c75af03942da0e7a1e8902ca5dbe51
+LOG job=publish ts=2026-09-28T10:55:16.0896370Z text=ownership retention 90 days
+LOG job=publish ts=2026-09-28T10:55:16.0897150Z text=evidence commit 214529eff25d9a5c82c307add55c281cbe05ae61 rebuilds 0
+LOG job=publish ts=2026-09-28T10:55:16.0897863Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T10:55:16.0898797Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T10:55:16.0899299Z text=freshness current
+LOG job=publish ts=2026-09-28T10:55:16.1029961Z text=steward job summary:
+LOG job=publish ts=2026-09-28T10:55:16.1036872Z text=- Submission: `steady-orchard/patch-steward-testbed-public` pull request `34`
+LOG job=publish ts=2026-09-28T10:55:16.1037990Z text=- Run: `36412442107-1`
+LOG job=publish ts=2026-09-28T10:55:16.1040941Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T10:55:16.1041756Z text=- Snapshot: `sha256:42947737e5cd63d5d6451df8952195498eab7d2d9f795b90b9cbfe7ad8bba4c1`
+LOG job=publish ts=2026-09-28T10:55:16.1042583Z text=- Policy revision: `d997b1e362c75af03942da0e7a1e8902ca5dbe51`
+LOG job=publish ts=2026-09-28T10:55:16.1044235Z text=- Evidence: commit `214529eff25d9a5c82c307add55c281cbe05ae61` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/pr-34/36412442107-1`
+LOG job=publish ts=2026-09-28T10:55:16.1045469Z text=- Freshness: `current`
+LOG job=publish ts=2026-09-28T10:55:16.1045939Z text=- Ownership artifact retention: `90` days
+```
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-pr-34
+ARTIFACT id=10964952587 name=steward-ownership-pr-34 created_at=2026-09-28T10:54:56Z expires_at=2026-12-27T10:54:17Z expired=false run_id=36412442107 size=536
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-pr-34 count=1 unexpired=1
+```
+
+```text
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public pr 34
+RECORD run=36412442107-1 kind=outcome outcome=needs-changes run_id=36412442107 run_attempt=1 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:42947737e5cd63d5d6451df8952195498eab7d2d9f795b90b9cbfe7ad8bba4c1 findings=submission.unstructured
+RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public subject=pr-34 runs=1 supersessions=0
+```
+
+Result: pass
+
+## S02 title-only edit keeps the owner
+
+Date (UTC): 2026-09-28. Edited only the title of pull request 34; the owner from the S01 run was kept and nothing was
+committed: https://github.com/steady-orchard/patch-steward-testbed-public/pull/34.
+Run: https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36412957123.
+
+```text
+$ A=$(gh api "repos/steady-orchard/patch-steward-testbed-public/actions/runs?per_page=1" --jq '.workflow_runs[0].id // 0'); echo "A=$A"
+A=36412442107
+$ gh pr edit 34 -R steady-orchard/patch-steward-testbed-public --title "[scenario S01] unstructured pull request (title edited by the author)"
+https://github.com/steady-orchard/patch-steward-testbed-public/pull/34
+$ bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-pr.yml "steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User" 36412442107 1
+RUN id=36412957123 attempt=1 event=pull_request_target status=completed conclusion=success created_at=2026-09-28T10:59:33Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36412957123 title=steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-pr.yml after=36412442107 count=1 completed=1 result=complete
+```
+
+```text
+$ gh run view 36412957123 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=skipped
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36412957123 1 gate | grep -E 'text=(event |policy |listing |dedup |disposition |- )'
+LOG job=gate ts=2026-09-28T11:00:13.0218093Z text=event pull_request_target edited pr 34 sender User
+LOG job=gate ts=2026-09-28T11:00:13.0219858Z text=policy trusted-branch revision d997b1e362c75af03942da0e7a1e8902ca5dbe51
+LOG job=gate ts=2026-09-28T11:00:13.0220692Z text=listing unique owner 36412442107-1
+LOG job=gate ts=2026-09-28T11:00:13.0221358Z text=dedup duplicate owner-unchanged owner 36412442107-1
+LOG job=gate ts=2026-09-28T11:00:13.0312431Z text=- Submission: `steady-orchard/patch-steward-testbed-public` pull request `34`
+LOG job=gate ts=2026-09-28T11:00:13.0313576Z text=- Run: `36412957123-1`
+LOG job=gate ts=2026-09-28T11:00:13.0314249Z text=- Status: `duplicate`
+LOG job=gate ts=2026-09-28T11:00:13.0315127Z text=- Snapshot: `sha256:42947737e5cd63d5d6451df8952195498eab7d2d9f795b90b9cbfe7ad8bba4c1`
+LOG job=gate ts=2026-09-28T11:00:13.0315995Z text=- Policy revision: `d997b1e362c75af03942da0e7a1e8902ca5dbe51`
+LOG job=gate ts=2026-09-28T11:00:13.0316674Z text=- Owner: kept `36412442107-1`
+```
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-pr-34
+ARTIFACT id=10964952587 name=steward-ownership-pr-34 created_at=2026-09-28T10:54:56Z expires_at=2026-12-27T10:54:17Z expired=false run_id=36412442107 size=536
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-pr-34 count=1 unexpired=1
+```
+
+```text
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public pr 34
+RECORD run=36412442107-1 kind=outcome outcome=needs-changes run_id=36412442107 run_attempt=1 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:42947737e5cd63d5d6451df8952195498eab7d2d9f795b90b9cbfe7ad8bba4c1 findings=submission.unstructured
+RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public subject=pr-34 runs=1 supersessions=0
+```
+
+Result: pass
