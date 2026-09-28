@@ -1,4 +1,4 @@
-import { RUN_FILES, repositoryStoreRoot, runStorePath, stagingStorePath, metricsStorePath } from './layout.js';
+import { RUN_FILES, repositoryStoreRoot, repositoryStorePath, runStorePath, stagingStorePath, metricsStorePath } from './layout.js';
 import type { EvidenceLayoutFailureCode } from './layout.js';
 import { assembleRunRecords } from './assemble.js';
 import type { RunAssemblyInput, RunAssemblyFailureCode } from './assemble.js';
@@ -41,8 +41,7 @@ import type { PolicyRevisionRecord } from '../policy/revision-record.js';
 import { err, ok } from '../result.js';
 import type { Result } from '../result.js';
 
-export interface RunEvidenceInput {
-  readonly evidenceDir: string;
+export interface RunEvidencePreparation {
   readonly assembly: RunAssemblyInput;
   readonly classification: ClassificationInput;
   readonly defaultBranch: string;
@@ -50,6 +49,11 @@ export interface RunEvidenceInput {
   readonly credentials: readonly string[];
   readonly localRun: boolean;
   readonly createdAt: string;
+  readonly evidenceLocation?: string;
+}
+
+export interface RunEvidenceInput extends RunEvidencePreparation {
+  readonly evidenceDir: string;
 }
 
 export interface RunEvidenceOptions {
@@ -69,6 +73,17 @@ export interface PublishedRun {
   readonly decision: DecisionRecord;
   readonly reportRecord: ReportRecord;
   readonly manifest: EvidenceManifest;
+}
+
+export interface PreparedEvidenceFile {
+  readonly path: string;
+  readonly bytes: Uint8Array;
+}
+
+export interface PreparedRunEvidence extends Omit<PublishedRun, 'directory'> {
+  readonly files: readonly PreparedEvidenceFile[];
+  readonly metrics: PreparedEvidenceFile;
+  readonly manifestBytes: Uint8Array;
 }
 
 export type RunEvidenceFailureCode =
@@ -99,20 +114,18 @@ function totalBytes(files: readonly SerializedFile[], log: Uint8Array, metrics: 
   return files.reduce((sum, file) => sum + file.bytes.length, 0) + log.length + metrics.length + manifest.length;
 }
 
-export async function publishRunEvidence(
-  input: RunEvidenceInput,
+export async function prepareRunEvidence(
+  input: RunEvidencePreparation,
   options: RunEvidenceOptions = {},
-): Promise<Result<PublishedRun, RunEvidenceFailureCode>> {
+): Promise<Result<PreparedRunEvidence, RunEvidenceFailureCode>> {
   try {
     const { submission, runId, runAttempt, startedAt, loadedPolicy } = input.assembly;
 
-    const storeRootResult = repositoryStoreRoot(input.evidenceDir, submission.repository);
-    if (!storeRootResult.ok) {
-      return storeRootResult;
-    }
-    const storeRoot = storeRootResult.value;
     const storePath = runStorePath(submission.type, submission.number, runId, runAttempt);
-    const stagingPath = stagingStorePath(runId, runAttempt);
+    const storePathResult = repositoryStorePath(submission.repository, storePath);
+    if (!storePathResult.ok) {
+      return storePathResult;
+    }
     const metricsPath = metricsStorePath(startedAt, runId, runAttempt);
 
     const assembled = assembleRunRecords(input.assembly);
@@ -164,7 +177,7 @@ export async function publishRunEvidence(
       defaultBranch: pass1.value.texts[1] as string,
       subjectTotals: input.assembly.findings.map((p) => p.finding.subjects.length),
       localRun: input.localRun,
-      storePath,
+      storePath: input.evidenceLocation ?? storePath,
     };
 
     const reportInput = buildReportInput(sources);
@@ -320,23 +333,7 @@ export async function publishRunEvidence(
       return err('evidence.too-large', 'budget-exhausted', 'The run evidence exceeds limits.evidence.run_bytes.');
     }
 
-    const written = await writeRunDirectory(
-      {
-        storeRoot,
-        storePath,
-        stagingPath,
-        files: [...files, { path: RUN_FILES.log, bytes: logFinal }],
-        metrics: { path: metricsPath, bytes: metricsBytes },
-        manifest: manifestBytes,
-      },
-      options.fs ?? nodeEvidenceFs,
-    );
-    if (!written.ok) {
-      return written;
-    }
-
     return ok({
-      directory: written.value.directory,
       storePath,
       report: renderedReport,
       checkSummary: renderedSummary,
@@ -347,6 +344,58 @@ export async function publishRunEvidence(
       decision,
       reportRecord,
       manifest,
+      files: [...files, { path: RUN_FILES.log, bytes: logFinal }],
+      metrics: { path: metricsPath, bytes: metricsBytes },
+      manifestBytes,
+    });
+  } catch {
+    return err('evidence.write-failed', 'steward-defect', 'The evidence write failed.');
+  }
+}
+
+export async function publishRunEvidence(
+  input: RunEvidenceInput,
+  options: RunEvidenceOptions = {},
+): Promise<Result<PublishedRun, RunEvidenceFailureCode>> {
+  try {
+    const storeRootResult = repositoryStoreRoot(input.evidenceDir, input.assembly.submission.repository);
+    if (!storeRootResult.ok) {
+      return storeRootResult;
+    }
+    const storeRoot = storeRootResult.value;
+
+    const prepared = await prepareRunEvidence(input, options);
+    if (!prepared.ok) {
+      return prepared;
+    }
+
+    const written = await writeRunDirectory(
+      {
+        storeRoot,
+        storePath: prepared.value.storePath,
+        stagingPath: stagingStorePath(input.assembly.runId, input.assembly.runAttempt),
+        files: prepared.value.files,
+        metrics: prepared.value.metrics,
+        manifest: prepared.value.manifestBytes,
+      },
+      options.fs ?? nodeEvidenceFs,
+    );
+    if (!written.ok) {
+      return written;
+    }
+
+    return ok({
+      directory: written.value.directory,
+      storePath: prepared.value.storePath,
+      report: prepared.value.report,
+      checkSummary: prepared.value.checkSummary,
+      run: prepared.value.run,
+      submission: prepared.value.submission,
+      policyRevision: prepared.value.policyRevision,
+      findings: prepared.value.findings,
+      decision: prepared.value.decision,
+      reportRecord: prepared.value.reportRecord,
+      manifest: prepared.value.manifest,
     });
   } catch {
     return err('evidence.write-failed', 'steward-defect', 'The evidence write failed.');
