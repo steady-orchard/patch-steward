@@ -7,7 +7,7 @@ updates Steps and appends Revisions.
 ## Plan
 
 - plan-name: patch-steward-m6
-- current-phase: 4
+- current-phase: 5
 - working-branch: milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish
 - starting-commit: 6418129c7b104fd93d9162efcda6fe08373287ee
 - default-branch: develop
@@ -22,7 +22,7 @@ updates Steps and appends Revisions.
 | 1     | done    | Core contracts (pure): bounds K38-K51, records (ownership, waiting, supersession, resolution keys), event model, dedup, newest owner, run-name and caps, store path planning, blob id, zip entry reader, job summary renderer. Complete 2026-09-27; DoD D1-D8 re-verified by the supervisor in the main tree. |
 | 2     | done    | GitHub and evidence-store adapters: allowlisted writer, App tokens, artifacts list and download, run list, Git Data API store with retries and read-back, gate fallback read, recorded responses. Needs Phase 1. Complete 2026-09-27; DoD D1-D10 re-verified by the supervisor in the main tree. |
 | 3     | done    | Hosted gate and publish, action package entry, invariant 2, 4, 7, 8 extensions, write allowlist, fixture-tier hosted scenarios. Needs Phase 2. Complete 2026-09-28; DoD D1-D11 re-verified by the supervisor in the main tree. |
-| 4     | in-progress | Reusable workflow, wrapper templates (secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`), static workflow tests, live-test switch, scenarios skeleton incl. SC5 secret-scope pair, push to origin, test-bed deployment, OA1 verified on org-public, org-public smoke. Needs Phase 3 and OA1 on org-public (before the smoke step only). |
+| 4     | done    | Reusable workflow, wrapper templates (secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`), static workflow tests, live-test switch, scenarios skeleton incl. SC5 secret-scope pair, push to origin, test-bed deployment, OA1 verified on org-public, org-public smoke. Needs Phase 3 and OA1 on org-public (before the smoke step only). Complete 2026-09-28; DoD D1-D13 re-verified by the supervisor in the main tree and on the test-beds. Pin 7161cd20df662314d14cc7f2f4130102baee1e98 pushed; wrappers and policies deployed on the three test-beds; smoke issue 31 on org-public OPEN, run 36397673122, evidence commit 6f1c3c890f7106aa762a591faff452a2cac35c1d on steward-evidence. |
 | 5     | pending | Live test-bed scenarios S01-S17 (S17 = Environment-only secret delivery on all three test-beds) with recorded results, steady state. Needs Phase 4; OA1 on personal and org-private, OA2, OA3, OA4 verified before the scenarios that need them (S15, S16, S17). |
 | 6     | pending | ADR-0071 onward, governing documents, whitepaper, README, CLAUDE.md, user manual, project DoD. Needs Phase 5. |
 
@@ -136,7 +136,7 @@ updates Steps and appends Revisions.
 | 4.15 | 4 | done | development-artifacts/patch-steward-m6-4.15-report.md | aebfeb3d5459d8d7990be2d258ff1d84393a0b60 |
 | 4.16 | 4 | done | packages/core/src/github/github.live.test.ts, packages/cli/src/steward-commands.live.test.ts, development-artifacts/patch-steward-m6-4.16-report.md | ebf4e7ba2e96e7a93c80d80745d8bbbf2bec4ff6 |
 | 4.17 | 4 | done | development-artifacts/patch-steward-m6-4.17-report.md | 2da1d63c0e876d6fb32fa5f64d49a63d650fd809 |
-| 4.18 | 4 | pending | development-artifacts/patch-steward-m6-4.18-report.md | |
+| 4.18 | 4 | done | development-artifacts/patch-steward-m6-4.18-report.md | 9ef8fb1bfe46764c3626c33d694796b5e04880b9 |
 
 ### Phase 1 notes
 
