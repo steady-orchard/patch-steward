@@ -157,7 +157,7 @@ updates Steps and appends Revisions.
 | 5.18 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.18-report.md | 4fdfe3fef1ef87dfd5206e93ad8fd8f2f73fae97 |
 | 5.19 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.19-report.md | afdd06ab94e2e50566edc82e53f9037609f62c63 |
 | 5.20 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.20-report.md | 24e31def2f9e573939c171b6c21b462cff6ed175 |
-| 5.21 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.21-report.md | |
+| 5.21 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.21-report.md | 503993c55b2033d7c310aaf76e24eb4dcec1aa18 |
 | 5.22 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.22-report.md | |
 | 5.23 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.23-report.md | |
 | 5.24 | 5 | pending | scenarios/results/org-public.md, scenarios/results/personal.md, scenarios/results/org-private.md, development-artifacts/patch-steward-m6-5.24-report.md | |
