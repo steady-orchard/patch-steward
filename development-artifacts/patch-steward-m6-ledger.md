@@ -162,6 +162,18 @@ updates Steps and appends Revisions.
 | 5.23 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.23-report.md | 56b5c7129c3e47ebcb5fae65262bb13d689b0602 |
 | 5.24 | 5 | pending | scenarios/results/org-public.md, scenarios/results/personal.md, scenarios/results/org-private.md, development-artifacts/patch-steward-m6-5.24-report.md | |
 | 5.25 | 5 | pending | development-artifacts/patch-steward-m6-5.25-report.md | |
+| 5.26 | 5 | pending | .github/workflows/steward-screening.yml, packages/core/src/conformance/workflows.fixture.test.ts, development-artifacts/patch-steward-m6-5.26-report.md | |
+| 5.27 | 5 | pending | scenarios/workflows/scenario-secret-scope-called.yml, scenarios/workflows/scenario-app-edit.yml, development-artifacts/patch-steward-m6-5.27-report.md | |
+| 5.28 | 5 | pending | scenarios/tools/pins.sh, development-artifacts/patch-steward-m6-5.28-report.md | |
+| 5.29 | 5 | pending | scenarios/tools/audit.sh, development-artifacts/patch-steward-m6-5.29-report.md | |
+| 5.30 | 5 | pending | scenarios/README.md, development-artifacts/patch-steward-m6-5.30-report.md | |
+| 5.31 | 5 | pending | development-artifacts/patch-steward-m6-5.31-report.md | |
+| 5.32 | 5 | pending | scenarios/workflows/steward-pr.yml, scenarios/workflows/steward-issues.yml, development-artifacts/patch-steward-m6-5.32-report.md | |
+| 5.33 | 5 | pending | development-artifacts/patch-steward-m6-5.33-report.md | |
+| 5.34 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.34-report.md | |
+| 5.35 | 5 | pending | scenarios/results/personal.md, development-artifacts/patch-steward-m6-5.35-report.md | |
+| 5.36 | 5 | pending | scenarios/results/org-private.md, development-artifacts/patch-steward-m6-5.36-report.md | |
+| 5.37 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.37-report.md | |
 
 ### Phase 1 notes
 
@@ -734,6 +746,73 @@ updates Steps and appends Revisions.
   - 5.24 attempt 1 (commit aaf443d, discarded by reset to 78f93cf): S13 audit on org-public ended `head_deployments=40 result=writes-found` (PRs 32: 2, 33: 2, 34: 28, 36: 4, 37: 4); all other counts 0. GitHub Actions creates one Deployment (environment steward-publication, creator = triggering actor jambolo, ref = PR head branch) per Environment-declaring job of every pull_request_target run. Supervisor probe (scenario-deployment-probe.yml deployed to org-public master at 144d784f970b44129192e8418f1b96de108b86a0; branch scenario-deployment-probe created and left): `environment: {name: steward-publication, deployment: false}` delivers the Environment secrets on master (run 36425499847, length-zero=false twice, 0 deployments) and is refused on a non-default branch (run 36425593693, annotation Branch "scenario-deployment-probe" is not allowed to deploy to steward-publication due to environment protection rules; 0 deployments). Planner amendment returned needs-human (options A, B, C; see Revisions). 5.24 and 5.25 stay pending.
   - Steady state applied by the supervisor after the escalation (steady-state.sh apply on the three test-beds: result=steady active_workflows=0 open_submissions=0; plan re-checked; every steward-pr.yml, steward-issues.yml, scenario-* workflow disabled_manually, including scenario-deployment-probe.yml and scenario-secret-scope-called.yml; no run in progress or queued). Resuming live scenarios needs `gh workflow enable <file> -R <repo>` first.
   - Notes for later wording passes: commit 503993c subject says S10 but records S11 daily (content correct); scenarios/README.md S10 procedure says the test App closes a pull request, but the scenario closes the S10 issue with the App (5.19).
+
+- Revision (decomposer, 2026-09-28; brief D7 Option A after amendment ce9d979): 5.24 and 5.25 revised in place (never
+  completed; attempt 1 of 5.24 discarded; previous versions reachable at ce9d979); new steps 5.26-5.37 pending. All
+  route mechanical. Base ce9d979. No planner amendment was needed.
+  - Dependency graph (scopes pairwise disjoint within each wave):
+    - R1 (parallel, no deps, no GitHub write): 5.26 product fix (steward-screening.yml gate and publish mapping form;
+      static test assertion via toEqual plus exact key list, titles unchanged); 5.27 scenario workflows mapping form
+      (called job inside, app-edit job edit); 5.28 pins.sh (mapping-form check, other_form detail, PINS_SCREENING_FILE
+      override); 5.29 audit.sh (AUDIT-DEPLOYMENT lines, before-fix split, AUDIT_WRAPPERS_DEPLOYED_AT override);
+      5.30 scenarios/README.md (declaration rule, tools, fix procedure, S10 wording fix, S13, S14, S17, what stays).
+    - R2: 5.31 local checks P1-P11 and the ONE non-forced push (needs 5.26-5.30; report `pushed:`).
+    - R3: 5.32 wrapper copies re-pinned to the 5.31 SHA (4 changed lines).
+    - R4: 5.33 redeploy (deploy-steward.sh x3, helper pair x3, app-edit on org-public only; workflows stay disabled;
+      report `wrappers_deployed_at <key>:` lines and `pin:`).
+    - R5 (parallel, different test-beds and results files): 5.34 org-public S17 post-fix; 5.35 personal S17 post-fix;
+      5.36 org-private S17 post-fix.
+    - R6: 5.37 org-public S13 post-fix pull request (needs 5.34: same results file).
+    - R7: 5.24 S13 audit, S14, steady state on all three (needs 5.37, 5.35, 5.36, 5.28, 5.29).
+    - R8: 5.25 gate D1-D16 (MAIN tree; needs 5.6, 5.24, 5.30).
+    - Critical path: 5.26 or 5.30 -> 5.31 -> 5.32 -> 5.33 -> 5.34 -> 5.37 -> 5.24 -> 5.25.
+  - Outward actions (all within the authorization): 5.31 pushes HEAD to origin milestone/6-... once (fast-forward from
+    7161cd2, never forced); 5.33 writes test-bed master only through deploy-steward.sh and probes deploy.sh (wrappers,
+    unchanged policies, scenario-secret-scope.yml, scenario-secret-scope-called.yml; scenario-app-edit.yml on org-public
+    only, the only test-bed that has it) and may only disable workflows; 5.34-5.36 enable then disable
+    scenario-secret-scope.yml and scenario-secret-scope-called.yml on their test-bed around one dispatch; 5.37 creates
+    branch scenario-s13-head (probes deploy.sh, file scenario-s13.txt), enables steward-pr.yml on org-public, opens PR
+    `[scenario S13] post-fix deployment check`, edits its body once, disables steward-pr.yml, leaves the PR open; 5.24
+    steady-state.sh apply closes it with every workflow disabled (no third run). Nothing deletes a Deployment, the probe
+    workflow scenario-deployment-probe.yml, or branch scenario-deployment-probe. steward-issues.yml is never enabled.
+  - Emergent contracts (tool output formats; persistent):
+    - audit.sh: first line `AUDIT repo=<r> wrappers_deployed_at=<T or none> source=history or override`; issue lines end
+      `head_deployments=n/a before_fix_deployments=n/a`; pr lines end `head_deployments=<counted> before_fix_deployments=<b>`,
+      each followed by `AUDIT-DEPLOYMENT repo=<r> pr=<n> id=<id> environment=<env> ref=<ref> creator=<login>
+      created_at=<t> class=before-fix or counted` lines; summary `... head_deployments=<counted> before_fix_deployments=<b>
+      result=clean or writes-found`. before-fix = environment steward-publication AND creator id 2095171 or 331019482 AND
+      created_at before T; T = committer date of the newest master commit changing .github/workflows/steward-pr.yml (after
+      5.33: the fixed deploy) or AUDIT_WRAPPERS_DEPLOYED_AT. Measured today: org-public 40 on PRs 32: 2, 33: 2, 34: 28
+      (27 jambolo, 1 bot), 36: 4, 37: 4, latest 2026-09-28T12:25:53Z; current T 2026-09-28T08:25:46Z.
+    - pins.sh: environment-jobs detail `jobs=<mapping jobs or none> other_form=<other jobs or none>`; with
+      PINS_SCREENING_FILE the final line is `PINS repo=<r> pin=<pin> screening=local result=...`.
+    - Results section titles: `## S17 repeated after the publication jobs declared deployment false` (5.34-5.36, second
+      S17 section per file, holds a `DEPLOYMENTS repo=<r> environment=steward-publication since=<T> count=0` line and the
+      three deployed environment lines); `## S13 post-fix pull request leaves no deployment` (5.37); 5.24 adds
+      `## S13 observe mode writes nothing on submissions`, `## S14 only gate and publish use the publication Environment;
+      everything is pinned`, `## Steady state`.
+    - Report key lines: 5.31 `pushed:`; 5.32 `pin:`; 5.33 `wrappers_deployed_at <key>:`, `pin:`; 5.34-5.36
+      `s17_postfix_run:`; 5.37 `s13_pr:`, `s13_run1:`, `s13_run2:`, `s13_head:`, `pin:`; 5.24 `pin:`.
+  - Couplings: 5.26 and 5.27 must land before the push (5.31 P7, P9, P10); 5.32 derives the copies from the unchanged
+    templates; pins.sh wrapper-blobs compares deployed blobs to HEAD copies, so 5.24 and 5.25 run in a tree containing
+    5.32; the before-fix split depends on 5.33 being the newest master change of steward-pr.yml on org-public (no later
+    wrapper deploy is planned).
+  - Environment facts found while decomposing: the runs API field `referenced_workflows[].path` names the called reusable
+    workflow with its pin (verified on run 36397673122), used to prove "at the fixed pin"; in Git Bash `node -e` loses
+    one backslash of `\\` inside the script text, so acceptance regexes use single backslashes in regex literals or
+    `[^ ]+` instead of `\S` in RegExp strings; `gh workflow enable` is required before a dispatch (all in-scope workflows
+    are disabled_manually); deploying a file does not change a workflow's state; org-public had 31 non-bot wrapper runs
+    on 2026-09-28 UTC (daily cap 50; the S13 PR is early-exit and not cap-evaluated anyway).
+  - Dry runs by the decomposer (scratch worktree C:/w/m6-p5rev, removed): 5.26 edit (actionlint, Prettier, eslint, tsc,
+    the three test files; the new assertion fails on the string form); 5.27 edit and its derived-content check; 5.28 and
+    5.29 verbatim blocks applied to the pristine tools and every acceptance command run against the live test-beds
+    (read-only); the 5.31 P7, P9 checks on a scratch commit; the 5.32 generator; 5.33 blob-identity and split commands;
+    the 5.34 results check on a synthetic section; the 5.24/5.25 split and post-fix PR commands (on PR 32 with the old
+    pin, syntax only).
+  - Open risks (revision loop, never worked around): the called workflow may refuse enable or run while disabled
+    (5.34-5.36 enable it); `deployment: false` behaving differently in a post-fix run (secrets empty, Deployment created)
+    is a platform deviation to escalate; a Bash timeout during secret-scope.sh run is handled by wait-run.sh on the same
+    run, never a second dispatch.
 
 ## Revisions
 
