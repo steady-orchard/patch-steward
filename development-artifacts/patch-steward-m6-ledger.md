@@ -7,7 +7,7 @@ updates Steps and appends Revisions.
 ## Plan
 
 - plan-name: patch-steward-m6
-- current-phase: 2
+- current-phase: 3
 - working-branch: milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish
 - starting-commit: 6418129c7b104fd93d9162efcda6fe08373287ee
 - default-branch: develop
@@ -20,7 +20,7 @@ updates Steps and appends Revisions.
 | Phase | Status  | Notes |
 | ----: | ------- | ----- |
 | 1     | done    | Core contracts (pure): bounds K38-K51, records (ownership, waiting, supersession, resolution keys), event model, dedup, newest owner, run-name and caps, store path planning, blob id, zip entry reader, job summary renderer. Complete 2026-09-27; DoD D1-D8 re-verified by the supervisor in the main tree. |
-| 2     | pending | GitHub and evidence-store adapters: allowlisted writer, App tokens, artifacts list and download, run list, Git Data API store with retries and read-back, gate fallback read, recorded responses. Needs Phase 1. |
+| 2     | done    | GitHub and evidence-store adapters: allowlisted writer, App tokens, artifacts list and download, run list, Git Data API store with retries and read-back, gate fallback read, recorded responses. Needs Phase 1. Complete 2026-09-27; DoD D1-D10 re-verified by the supervisor in the main tree. |
 | 3     | pending | Hosted gate and publish, action package entry, invariant 2, 4, 7, 8 extensions, write allowlist, fixture-tier hosted scenarios. Needs Phase 2. |
 | 4     | pending | Reusable workflow, wrapper templates (secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`), static workflow tests, live-test switch, scenarios skeleton incl. SC5 secret-scope pair, push to origin, test-bed deployment, OA1 verified on org-public, org-public smoke. Needs Phase 3 and OA1 on org-public (before the smoke step only). |
 | 5     | pending | Live test-bed scenarios S01-S17 (S17 = Environment-only secret delivery on all three test-beds) with recorded results, steady state. Needs Phase 4; OA1 on personal and org-private, OA2, OA3, OA4 verified before the scenarios that need them (S15, S16, S17). |
@@ -93,7 +93,7 @@ updates Steps and appends Revisions.
 | 2.10 | 2 | done | packages/core/src/evidence/store-readback.ts, packages/core/src/evidence/store-readback.test.ts, development-artifacts/patch-steward-m6-2.10-report.md | 5a6d3c9f86191b84e20729b95f3780badeeec0d3 |
 | 2.11 | 2 | done | packages/core/src/github/hosted-responses.fixture.test.ts, development-artifacts/patch-steward-m6-2.11-report.md | c5bfad5ff9302766b80cdeb4e2dc8f2feafe57e0 |
 | 2.12 | 2 | done | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-2.12-report.md | 194d1270f9f327292764350e720d0fd788c23472 |
-| 2.13 | 2 | pending | development-artifacts/patch-steward-m6-2.13-report.md |  |
+| 2.13 | 2 | done | development-artifacts/patch-steward-m6-2.13-report.md | 74d9cf15c186f98dde5c54048466bd28ea63ef94 |
 
 ### Phase 1 notes
 
@@ -307,6 +307,21 @@ updates Steps and appends Revisions.
   - One committed outcome run costs about 2 + (file count) + 4 requests plus 1 + (group count) for read-back; a policy at the
     limits.github.requests_per_run minimum (10) cannot publish a run directory (exhaustion fails the job, never pass).
   - evidence/verify.ts still cannot verify a waiting run directory (phase 1 open item); OW7 successor attempt still open.
+- Execution (supervisor, 2026-09-27):
+  - Waves run: W1 2.1-2.5 in worktrees C:/w/m6-<id> at af7afd8; W2 2.6-2.9 at ded94d9; W3 2.10, 2.11 at 2752d3b;
+    2.12 and 2.13 in the main tree. All steps passed first try; no retry, no in-flight correction, no revision, no amendment.
+  - Worker deviations accepted (behavior unchanged, no contract affected): 2.1 getPaginatedList returns github.schema-mismatch
+    WITHOUT details for structural page violations (non-object body, bad total_count, missing list array); zod item violations
+    carry getJson-style details as specified. No later step inspects details of a structural list failure. 2.7 test helpers
+    (fakeResolver, fakeTransport, bodyFrom) are trimmed copies of the attachment-fetch.test.ts helpers. 2.5 fixed a
+    result.code vs result.failure.code slip before commit.
+  - 2.4 recordings dated 2026-09-28 (UTC at record time). Supervisor scan of fixtures/github/hosted: no match for ghs_, ghp_,
+    github_pat_, gho_, ghu_, ghr_, sig=, authorization, bearer, token, PRIVATE, x-github, STEWARD_APP_, or an e-mail pattern.
+    runs-in-progress.json holds zero runs (total_count 0).
+  - Post-merge integration after each wave (main tree): full vitest, typecheck, lint, format:check exit 0; final 163 files, 3062
+    tests. Phase DoD D1-D10 re-run by the supervisor in the main tree: all PASS (D2 91 titles, D3 7 titles, D5 fetch-blocked
+    test run 3062 pass, D8 leak check clean).
+  - All C:/w/m6-* worktrees and wt/patch-steward-m6-* branches removed. C:/w/m5-3.4 is a pre-existing M05 leftover, untouched.
 
 ## Revisions
 
