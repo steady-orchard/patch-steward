@@ -12,9 +12,10 @@
 #     directory outside this repository (removed at exit), checks that every commit only adds
 #     files (append-only), then runs the run check against the clone;
 #   - local mode: skips git and network entirely; the given directory is the store root;
-#   - run check: for each run directory of <target>/runs/<kind>-<number>, prints whether it is a
-#     waiting run or verifies an outcome run with `node packages/cli/dist/main.js report --json`,
-#     then lists supersession records.
+#   - run check: for each run directory of <target>/runs/<kind>-<number>, verifies an outcome run
+#     with `node packages/cli/dist/main.js report --json` or a waiting run against its manifest
+#     (files present match manifest, every listed file's sha256 matches its bytes), then lists
+#     supersession records.
 #   - never pushes, never writes via gh, never prints file contents, tokens, or secrets.
 #
 # Output: "EVIDENCE key=value ..." lines.
@@ -139,7 +140,46 @@ else
     if [ "$name" = "supersessions" ]; then continue; fi
     runs=$((runs + 1))
     if [ -f "$run_dir/$name/waiting.json" ]; then
-      echo "EVIDENCE run=$name kind=waiting"
+      status="$(node -e '
+        const fs = require("fs");
+        const path = require("path");
+        const crypto = require("crypto");
+        const dir = process.argv[1];
+        try {
+          const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8"));
+          if (manifest.run_kind !== "waiting") throw new Error("not waiting");
+          const listPaths = (base) => {
+            let out = [];
+            for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
+              if (base === dir && entry.name === "manifest.json") continue;
+              const full = path.join(base, entry.name);
+              if (entry.isDirectory()) {
+                out = out.concat(listPaths(full));
+              } else {
+                out.push(path.relative(dir, full).split(path.sep).join("/"));
+              }
+            }
+            return out;
+          };
+          const present = listPaths(dir).sort();
+          const listed = manifest.files.map((f) => f.path).sort();
+          const expected = ["logs/steward.txt", "policy-revision.json", "run.json", "submission.json", "waiting.json"].sort();
+          const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+          if (!eq(present, listed) || !eq(present, expected)) throw new Error("mismatch");
+          for (const f of manifest.files) {
+            const bytes = fs.readFileSync(path.join(dir, f.path));
+            const hash = "sha256:" + crypto.createHash("sha256").update(bytes).digest("hex");
+            if (hash !== f.sha256) throw new Error("hash mismatch");
+          }
+          console.log("verified");
+        } catch (e) {
+          console.log("failed");
+        }
+      ' "$run_dir/$name")"
+      echo "EVIDENCE run=$name kind=waiting manifest=$status"
+      if [ "$status" = "verified" ]; then
+        verified=$((verified + 1))
+      fi
     else
       json="$(node packages/cli/dist/main.js report --json "$run_dir/$name" 2> /dev/null || true)"
       result="$(node -e '
