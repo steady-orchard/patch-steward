@@ -66,10 +66,10 @@ updates Steps and appends Revisions.
 
 | id | phase | status | files | commit |
 | --- | --- | --- | --- | --- |
-| 1.1 | 1 | pending | packages/core/src/policy/bounds.ts, packages/core/src/policy/bounds.test.ts, development-artifacts/patch-steward-m6-1.1-report.md | |
-| 1.2 | 1 | pending | packages/core/src/vocabulary.ts, packages/core/src/vocabulary.test.ts, packages/core/src/records/common.ts, packages/core/src/records/common.test.ts, packages/core/src/exports.test.ts, development-artifacts/patch-steward-m6-1.2-report.md | |
-| 1.3 | 1 | pending | packages/core/src/net/zip-entry.ts, packages/core/src/net/zip-entry.test.ts, development-artifacts/patch-steward-m6-1.3-report.md | |
-| 1.4 | 1 | pending | packages/core/src/evidence/blob-id.ts, packages/core/src/evidence/blob-id.test.ts, packages/core/src/evidence/store-checks.ts, packages/core/src/evidence/store-checks.test.ts, development-artifacts/patch-steward-m6-1.4-report.md | |
+| 1.1 | 1 | done | packages/core/src/policy/bounds.ts, packages/core/src/policy/bounds.test.ts, development-artifacts/patch-steward-m6-1.1-report.md | a199a8899587e206555aa9ef1316264088b43350 |
+| 1.2 | 1 | done | packages/core/src/vocabulary.ts, packages/core/src/vocabulary.test.ts, packages/core/src/records/common.ts, packages/core/src/records/common.test.ts, packages/core/src/exports.test.ts, development-artifacts/patch-steward-m6-1.2-report.md | 787eeb56ef4b43df8fc118eb2dace82dfc2efe4f |
+| 1.3 | 1 | done | packages/core/src/net/zip-entry.ts, packages/core/src/net/zip-entry.test.ts, development-artifacts/patch-steward-m6-1.3-report.md | 57d622c5acb5fdb1078417ddb9b9d736b52ae0ee |
+| 1.4 | 1 | done | packages/core/src/evidence/blob-id.ts, packages/core/src/evidence/blob-id.test.ts, packages/core/src/evidence/store-checks.ts, packages/core/src/evidence/store-checks.test.ts, development-artifacts/patch-steward-m6-1.4-report.md | 16f56593256386f3d578c4cde5cf3bb6c5ce5e78 |
 | 1.5 | 1 | pending | packages/core/src/ownership/dedup.ts, packages/core/src/ownership/dedup.test.ts, development-artifacts/patch-steward-m6-1.5-report.md | |
 | 1.6 | 1 | pending | packages/core/src/records/waiting.ts, packages/core/src/records/waiting.test.ts, packages/core/src/records/supersession.ts, packages/core/src/records/supersession.test.ts, development-artifacts/patch-steward-m6-1.6-report.md | |
 | 1.7 | 1 | pending | packages/core/src/ownership/record.ts, packages/core/src/ownership/record.test.ts, development-artifacts/patch-steward-m6-1.7-report.md | |
