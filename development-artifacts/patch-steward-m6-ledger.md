@@ -111,12 +111,12 @@ updates Steps and appends Revisions.
 | 3.15 | 3 | done | packages/core/src/pipeline/hosted-freshness.ts, packages/core/src/pipeline/hosted-freshness.test.ts, development-artifacts/patch-steward-m6-3.15-report.md | 48b5fdf93575c41d94d6fc0f497b0fdf41751f9b |
 | 3.16 | 3 | done | packages/core/src/pipeline/hosted-publish.ts, packages/core/src/pipeline/hosted-publish.test.ts, development-artifacts/patch-steward-m6-3.16-report.md | 83a8c4608d9a4c438de393861fd21f5647561446 |
 | 3.17 | 3 | done | packages/core/src/pipeline/hosted-gate-scenarios.fixture.test.ts, development-artifacts/patch-steward-m6-3.17-report.md | 0f329dbcff3c1ccdacdd8f096ab1da5f39c4cc09 |
-| 3.18 | 3 | pending | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-3.18-report.md | |
-| 3.19 | 3 | pending | packages/core/src/pipeline/hosted-publish-scenarios.fixture.test.ts, development-artifacts/patch-steward-m6-3.19-report.md | |
-| 3.20 | 3 | pending | packages/core/src/conformance/invariant-2-hosted.test.ts, packages/core/src/conformance/invariant-8-hosted.test.ts, development-artifacts/patch-steward-m6-3.20-report.md | |
-| 3.21 | 3 | pending | packages/core/src/conformance/invariant-4-hosted.test.ts, development-artifacts/patch-steward-m6-3.21-report.md | |
-| 3.22 | 3 | pending | packages/core/src/conformance/invariant-7-hosted.test.ts, development-artifacts/patch-steward-m6-3.22-report.md | |
-| 3.23 | 3 | pending | packages/core/src/conformance/write-allowlist.test.ts, packages/core/src/conformance/zero-execution.fixture.test.ts, development-artifacts/patch-steward-m6-3.23-report.md | |
+| 3.18 | 3 | done | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-3.18-report.md | 94fff9dbb6d22c210f0059a872f473fd93dd33d0 |
+| 3.19 | 3 | done | packages/core/src/pipeline/hosted-publish-scenarios.fixture.test.ts, development-artifacts/patch-steward-m6-3.19-report.md | b8fa62ab7b62818d1edfc40cb706779c3e586664 |
+| 3.20 | 3 | done | packages/core/src/conformance/invariant-2-hosted.test.ts, packages/core/src/conformance/invariant-8-hosted.test.ts, development-artifacts/patch-steward-m6-3.20-report.md | 40f4338bae45ed8ad58fde4e0ed163ab8ea83c51 |
+| 3.21 | 3 | done | packages/core/src/conformance/invariant-4-hosted.test.ts, development-artifacts/patch-steward-m6-3.21-report.md | 75b1644b87ed2e4ec626acd4cf17523b8b73b7c8 |
+| 3.22 | 3 | done | packages/core/src/conformance/invariant-7-hosted.test.ts, development-artifacts/patch-steward-m6-3.22-report.md | 9603a9b28059e73f78392b48ac48782256f266f8 |
+| 3.23 | 3 | done | packages/core/src/conformance/write-allowlist.test.ts, packages/core/src/conformance/zero-execution.fixture.test.ts, development-artifacts/patch-steward-m6-3.23-report.md | fffacdb9bf6424f360f8bfdb1db317acc64c203a |
 | 3.24 | 3 | pending | packages/action/src/dispatch.ts, packages/action/src/dispatch.test.ts, packages/action/src/main.ts, development-artifacts/patch-steward-m6-3.24-report.md | |
 | 3.25 | 3 | pending | development-artifacts/patch-steward-m6-3.25-report.md | |
 
