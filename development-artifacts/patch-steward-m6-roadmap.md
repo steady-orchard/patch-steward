@@ -118,7 +118,14 @@ Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the
 
 - **Objective:** every M06 exit criterion is demonstrated live on the test-beds and recorded with verbatim evidence.
 - **Scope:** run S01–S17 (brief G10; S17 is the live Environment-only delivery check, SC5 and I21) with `scenarios/tools/`, record `scenarios/results/org-public.md`, `personal.md`, `org-private.md`;
-  defects found go back through the supervisor revision loop (re-push, re-deploy); steady state SC3 at the end.
+  defects found go back through the supervisor revision loop (re-push, re-deploy); steady state SC3 at the end. Owner decision
+  2026-09-28 (brief D7, Option A): before the S13 audit, the product-fix loop puts every Environment declaration in the mapping form
+  `name: steward-publication` plus `deployment: false` (reusable workflow `gate` and `publish`, static workflow test assertions, SC5 job
+  `inside`, `scenario-app-edit.yml` job `edit`, scenario tools matching the declaration): local checks, one non-forced push,
+  test-bed wrapper copies re-pinned to the fix commit, redeploys to the three test-beds (workflows re-enabled only as needed; all are
+  `disabled_manually` since the escalation), then S17 re-run on all three test-beds, the S13 post-fix PR on org-public (open, one body
+  edit), S13 and S14 on all three, steady state re-applied. S01–S12, S15, S16 results stand; no Deployment and no probe leftover is
+  deleted (brief SC3).
 - **Depends on:** Phase 4. Owner actions (all reported done 2026-09-27; OA1 and OA2 verified; OA3 and OA4 unproved until S16 and S15),
   each re-verified with the brief's command before the first scenario that needs it (a failing verify returns `RESULT: needs-human`
   naming the action): OA1 on personal before S15 and S17 there; OA1 on org-private before S16 and S17 there; OA2 before S16; OA3 by the
@@ -126,23 +133,36 @@ Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the
   naming OA3); OA4 by the S15 run (publish to the personal `steward-evidence`; a token-mint failure or HTTP 403 there returns
   `needs-human` naming OA4). Scenarios on org-public (S01–S14, S17) need only OA1 on org-public, re-verified at the start of the phase.
 - **Definition of Done (phase):** each result file lists S01–S17 as applicable with result `pass` and evidence (run URLs, artifact
-  listings with `created_at`, evidence commit SHAs, compare outputs); the observe audit (S13) counts are all `0`; S17 on each of the three test-beds shows job `outside` logging both `length-zero=true`
-  and job `inside` logging both `length-zero=false`; SC3 steady state
+  listings with `created_at`, evidence commit SHAs, compare outputs); the observe audit (S13) meets the brief's S13 pass condition:
+  App-authored comments, labels, App check runs, and requested reviewers `0` on every scenario submission, head-SHA deployments `0` on
+  every PR screened only by the fixed pin (the S13 post-fix PR: two runs at the fixed pin, `gate` and `publish` `success` in each),
+  and org-public pre-fix PRs 32, 33, 34, 36, 37 recorded verbatim with exactly 2, 2, 28, 4, 4 deployments (creator `jambolo` or
+  `patch-steward-testbed[bot]`, created before the fixed wrappers' deploy); `git show HEAD:.github/workflows/steward-screening.yml`
+  declares `deployment: false` under both `gate` and `publish` and the fix commit is an ancestor of the pushed milestone branch and is
+  the pin of every deployed test-bed wrapper; S14 on all three test-beds shows the mapping form in the pinned reusable workflow; S17
+  on each of the three test-beds shows job `outside` logging both `length-zero=true` and job `inside` logging both
+  `length-zero=false`, in the pre-fix section and in the appended post-fix section (the post-fix section also shows 0 deployments
+  created since its run); SC3 steady state (including the D7 leftovers: `scenario-deployment-probe.yml` `disabled_manually`, branch
+  `scenario-deployment-probe` present)
   verified by `gh workflow list` and open-issue/PR queries on the three test-beds; `pnpm prettier --check scenarios` exits 0; no token or
   key in any result file (grep for `ghs_`, `ghp_`, `-----BEGIN`); brief project DoD item 18's `git grep` prints nothing.
 - **Risks:** timing-dependent overlap for S04/S05 (bounded retries of the scenario, recorded); run-list freshness (22 s) making cap
   scenarios flaky (space runs, record counts); Actions minutes on org-private; a platform deviation requiring an owner decision
-  (escalate, never work around).
+  (escalate, never work around); `deployment: false` behaving differently in the post-fix runs than in the single probe (secrets
+  empty, branch policy not enforced, or a Deployment created: escalate); the audit tool treating the recorded pre-fix deployments as
+  a failure.
 
 ## Phase 6 — ADRs, governing documents, manual, project DoD
 
 - **Objective:** every settled decision is recorded governing document first, the documentation describes exactly the delivered
   skeleton, and the brief's project DoD passes.
-- **Scope:** ADR-0071 onward and ADR-0011's status (G11), `docs/adr/README.md`, `docs/architecture.md`, `docs/processes.md`,
+- **Scope:** ADR-0071 onward and ADR-0011's status (G11; D7 folded into ADR-0076 and ADR-0078), `docs/adr/README.md`, `docs/architecture.md`, `docs/processes.md`,
   `docs/whitepaper.md` §9–§14, `README.md`, `CLAUDE.md`, `docs/user-manual/` pages in the G11 inventory, `fixtures/README.md` if not
   already current, `scenarios/README.md` wording review.
 - **Depends on:** Phase 5 (documents state measured and delivered behavior).
-- **Definition of Done (phase):** brief project DoD items 1–18 all pass as pinned by the approval amendment of 2026-09-27; `pnpm prettier --check docs
+- **Definition of Done (phase):** brief project DoD items 1–18 all pass as pinned by the approval amendment of 2026-09-27 and the D7
+  amendment of 2026-09-28 (item 16: architecture, the configuration manual, and ADR-0076 state that the publication jobs declare the
+  Environment with `deployment: false` and why; ADR count stays 8, README rows 78); `pnpm prettier --check docs
   README.md CLAUDE.md` exits 0; link check over persistent docs passes; Status paragraphs of architecture, processes, README, CLAUDE.md,
   and the manual describe the hosted skeleton as observe-mode, contract-level, test-bed-only; `docs/deferred.md` and the plan documents
   unchanged since `S`.
