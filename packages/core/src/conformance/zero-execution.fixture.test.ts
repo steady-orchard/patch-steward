@@ -451,6 +451,8 @@ describe('zero model calls and zero executions', () => {
       fileURLToPath(new URL('../evidence/', import.meta.url)),
       fileURLToPath(new URL('../report/', import.meta.url)),
       fileURLToPath(new URL('../decision/', import.meta.url)),
+      fileURLToPath(new URL('../ownership/', import.meta.url)),
+      fileURLToPath(new URL('../../../action/src/', import.meta.url)),
     ];
 
     const forbiddenNamePattern = /(llm|model|copilot|openai|anthropic|sandbox|container|docker|runner)/i;
