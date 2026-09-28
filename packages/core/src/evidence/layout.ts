@@ -19,9 +19,18 @@ export const RUN_FILES = Object.freeze({
   log: 'logs/steward.txt',
 });
 
+export const WAITING_RUN_FILES = Object.freeze({
+  run: 'run.json',
+  submission: 'submission.json',
+  policyRevision: 'policy-revision.json',
+  waiting: 'waiting.json',
+  log: 'logs/steward.txt',
+});
+
 export const RUNS_DIRECTORY = 'runs';
 export const STAGING_DIRECTORY_NAME = '.staging';
 export const METRICS_DIRECTORY = 'metrics';
+export const SUPERSESSIONS_DIRECTORY = 'supersessions';
 
 export type EvidenceLayoutFailureCode = 'evidence.layout-invalid';
 
@@ -77,6 +86,58 @@ export function metricsStorePath(startedAt: string, runId: string | number, runA
   return `${METRICS_DIRECTORY}/${month}/${runDirectoryName(runId, runAttempt)}.json`;
 }
 
+export function supersessionStorePath(type: SubmissionType, number: number, runId: number, runAttempt: number): string {
+  const kind = type === 'pull_request' ? 'pr' : 'issue';
+  return `${RUNS_DIRECTORY}/${kind}-${number}/${SUPERSESSIONS_DIRECTORY}/${runDirectoryName(runId, runAttempt)}.json`;
+}
+
+export function supersessionMetricsStorePath(recordedAt: string, runId: number, runAttempt: number): string {
+  const month = new Date(recordedAt).toISOString().slice(0, 7);
+  return `${METRICS_DIRECTORY}/${month}/${runDirectoryName(runId, runAttempt)}-supersession.json`;
+}
+
+const LATEST_RUN_DIRECTORY_PATTERN = /^([1-9][0-9]{0,19})-([1-9][0-9]{0,9})$/;
+
+export function repositoryStorePath(repository: string, storePath: string): Result<string, EvidenceLayoutFailureCode> {
+  const parsed = recordRepositorySchema.safeParse(repository);
+  if (!parsed.success) {
+    return err('evidence.layout-invalid', 'steward-defect', 'The repository name cannot form an evidence path.');
+  }
+  const [owner, name] = parsed.data.split('/');
+  if (name === '.' || name === '..') {
+    return err('evidence.layout-invalid', 'steward-defect', 'The repository name cannot form an evidence path.');
+  }
+  if (storePath === '' || storePath.startsWith('/') || storePath.includes('\\')) {
+    return err('evidence.layout-invalid', 'steward-defect', 'The repository name cannot form an evidence path.');
+  }
+  const segments = storePath.split('/');
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+    return err('evidence.layout-invalid', 'steward-defect', 'The repository name cannot form an evidence path.');
+  }
+  return ok(`${owner}/${name}/${storePath}`);
+}
+
+export function latestRunDirectoryName(
+  names: readonly string[],
+): { readonly name: string; readonly runId: number; readonly runAttempt: number } | null {
+  let best: { readonly name: string; readonly runId: number; readonly runAttempt: number } | null = null;
+  for (const name of names) {
+    const match = LATEST_RUN_DIRECTORY_PATTERN.exec(name);
+    if (match === null) {
+      continue;
+    }
+    const runId = Number(match[1]);
+    const runAttempt = Number(match[2]);
+    if (!Number.isSafeInteger(runId) || !Number.isSafeInteger(runAttempt)) {
+      continue;
+    }
+    if (best === null || runId > best.runId || (runId === best.runId && runAttempt > best.runAttempt)) {
+      best = { name, runId, runAttempt };
+    }
+  }
+  return best;
+}
+
 const FINDING_FILE_PATTERN = /^findings\/finding-[0-9]{4}\.json$/;
 const EXECUTION_FILE_PATTERN = /^executions\/execution-[0-9]{4}\.json$/;
 const MAINTAINER_ACTION_FILE_PATTERN = /^maintainer-actions\/action-[0-9]{4}\.json$/;
@@ -96,6 +157,8 @@ export function recordTypeForPath(path: string): RecordType | null | undefined {
       return 'report';
     case RUN_FILES.reportMarkdown:
       return null;
+    case WAITING_RUN_FILES.waiting:
+      return 'waiting';
     default:
       break;
   }

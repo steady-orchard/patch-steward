@@ -52,6 +52,18 @@ function buildBaseManifest(): EvidenceManifest {
   return result.value;
 }
 
+const WAITING_FILES: readonly { readonly path: string; readonly bytes: Uint8Array }[] = [
+  { path: 'run.json', bytes: textBytes(SMALL_JSON) },
+  { path: 'submission.json', bytes: textBytes(SMALL_JSON) },
+  { path: 'policy-revision.json', bytes: textBytes(SMALL_JSON) },
+  { path: 'waiting.json', bytes: textBytes(SMALL_JSON) },
+  { path: 'logs/steward.txt', bytes: textBytes('plain log text\n') },
+];
+
+function waitingInput(overrides: Partial<EvidenceManifestInput> = {}): EvidenceManifestInput {
+  return baseInput({ runKind: 'waiting', files: WAITING_FILES, ...overrides });
+}
+
 describe('buildEvidenceManifest', () => {
   it('manifest lists every file sorted by path with its bytes and hashes', () => {
     const manifest = buildBaseManifest();
@@ -180,6 +192,73 @@ describe('buildEvidenceManifest', () => {
     expect(wrongMetricsPath.ok).toBe(false);
     if (!wrongMetricsPath.ok) {
       expect(wrongMetricsPath.failure.code).toBe('evidence.manifest-invalid');
+    }
+  });
+
+  it('waiting manifests require the waiting run files', () => {
+    const valid = buildEvidenceManifest(waitingInput());
+    expect(valid.ok).toBe(true);
+
+    const withoutWaiting = buildEvidenceManifest(
+      waitingInput({ files: WAITING_FILES.filter((file) => file.path !== 'waiting.json') }),
+    );
+    expect(withoutWaiting.ok).toBe(false);
+    if (!withoutWaiting.ok) {
+      expect(withoutWaiting.failure.code).toBe('evidence.manifest-invalid');
+    }
+  });
+
+  it('waiting manifests reject decision, report, and findings files', () => {
+    for (const extra of [
+      { path: 'decision.json', bytes: textBytes(SMALL_JSON) },
+      { path: 'report.json', bytes: textBytes(SMALL_JSON) },
+      { path: 'report.md', bytes: textBytes('# Report\n') },
+      { path: 'findings/finding-0001.json', bytes: textBytes(SMALL_JSON) },
+    ]) {
+      const result = buildEvidenceManifest(waitingInput({ files: [...WAITING_FILES, extra] }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('evidence.manifest-invalid');
+      }
+    }
+  });
+
+  it('outcome manifests reject a waiting record file', () => {
+    const result = buildEvidenceManifest(
+      baseInput({ files: [...BASE_FILES, { path: 'waiting.json', bytes: textBytes(SMALL_JSON) }] }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('evidence.manifest-invalid');
+    }
+  });
+
+  it('manifests without run_kind stay valid', () => {
+    const manifest = buildBaseManifest();
+    expect(evidenceManifestSchema.safeParse(manifest).success).toBe(true);
+    expect(manifest).not.toHaveProperty('run_kind');
+
+    const withRunKind = evidenceManifestSchema.safeParse({ ...manifest, run_kind: 'outcome' });
+    expect(withRunKind.success).toBe(true);
+  });
+
+  it('run_kind is written only when given', async () => {
+    const manifest = buildBaseManifest();
+    const { prettyJson } = await import('./pretty-json.js');
+    const withoutRunKind = prettyJson(manifest);
+    expect(withoutRunKind.ok).toBe(true);
+    if (withoutRunKind.ok) {
+      expect(withoutRunKind.value).not.toContain('"run_kind"');
+    }
+
+    const waitingResult = buildEvidenceManifest(waitingInput());
+    expect(waitingResult.ok).toBe(true);
+    if (waitingResult.ok) {
+      const withRunKind = prettyJson(waitingResult.value);
+      expect(withRunKind.ok).toBe(true);
+      if (withRunKind.ok) {
+        expect(withRunKind.value).toContain('"run_kind": "waiting"');
+      }
     }
   });
 
