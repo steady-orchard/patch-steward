@@ -7,7 +7,7 @@ updates Steps and appends Revisions.
 ## Plan
 
 - plan-name: patch-steward-m6
-- current-phase: 1
+- current-phase: 2
 - working-branch: milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish
 - starting-commit: 6418129c7b104fd93d9162efcda6fe08373287ee
 - default-branch: develop
@@ -19,7 +19,7 @@ updates Steps and appends Revisions.
 
 | Phase | Status  | Notes |
 | ----: | ------- | ----- |
-| 1     | pending | Core contracts (pure): bounds K38-K51, records (ownership, waiting, supersession, resolution keys), event model, dedup, newest owner, run-name and caps, store path planning, blob id, zip entry reader, job summary renderer. Blocked on owner gate. |
+| 1     | done    | Core contracts (pure): bounds K38-K51, records (ownership, waiting, supersession, resolution keys), event model, dedup, newest owner, run-name and caps, store path planning, blob id, zip entry reader, job summary renderer. Complete 2026-09-27; DoD D1-D8 re-verified by the supervisor in the main tree. |
 | 2     | pending | GitHub and evidence-store adapters: allowlisted writer, App tokens, artifacts list and download, run list, Git Data API store with retries and read-back, gate fallback read, recorded responses. Needs Phase 1. |
 | 3     | pending | Hosted gate and publish, action package entry, invariant 2, 4, 7, 8 extensions, write allowlist, fixture-tier hosted scenarios. Needs Phase 2. |
 | 4     | pending | Reusable workflow, wrapper templates (secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`), static workflow tests, live-test switch, scenarios skeleton incl. SC5 secret-scope pair, push to origin, test-bed deployment, OA1 verified on org-public, org-public smoke. Needs Phase 3 and OA1 on org-public (before the smoke step only). |
@@ -80,7 +80,7 @@ updates Steps and appends Revisions.
 | 1.12 | 1 | done | packages/core/src/records/metrics-event.ts, packages/core/src/records/metrics-event.test.ts, packages/core/src/evidence/metrics.ts, packages/core/src/evidence/metrics.test.ts, development-artifacts/patch-steward-m6-1.12-report.md | 68b43a1353caf718beca5cab6fe02fba9dd5c906 |
 | 1.13 | 1 | done | packages/core/src/pipeline/job-summary.ts, packages/core/src/pipeline/job-summary.test.ts, development-artifacts/patch-steward-m6-1.13-report.md | e02c34475f3c42f56f387d257c0f3dc8d715647b |
 | 1.14 | 1 | done | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/invariant-5.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-1.14-report.md | facfbf79e4d03b7a8cf341b8b2b1ed54c6c8a9b5 |
-| 1.15 | 1 | pending | development-artifacts/patch-steward-m6-1.15-report.md | |
+| 1.15 | 1 | done | development-artifacts/patch-steward-m6-1.15-report.md | 57ddd023d7535a34c5eaa0dbcb57b3106235da6a |
 
 ### Phase 1 notes
 
@@ -194,6 +194,14 @@ updates Steps and appends Revisions.
   - Job summary values (for example a long evidence location URL) are code spans truncated at 200 code units by the M05 escaper.
   - Pre-existing temp-directory leaks in packages/cli tests (prefixes policy-gitconfig-, policy-repo-, ps-cli-missing-) remain;
     packages/cli is out of scope in M06 except the live-test switch. The 1.15 leak check tolerates exactly those prefixes.
+- Execution (supervisor, 2026-09-27):
+  - Waves run: W1 1.1-1.4 in worktrees C:/w/m6-<id> (parallel with the decomposer revision of 1.5, 1.14, 1.15, commit 2230d48);
+    W2 1.5-1.13 in worktrees; 1.14 and 1.15 in the main tree. All steps passed first try; no retry, no in-flight correction.
+  - Worker deviations accepted (behavior unchanged): 1.1 relation test multiplies by `findPolicyLimit(...)?.max ?? NaN` (strict
+    typecheck rejects arithmetic on a possibly undefined operand); 1.14 never-pass trigger for caps.run-list-unavailable passes full
+    RunListQueryResult shapes and `now` as a Date, per the real evaluateCaps signature.
+  - Post-merge integration after each wave (main tree): full vitest, typecheck, lint exit 0; final 153 files, 2928 tests.
+  - All C:/w/m6-* worktrees and wt/patch-steward-m6-* branches removed. C:/w/m5-3.4 is a pre-existing M05 leftover, untouched.
 
 ## Revisions
 
