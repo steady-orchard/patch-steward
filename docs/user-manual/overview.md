@@ -2,12 +2,7 @@
 
 [Manual contents](README.md) · [Installation](installation.md)
 
-**Status:** Product behavior on this page is proposed. The development
-scaffold, the policy module, the submission contract check, the `steward policy`
-command, and the deterministic part of `steward preflight` exist, along with
-`steward screen`, which screens an issue or pull request locally at contract
-level, and `steward report`, which prints a stored run; full screening does
-not exist.
+**Status:** Product behavior on this page is proposed. The development scaffold, the policy module, the submission contract check, the `steward policy` command, and the deterministic part of `steward preflight` exist, along with `steward screen`, which screens an issue or pull request locally at contract level, `steward report`, which prints a stored run, and a GitHub-hosted skeleton that screens in observe mode at contract level on dedicated test-bed repositories only; full screening does not exist.
 
 ## Purpose and scope
 
@@ -83,6 +78,8 @@ Available today, `steward screen` runs the maintainer local screening option
 at contract level only, with no container or model, and writes local
 evidence; see [Local screening](usage.md#local-screening-available).
 
+GitHub-hosted screening (T1) exists only as a GitHub-hosted skeleton in observe mode at contract level, verified on dedicated test-bed repositories: wrapper workflows call the reusable workflow's `build`, `gate`, and `publish` jobs, which authenticate the event, deduplicate by snapshot, apply the run caps, commit ownership, and write evidence to the evidence branch or repository. It creates no check run, report comment, or label, runs no stage, container, or model call, and cannot be installed in a target repository yet (see [Target-repository installation](installation.md#target-repository-installation-proposed)).
+
 Sources: [architecture §5](../architecture.md#5-runtime-topologies),
 [sandbox process SP17](../processes.md#sp17-sandboxed-execution).
 
@@ -100,6 +97,8 @@ Sources: [architecture §5](../architecture.md#5-runtime-topologies),
 `queued` and `awaiting-approval` are waiting states, not outcomes. They represent
 capacity limits and an inference-admission hold, respectively. Any check remains
 pending while waiting.
+
+In the GitHub-hosted skeleton an over-cap run commits ownership and records a waiting run directory with `waiting.json` in the evidence store; nothing restarts it yet.
 
 Issue classifications describe the claim rather than the run outcome:
 `supported-defect`, `intended-behavior`, `feature-request`, `accepted-proposal`,

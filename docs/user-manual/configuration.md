@@ -649,7 +649,7 @@ always replaced.
 | Key                                       | Value                             | Notes                                                            |
 | ----------------------------------------- | --------------------------------- | ---------------------------------------------------------------- |
 | `evidence.store.type`                     | `orphan-branch` or `repository`   | Template `orphan-branch`.                                        |
-| `evidence.store.branch`                   | branch name                       | Used by both store types.                                        |
+| `evidence.store.branch`                   | branch name                       | Used by both store types. Template `steward-evidence`.           |
 | `evidence.store.repository`               | `owner/name`                      | Repository store type only.                                      |
 | `evidence.retention_days`                 | bounded integer (days)            | Template `365`.                                                  |
 | `evidence.redaction_patterns[].id`        | unique id                         | `policy.duplicate-id` on repeats.                                |
@@ -748,16 +748,28 @@ Sources: [architecture §8](../architecture.md#8-policy-the-quality-contract), [
 
 ## Credentials and deployment (Proposed)
 
-| Credential                    | Actions screening                                                                                                                                                                                               | Local use                                                                             |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| GitHub App id and private key | Default-branch-only publication Environment; only `gate` and `publish` receive App credentials.                                                                                                                 | CLI never holds the App private key.                                                  |
-| GitHub access                 | Job-specific `GITHUB_TOKEN`; scoped App tokens for writes and authorized separate-evidence-repository access.                                                                                                   | User's own token through `gh` authentication or a fine-grained personal access token. |
-| Copilot inference             | Model jobs use `GITHUB_TOKEN` with `copilot-requests: write`. Organization use requires the documented policy, "Allow use of Copilot CLI billed to the organization" (unverified; `probes/findings.md` PA08.7). | User's Copilot login or token with Copilot Requests permission.                       |
-| OpenAI-compatible inference   | `STEWARD_LLM_API_KEY`, supplied from the separate model Environment only to `intake` and `assess` jobs.                                                                                                         | The same fixed variable in the user's shell.                                          |
+GitHub-hosted screening runs today only as a skeleton on dedicated test-bed repositories, with the App credentials described here; installation in a target repository is not available yet.
+
+| Credential                    | Actions screening                                                                                                                                                                                                                                                                                                                      | Local use                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| GitHub App id and private key | Environment secrets `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY` of the Environment `steward-publication`, whose deployment branches are restricted to the default branch; never repository or organization secrets. The wrappers pass both by name; only `gate` and `publish` declare the Environment and receive them. | CLI never holds the App private key.                                                  |
+| GitHub access                 | Job `GITHUB_TOKEN`s with empty permissions; installation tokens the steward mints from the App key in `gate` and `publish`, each naming exactly its repositories and permissions (the target, and the evidence repository when separate), revoked when the job ends.                                                                   | User's own token through `gh` authentication or a fine-grained personal access token. |
+| Copilot inference             | Model jobs use `GITHUB_TOKEN` with `copilot-requests: write`. Organization use requires the documented policy, "Allow use of Copilot CLI billed to the organization" (unverified; `probes/findings.md` PA08.7).                                                                                                                        | User's Copilot login or token with Copilot Requests permission.                       |
+| OpenAI-compatible inference   | `STEWARD_LLM_API_KEY`, supplied from the separate model Environment only to `intake` and `assess` jobs.                                                                                                                                                                                                                                | The same fixed variable in the user's shell.                                          |
 
 No job holds both App and model credentials. Execution jobs run submitted code
 inside credential-free containers. Environment branch rules restrict privileged
 jobs to the default branch.
+
+`gate` and `publish` declare the Environment as a mapping with `deployment: false`:
+
+```yaml
+environment:
+  name: steward-publication
+  deployment: false
+```
+
+In the string form `environment: steward-publication`, GitHub Actions records a Deployment for every job that declares the Environment, which for a `pull_request_target` run leaves a Deployment on the pull request head, a write on the submission that observe mode must not make. With `deployment: false` the Environment secrets and the default-branch restriction still apply, and no Deployment is created.
 
 The design assigns Copilot usage in organization-owned repositories to the
 organization and in personal repositories to the owner's seat. This organization
@@ -777,9 +789,7 @@ user-selectable policy keys: a fresh `COPILOT_HOME`, unset
 `COPILOT_CLI_PATH` in Actions. Its runtime works outside checkouts, with no MCP
 servers and every tool denied.
 
-> **[NEEDS INPUT]** Reuse of the user's Copilot login for local `github-token`
-> inference, App-secret names, Environment names, the default model per
-> adapter, and credential-provisioning commands are not specified.
+> **[NEEDS INPUT]** Reuse of the user's Copilot login for local `github-token` inference, the default model per adapter, and credential-provisioning commands are not specified.
 
 Sources: [architecture §6.3](../architecture.md#63-adapters),
 [§6.4](../architecture.md#64-github-action-and-reusable-workflows),
@@ -896,9 +906,7 @@ Sources: [architecture §11](../architecture.md#11-evidence-store-and-publicatio
 
 ## Evidence and visibility (Proposed)
 
-See [Local evidence and reports](#local-evidence-and-reports-available) for the
-local store that exists today; the branch or repository store described below
-is not implemented.
+See [Local evidence and reports](#local-evidence-and-reports-available) for the local store. The orphan-branch and repository stores exist in the GitHub-hosted skeleton, which runs in observe mode at contract level only on dedicated test-bed repositories; see [Store commits](#store-commits).
 
 The evidence store is append-only except for retention pruning. It holds run
 records, findings, reports, redacted bounded logs, maintainer actions, and metrics.
@@ -930,6 +938,28 @@ policy subset and validates it against its own schema; publishing it to Pages
 is not implemented. The browser cannot read
 private evidence stores directly in version 1. Actions summaries and private
 evidence remain available when no public dashboard is authorized.
+
+### Store commits
+
+The trusted policy's `evidence.store` selects the store: an orphan branch named by `evidence.store.branch` in the target repository (the policy template uses `steward-evidence`), or a branch of the separate repository `evidence.store.repository`, which must already hold at least one commit and have the App installed. Both hold the same `<owner>/<repo>/` subtree as the local store (see [Layout](#layout)).
+
+The `publish` job commits each run in one commit through the Git Data API, with an App token for the store repository only:
+
+1. It reads the branch tip; an absent branch starts with a root commit.
+2. It creates one blob per file, one tree on the tip's tree with an entry per new path, and one commit with the message `evidence: <owner>/<repo> <pr|issue>-<number> run <run_id>-<run_attempt>`.
+3. It compares the tip with the new commit, which must only add the expected paths; otherwise the write fails with `evidence.store-not-append-only`.
+4. It updates the branch without force. When another run moved the branch first, it rebuilds the tree and commit on the new tip, waiting 1 s times the attempt number (at most 10 s), at most `limits.evidence.write_retries` times, and then fails with `evidence.store-conflict`.
+5. It reads the commit back and checks every expected file by its git blob id before writing its job summary; a mismatch fails with `evidence.readback-mismatch`.
+
+A failed write fails the `publish` job with no summary outcome. Besides outcome run directories the store receives:
+
+| Record                | Path                                                                    | Content                                                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Waiting run directory | `runs/<pr or issue>-<number>/<run_id>-<run_attempt>/`                   | `run.json`, `submission.json`, `policy-revision.json`, `waiting.json`, `logs/steward.txt`, and a manifest with `run_kind: waiting`; no decision or report     |
+| Supersession record   | `runs/<pr or issue>-<number>/supersessions/<run_id>-<run_attempt>.json` | Reason (`newer-owner` or `snapshot-changed`), successor, and recorded and live snapshot hashes; its metrics file name ends `-supersession.json`               |
+| Closure resolution    | `metrics/<YYYY-MM>/<run_id>-<run_attempt>.json`                         | One `maintainer-resolution` event (`merged`, `closed-by-author`, `closed-by-maintainer`, or `deleted`) paired with the newest committed run; no run directory |
+
+Every request counts against `limits.github.requests_per_run`; a policy at its minimum of 10 cannot afford a GitHub-hosted run, which fails with `github.budget-exhausted` instead of passing.
 
 Sources: [architecture §6.6](../architecture.md#66-browser-application-packagesweb),
 [§11](../architecture.md#11-evidence-store-and-publication),

@@ -1,6 +1,6 @@
 # ADR-0011: Distribution
 
-- Status: accepted
+- Status: superseded by ADR-0077
 - Date: 2026-09-15
 - Deciders: project owner
 - Source: `docs/architecture.md` §1.2 "Decisions recorded", row "Distribution", commit `0da65aa`

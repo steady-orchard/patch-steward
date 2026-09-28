@@ -215,6 +215,61 @@ describe('package root exports', () => {
     'screenPreRunExitStatus',
     'screenPublishFailure',
     'screenSubmission',
+    'readSingleZipEntry',
+    'gitBlobId',
+    'verifyAppendOnlyCompare',
+    'readBackTipAccepted',
+    'verifyReadBackTree',
+    'ownershipArtifactName',
+    'encodeOwnershipRecord',
+    'decodeOwnershipRecord',
+    'newestOwnershipArtifact',
+    'artifactRetentionDays',
+    'ownershipRetentionShort',
+    'decideDeduplication',
+    'appliesListingDeduplication',
+    'isVerifiedEcho',
+    'authenticateEvent',
+    'eventIdentity',
+    'stewardConcurrencyGroup',
+    'closureResolution',
+    'buildRunName',
+    'parseRunName',
+    'runListQueryDate',
+    'evaluateCaps',
+    'supersessionStorePath',
+    'supersessionMetricsStorePath',
+    'repositoryStorePath',
+    'latestRunDirectoryName',
+    'buildWaitingMetricsEvents',
+    'buildSupersessionMetricsEvents',
+    'buildClosureMetricsEvent',
+    'renderJobSummary',
+    'fitJobSummary',
+    'githubWriteFailure',
+    'githubRepositoryPath',
+    'githubBranchRefPath',
+    'isAllowedGitHubWrite',
+    'createGitHubWriter',
+    'createAppJwt',
+    'lookupInstallationId',
+    'mintInstallationToken',
+    'revokeInstallationToken',
+    'lookupAppBotUserId',
+    'listOwnershipArtifacts',
+    'downloadOwnershipRecord',
+    'readOwnershipListing',
+    'dedupListingRead',
+    'readRunList',
+    'readCapRunLists',
+    'readPublishedSnapshot',
+    'evidenceStoreLocation',
+    'evidenceCommitMessage',
+    'hostedEvidenceLocation',
+    'commitEvidence',
+    'readBackEvidence',
+    'writeEvidenceCommit',
+    'prepareRunEvidence',
   ] as const;
 
   it.each(functionExports)('exports %s as a function', (name) => {
@@ -239,6 +294,17 @@ describe('package root exports', () => {
     'FAILURE_CAUSES',
     'BUILT_IN_DISMISSAL_CODES',
     'LABEL_FAMILIES',
+    'GATE_DISPOSITIONS',
+    'OWNERSHIP_DISPOSITIONS',
+    'CAP_STATES',
+    'WAITING_REASONS',
+    'SUPERSESSION_REASONS',
+    'RESOLUTION_KINDS',
+    'RUN_KINDS',
+    'WRAPPER_EVENT_NAMES',
+    'PULL_REQUEST_EVENT_ACTIONS',
+    'ISSUE_EVENT_ACTIONS',
+    'SENDER_TYPES',
     'BUILT_IN_TRUSTED_PATHS',
     'BUILT_IN_EXECUTION_SENSITIVE_PATHS',
     'PATH_CLASS_TEST_GLOBS',
@@ -280,6 +346,12 @@ describe('package root exports', () => {
     'PIPELINE_FAILURE_CODES',
     'SCREEN_POLICY_FAILURE_CODES',
     'SCREEN_FAILURE_CODES',
+    'ZIP_ENTRY_VIOLATION_REASONS',
+    'DEDUP_COMMIT_REASONS',
+    'DEDUP_DUPLICATE_REASONS',
+    'STEWARD_WRAPPER_PATHS',
+    'GITHUB_WRITE_FAILURE_CODES',
+    'APP_AUTH_FAILURE_CODES',
   ] as const;
 
   it.each(tupleExports)('exports %s as a tuple', (name) => {
@@ -304,6 +376,18 @@ describe('package root exports', () => {
     'failureCauseSchema',
     'builtInDismissalCodeSchema',
     'labelFamilySchema',
+    'gateDispositionSchema',
+    'ownershipDispositionSchema',
+    'capStateSchema',
+    'waitingReasonSchema',
+    'supersessionReasonSchema',
+    'resolutionKindSchema',
+    'runKindSchema',
+    'wrapperEventNameSchema',
+    'pullRequestEventActionSchema',
+    'issueEventActionSchema',
+    'senderTypeSchema',
+    'recordTreeIdSchema',
     'policySchema',
     'resolvedPolicySchema',
     'resolvedDismissalCodeSchema',
@@ -349,6 +433,21 @@ describe('package root exports', () => {
     'handoffRecordSchema',
     'evidenceManifestSchema',
     'metricsFileSchema',
+    'evidenceCompareSchema',
+    'waitingRecordSchema',
+    'supersessionRecordSchema',
+    'ownershipRecordSchema',
+    'ownershipEventSchema',
+    'ownershipCapSchema',
+    'githubInstallationResponseSchema',
+    'githubInstallationTokenResponseSchema',
+    'githubAppResponseSchema',
+    'githubBotUserSchema',
+    'githubArtifactSchema',
+    'githubWorkflowRunSchema',
+    'githubContentsFileSchema',
+    'githubGitObjectResponseSchema',
+    'githubGitCommitResponseSchema',
   ] as const;
 
   it.each(schemaExports)('exports %s as an object', (name) => {
@@ -392,6 +491,9 @@ describe('package root exports', () => {
     'PIPELINE_FAILURE_CAUSES',
     'PIPELINE_FAILURE_MESSAGES',
     'SCREEN_EXIT_BY_OUTCOME',
+    'WAITING_RUN_FILES',
+    'APP_TOKEN_PERMISSION_SETS',
+    'GITHUB_WRITE_FAILURE_CAUSES',
   ] as const;
 
   it.each(recordExports)('exports %s as an object', (name) => {
@@ -413,7 +515,7 @@ describe('package root exports', () => {
     expect(Array.isArray(core.BUILT_IN_DETECTORS)).toBe(true);
     expect(core.POLICY_FILE_NAME).toBe('policy.yml');
     expect(Array.isArray(core.RECORD_TYPES)).toBe(true);
-    expect(core.RECORD_TYPES).toHaveLength(9);
+    expect(core.RECORD_TYPES).toHaveLength(12);
     expect(core.POLICY_FILE_MAX_BYTES).toBe(262144);
   });
 
@@ -480,5 +582,81 @@ describe('package root exports', () => {
     expect(core.PIPELINE_FAILURE_CODES).toHaveLength(6);
     expect(core.SCREEN_EXIT_BY_OUTCOME.inconclusive).toBe(3);
     expect(core.SEQUENCE_PHASES).toEqual(['intake', 'execute', 'assess']);
+  });
+
+  it('exports the hosted contract constants', () => {
+    expect(core.OWNERSHIP_ARTIFACT_FILE).toBe('ownership.json');
+    expect(core.OWNERSHIP_ARTIFACT_PREFIX).toBe('steward-ownership-');
+    expect(core.SUPERSESSIONS_DIRECTORY).toBe('supersessions');
+    expect(core.OWNERSHIP_SETTLE_DELAY_MS).toBe(10000);
+    expect(core.JOB_SUMMARY_MAX_LENGTH).toBe(65536);
+    expect(core.RECORD_TYPES).toHaveLength(12);
+    expect(core.STEWARD_WRAPPER_PATHS).toEqual(['.github/workflows/steward-pr.yml', '.github/workflows/steward-issues.yml']);
+  });
+
+  it('exports the hosted adapter constants', () => {
+    expect(core.GITHUB_WRITE_FAILURE_CODES).toEqual(['github.write-not-allowed', 'github.write-conflict']);
+    expect(core.APP_AUTH_FAILURE_CODES).toEqual(['app-auth.credentials-invalid', 'app-auth.token-scope-mismatch']);
+    expect(core.APP_TOKEN_PERMISSION_SETS['publish-store']).toEqual({ contents: 'write' });
+    expect(core.APP_TOKEN_PERMISSION_SETS['gate-target']).toEqual({
+      actions: 'read',
+      contents: 'read',
+      issues: 'read',
+      pull_requests: 'read',
+    });
+    expect(core.GITHUB_FAILURE_CODES).toHaveLength(17);
+  });
+
+  it('exports the hosted pipeline entry points', () => {
+    const functions = [
+      'runHostedGate',
+      'runHostedPublish',
+      'readGateEnvironment',
+      'readPublishEnvironment',
+      'hostedEventEnvironment',
+      'prepareHostedRunEvidence',
+      'verifyPublishFreshness',
+      'publishFreshnessFailure',
+      'decidePublishFreshness',
+      'freshnessTop',
+      'findOwnOwnershipArtifact',
+      'encodeGateContext',
+      'decodeGateContext',
+      'encodeClosureContext',
+      'decodeClosureContext',
+      'decodeHandoffBytes',
+      'classificationRecord',
+      'gateContextClassification',
+      'prepareWaitingEvidence',
+      'prepareSupersessionEvidence',
+      'prepareClosureEvidence',
+      'runEvidenceGroups',
+      'loadPolicyRevision',
+      'gateCaptureSubmission',
+      'buildGateHandoff',
+      'gateContractLogLines',
+      'mapHostedPolicyFailure',
+      'repositoryGateRefusal',
+      'hostedRepositoryGateActive',
+    ] as const;
+    for (const name of functions) {
+      expect(typeof core[name]).toBe('function');
+    }
+    expect(core.HANDOFF_ARTIFACT).toBe('steward-handoff');
+    expect(core.CLOSURE_ARTIFACT).toBe('steward-closure');
+    expect(core.HANDOFF_FILE).toBe('handoff.json');
+    expect(core.GATE_CONTEXT_FILE).toBe('gate-context.json');
+    expect(core.CLOSURE_CONTEXT_FILE).toBe('closure.json');
+    expect(core.GATE_CONTEXT_LOG_LINES_MAX).toBe(200);
+    expect(core.HOSTED_GATE_FAILURE_CODES).toEqual([
+      'gate.policy-missing',
+      'gate.policy-invalid',
+      'gate.repository-gate-unsupported',
+    ]);
+    expect(core.PUBLISH_FRESHNESS_FAILURE_CODES).toEqual(['publish.freshness-unknown']);
+    expect(core.HOSTED_ENVIRONMENT_FAILURE_CODES).toEqual(['action.environment-invalid']);
+    expect(core.FRESHNESS_UNKNOWN_REASONS).toHaveLength(7);
+    expect(core.HOSTED_APP_ID_VARIABLE).toBe('PATCH_STEWARD_APP_ID');
+    expect(core.HOSTED_APP_KEY_VARIABLE).toBe('PATCH_STEWARD_APP_PRIVATE_KEY');
   });
 });

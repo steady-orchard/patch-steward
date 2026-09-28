@@ -37,7 +37,7 @@ ADR-0001 to ADR-0016 record the decisions selected with the architecture, in the
 | [ADR-0008](0008-llm-provider.md)                                   | LLM provider                                                              | accepted               | 2026-09-16 |
 | [ADR-0009](0009-evidence-store.md)                                 | Evidence store                                                            | accepted               | 2026-09-15 |
 | [ADR-0010](0010-automated-participation.md)                        | Automated participation                                                   | accepted               | 2026-09-15 |
-| [ADR-0011](0011-distribution.md)                                   | Distribution                                                              | accepted               | 2026-09-15 |
+| [ADR-0011](0011-distribution.md)                                   | Distribution                                                              | superseded by ADR-0077 | 2026-09-15 |
 | [ADR-0012](0012-repository-layout.md)                              | Repository layout                                                         | accepted               | 2026-09-15 |
 | [ADR-0013](0013-orchestration.md)                                  | Orchestration                                                             | accepted               | 2026-09-15 |
 | [ADR-0014](0014-llm-authentication.md)                             | LLM authentication                                                        | accepted               | 2026-09-16 |
@@ -97,3 +97,11 @@ ADR-0001 to ADR-0016 record the decisions selected with the architecture, in the
 | [ADR-0068](0068-local-run-identity.md)                             | Local run identity                                                        | accepted               | 2026-09-27 |
 | [ADR-0069](0069-required-stages-never-pass-incomplete.md)          | Required stages never pass incomplete                                     | accepted               | 2026-09-27 |
 | [ADR-0070](0070-phase-handoff-records.md)                          | Phase handoff records                                                     | accepted               | 2026-09-27 |
+| [ADR-0071](0071-ownership-record-and-artifact-protocol.md)         | Ownership record and artifact protocol                                    | accepted               | 2026-09-27 |
+| [ADR-0072](0072-snapshot-based-deduplication.md)                   | Snapshot-based deduplication and event identity                           | accepted               | 2026-09-27 |
+| [ADR-0073](0073-caps-from-a-tagged-run-list.md)                    | Approximate caps from a tagged run list                                   | accepted               | 2026-09-27 |
+| [ADR-0074](0074-evidence-store-commits-through-git-data-api.md)    | Evidence store commits through the Git Data API                           | accepted               | 2026-09-27 |
+| [ADR-0075](0075-waiting-supersession-and-closure-records.md)       | Waiting, supersession, and closure records                                | accepted               | 2026-09-27 |
+| [ADR-0076](0076-screening-workflow-environment-and-app-tokens.md)  | Reusable screening workflow, publication Environment, and App tokens      | accepted               | 2026-09-27 |
+| [ADR-0077](0077-steward-built-at-runtime.md)                       | Steward built at runtime inside jobs                                      | accepted               | 2026-09-27 |
+| [ADR-0078](0078-test-bed-scenario-suite.md)                        | Test-bed scenario suite                                                   | accepted               | 2026-09-27 |

@@ -486,10 +486,11 @@ Patch Steward is a pnpm monorepo (architecture §6):
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `core`               | Policy, submission parsing, context retrieval, reference verification, stages, execution planning, decision rules, report composition, evidence records, budgets, ownership/freshness, adapter interfaces and built-in adapters. |
 | `cli`                | `steward init`, `preflight`, `screen`, `replay`, `policy`, and `report` commands, published to npm.                                                                                                                              |
-| `action`             | GitHub JavaScript action that runs the core inside workflow jobs.                                                                                                                                                                |
+| `action`             | Entry point that runs the core inside workflow jobs, from a runtime the credential-free `build` job compiles at the pinned commit.                                                                                               |
 | `web`                | Static browser app: contributor submission assistant and maintainer dashboard.                                                                                                                                                   |
-| `.github/workflows`  | Reusable steward workflows called by thin wrappers in target repositories at a pinned version.                                                                                                                                   |
+| `.github/workflows`  | Reusable steward workflows called by thin wrappers in target repositories at a pinned version; `steward-screening.yml` runs the `build`, `gate`, and `publish` jobs so far.                                                      |
 | `templates`          | Policy skeleton, issue forms, PR template, wrapper workflows, labels, and CODEOWNERS entries installed by `init`.                                                                                                                |
+| `scenarios`          | Test-bed scenario suite for GitHub-hosted screening: tools, helper workflows, fixtures, and recorded results; not a workspace package; never runs in CI.                                                                         |
 
 Adapters isolate external systems behind interfaces: LLM (a Copilot SDK
 adapter and an OpenAI-compatible HTTP adapter behind one interface), GitHub
@@ -528,9 +529,7 @@ One screening core runs in four topologies (architecture §5):
 | Maintainer local screening | `steward screen`                        | Local Docker or Podman container                                   | Attributed report; never the required check                                     |
 | Evaluation replay          | `steward replay`                        | Local container                                                    | Frozen historical inputs; remote inference permitted; no live submission writes |
 
-Each event produces one workflow run on the default branch. `gate`
-authenticates, deduplicates, captures inputs, decides contract/caps/admission,
-creates a check when needed, then commits an immutable ownership artifact.
+Each event produces one workflow run on the default branch. A credential-free `build` job first compiles the steward at the pinned commit; later jobs run only that runtime after verifying its SHA-256. `gate` authenticates, lists ownership artifacts, drops verified echoes, captures inputs, deduplicates by snapshot, decides contract/caps/admission, creates a check when needed, then commits an immutable ownership artifact.
 `intake` validates claims and plans executions; `execute` runs containers;
 `assess` interprets results and plans challenges. Fixed, bounded
 `execute-N`/`assess-N` pairs handle challenge rounds on separate fresh
@@ -541,8 +540,8 @@ evidence, checks freshness/ownership, and applies the outcome/waiting-state
 mapping. Failed `gate`/`publish` jobs, or a cancellation that reaches them,
 may leave pending checks for reconciliation.
 
-Only `gate`/`publish` hold App credentials through a default-branch-only
-Environment. An `env` provider key reaches only model jobs through a separate
+Only `gate`/`publish` hold App credentials, through the default-branch-only Environment `steward-publication`, which they declare with `deployment: false` so that screening leaves no Deployment on pull requests; the core mints short-lived installation tokens scoped per job and repository.
+An `env` provider key reaches only model jobs through a separate
 Environment; Copilot uses those jobs' `GITHUB_TOKEN` with inference
 permission, without an Environment secret. Private cross-repository evidence
 is read in `gate` and handed off only as authorized bounded data. There is no
@@ -615,8 +614,7 @@ because `workflow_dispatch` otherwise uses the selected ref; it reconciles
 stale checks and missed events and handles queued starts, audits, and
 publication (architecture §6.4).
 
-A GitHub App provides the bot identity and fine-grained permissions. Its
-installation tokens are minted only in `gate` and `publish`; no webhook
+A GitHub App provides the bot identity and fine-grained permissions. The core mints its installation tokens only in `gate` and `publish`, scoped per job and repository and revoked when the job ends; no webhook
 receiver exists, so maintainer control uses comment commands. Events created
 with the App token trigger workflows, so the steward ignores its verified
 report, follow-up, usage, ready-for-review, label/reaction, and maintenance-issue
@@ -655,7 +653,7 @@ tested revision, environment, and schema; changed control paths prevent reliance
 on PR-controlled CI. Containers and CI share the risk that submitted code
 manipulates tests, reporters, exits, and result files. Sensitive execution-path
 triage, baseline comparisons, and independent challenge reduce that risk but
-do not eliminate it. Pin steward workflows/actions by immutable commit SHA.
+do not eliminate it. Pin steward workflows/actions by immutable commit SHA, and build the steward inside the run in a credential-free job, so the jobs holding the App key never install dependencies.
 Artifact identity checks establish provenance, not truth. Where the plan and
 visibility of the evidence store's repository offer rulesets, evidence writes
 are restricted to the App and maintainers; where GitHub refuses rulesets, as
@@ -670,7 +668,7 @@ constants that a policy can lower but never raise (architecture §12); Copilot
 credit limits are soft, checked after each model call, and may overshoot. Usage
 across all sessions/rounds debits one run/stage allowance; exhausted limits
 are never automatically extended. Daily and per-author caps are approximate counts
-taken from GitHub's run list and are documented as cost controls. Inference
+taken from GitHub's run list, tagged by the wrapper run name, and are documented as cost controls. Inference
 spending is independent of the operating mode, because observe mode runs the
 full pipeline: the contract gate precedes any model call, per-run budgets map
 onto adapter session or request limits, the repository-wide daily cap bounds
@@ -775,33 +773,7 @@ a separate type-check pass over sources and tests, coverage support, an MIT
 license, and GitHub CI/CD templates. Authored documentation is tracked in
 docs. The monorepo layout in §9 is implemented.
 
-Implemented so far: the policy module in `core` (loading from an explicit git
-revision, the GitHub API, or a named local file, strict YAML and schema
-validation, hard bounds, the policy revision as the git tree id of the policy
-directory, documented defaults, and the public subset), shared vocabularies,
-version-1 record schemas, a redaction module, the submission module (versioned
-field mapping and parsing, category and path classification with built-in
-trusted and execution-sensitive lists, attachment rules with a bounded fetcher
-and archive inspector, the policy-change flag, snapshot and claim-scope
-hashing, the deterministic contract check, and issue and PR capture), a
-read-only GitHub REST adapter, git diff, merge-base, and remote reads, the
-decision module (SP13's table in precedence order, the required-stage plan,
-and the architecture §10 check and label mappings as rules), the report
-module (a fixed-order report and check-run summary within report caps,
-escaping of derived text, and a wording denylist), the evidence module with a
-local store (one directory per run, one JSON file per record, a manifest, and
-redaction at persistence with 23 built-in detectors and exact-value redaction
-of resolved credentials), the job phases running in one process with
-validated handoff records, conformance tests for invariants 1, 2, 4, 5, 6, 7, and 8, the `steward policy` command, the
-deterministic part of `steward preflight`, the `steward screen` command at contract level, and `steward
-report` under uniform CLI conventions with exit status 3 for `inconclusive`
-in every command, in `cli`, the policy template and its editor schema, the
-issue forms, and the PR template in `templates`, and policy, submission, and
-recorded GitHub response fixture corpora, now with golden reports and
-screening scenarios. The `action` and `web` packages hold toolchain smoke
-code only. No screening stage, container, model call, provider integration,
-publication, GitHub write, evidence branch or repository store, workflow, or
-browser app is claimed.
+Implemented so far: the policy module in `core` (loading from an explicit git revision, the GitHub API, or a named local file, strict YAML and schema validation, hard bounds, the policy revision as the git tree id of the policy directory, documented defaults, and the public subset), shared vocabularies, version-1 record schemas, a redaction module, the submission module (versioned field mapping and parsing, category and path classification with built-in trusted and execution-sensitive lists, attachment rules with a bounded fetcher and archive inspector, the policy-change flag, snapshot and claim-scope hashing, the deterministic contract check, and issue and PR capture), a GitHub REST adapter whose only writes are App token requests and evidence commits, git diff, merge-base, and remote reads, the decision module (SP13's table in precedence order, the required-stage plan, and the architecture §10 check and label mappings as rules), the report module (a fixed-order report and check-run summary within report caps, escaping of derived text, and a wording denylist), the evidence module with a local store and the orphan-branch and repository stores (one directory per run, one JSON file per record, a manifest, redaction at persistence with 23 built-in detectors and exact-value redaction of resolved credentials, and append-only Git Data API commits read back by blob id), the job phases running in one process with validated handoff records, and the GitHub-hosted skeleton: the reusable screening workflow's `build`, `gate`, and `publish` jobs, called by the pull request and issues wrapper templates, in observe mode at contract level, with event authentication, App tokens the core mints, the ownership record and artifact, snapshot-based deduplication, caps from the tagged run list, waiting, supersession, and closure records, and job summaries, verified only on dedicated test-bed repositories by the scenario suite in `scenarios/`; conformance tests for invariants 1, 2, 4, 5, 6, 7, and 8; the `steward policy` command, the deterministic part of `steward preflight`, the `steward screen` command at contract level, and `steward report` under uniform CLI conventions with exit status 3 for `inconclusive` in every command, in `cli`; the policy template and its editor schema, the issue forms, the PR template, and the wrapper workflows in `templates`; and policy, submission, recorded GitHub response, and webhook event fixture corpora, with golden reports and screening scenarios. The `action` package runs the core's `gate` and `publish` inside workflow jobs; the `web` package holds toolchain smoke code only. No screening stage, container, model call, provider integration, check run, report comment, label, review request, publication of local results, maintenance workflow, restart of queued runs, installation in a target repository, or browser app is claimed.
 
 Decisions recorded on September 15, 2026 and revised on September 16, 2026
 (ADR-0001–ADR-0016 in `docs/adr`) settle the browser code's role, the absence of browser
@@ -843,6 +815,8 @@ rule of the `steward preflight` record; the `steward screen` and `steward
 report` commands; local run identity; that required stages never pass
 incomplete; and phase handoff records.
 
+Further decisions recorded on September 27, 2026 (ADR-0071–ADR-0078 in `docs/adr`) settle the ownership record and artifact protocol, which orders owners by artifact creation time and re-lists after a settle delay; snapshot-based deduplication, in which explicit reruns and reopens replace the owner; approximate caps counted from a run list tagged by the wrapper run name; evidence store commits through the Git Data API, append-only and read back; waiting, supersession, and closure records; the reusable screening workflow, the publication Environment `steward-publication`, declared with `deployment: false` since September 28, 2026, and App tokens that the core mints; the steward built at runtime inside jobs, which supersedes the distribution record ADR-0011; and the test-bed scenario suite.
+
 Decisions still to be made are implementation details (architecture §15): the
 container image strategy and the network policy for dependency installation;
 the default model per shipped adapter and prompt and repair design; the
@@ -854,8 +828,7 @@ administrator token can read about the model provider's state without an
 inference request; the job token reads none of it); whether read-only Copilot
 tools consult the permission handler; and evidence retention mechanics.
 Additional open details are daily inference aggregation; efficient live
-PR-link reconciliation; ownership artifact naming, retention, and listing
-consistency; Copilot prompt-mode evaluation; fixed round-job expansion and
+PR-link reconciliation; Copilot prompt-mode evaluation; fixed round-job expansion and
 budget handoff; and installation confirmation of latest-check and
 neutral-check semantics. Architecture §15 is the authoritative open list.
 

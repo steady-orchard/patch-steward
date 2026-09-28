@@ -35,32 +35,7 @@ quality. Passing checks does not establish project value or authorize merging.
 
 This is a **WORK IN PROGRESS**
 
-Project scaffold, design documentation, the policy layer, submission intake,
-and a local screening skeleton. Implemented: loading a policy from an explicit
-git revision, the GitHub API, or a named local file; strict validation against
-the version-1 schema with hard bounds; the policy revision (the git tree id of
-`.github/patch-steward/`); the resolved policy and its public subset; shared
-vocabularies; version-1 record schemas; a redaction module; the submission
-module, which parses issue-form and pull request template bodies through a
-versioned field mapping, classifies changed paths, applies the attachment
-rules, hashes the snapshot, and decides the deterministic contract result,
-with a read-only GitHub adapter and git reads; the issue forms and PR
-template; the decision module, which applies the required-stage plan and the
-label mappings as pure rules; the report module, which builds a fixed-order
-report and check-run summary within report caps; the evidence module, which
-assembles, redacts, and stores records in a local evidence store; the phase
-sequence (gate, intake, execute, assess, rounds, publish), run in one process
-with intake, execute, and assess as pass-throughs; and the `steward policy`
-command, the deterministic part of `steward preflight`, `steward report`, and
-`steward screen` at contract level. Screening stages (reference
-verification, claim validation, reproduction, fix verification, regression,
-challenge), the local container runner, model calls and LLM adapters,
-publication of local results, GitHub writes, the evidence branch or
-repository store, workflows, the GitHub action, the browser app, `steward
-init`, `steward replay`, and preflight's mandatory commands and self-review
-are, however, not implemented yet. The probes/ directory holds the
-platform-assumption probe suite and its findings for disposable test-bed
-repositories; it is not product code and never runs in CI.
+Project scaffold, design documentation, the policy layer, submission intake, a local screening skeleton, and a GitHub-hosted skeleton. Implemented: loading a policy from an explicit git revision, the GitHub API, or a named local file; strict validation against the version-1 schema with hard bounds; the policy revision (the git tree id of `.github/patch-steward/`); the resolved policy and its public subset; shared vocabularies; version-1 record schemas; a redaction module; the submission module, which parses issue-form and pull request template bodies through a versioned field mapping, classifies changed paths, applies the attachment rules, hashes the snapshot, and decides the deterministic contract result, with a GitHub adapter and git reads; the issue forms and PR template; the decision module, which applies the required-stage plan and the label mappings as pure rules; the report module, which builds a fixed-order report and check-run summary within report caps; the evidence module, which assembles, redacts, and stores records in a local evidence store or commits them to an orphan branch or a separate repository; the phase sequence (gate, intake, execute, assess, rounds, publish), run in one process with intake, execute, and assess as pass-throughs; the `steward policy` command, the deterministic part of `steward preflight`, `steward report`, and `steward screen` at contract level; and the GitHub-hosted skeleton, in observe mode at contract level: the reusable workflow `.github/workflows/steward-screening.yml`, called by the wrapper templates in `templates/workflows/`, whose credential-free `build` job compiles the steward at the pinned commit and whose `gate` and `publish` jobs authenticate the event, mint scoped App tokens, deduplicate by snapshot, apply approximate caps from the run list, commit an ownership artifact, and write evidence before their job summaries. It has run only on dedicated test-bed repositories, verified by the scenario suite in scenarios/. Screening stages (reference verification, claim validation, reproduction, fix verification, regression, challenge), the local container runner, model calls and LLM adapters, check runs, report comments, labels, and review requests, publication of local results, the maintenance workflow and restarts of queued runs, installation in a target repository, the browser app, `steward init`, `steward replay`, and preflight's mandatory commands and self-review are, however, not implemented yet. The probes/ directory holds the platform-assumption probe suite and its findings for disposable test-bed repositories; it is not product code and never runs in CI.
 
 The [user manual](docs/user-manual/README.md) covers scaffold setup, proposed
 workflows, configuration, and troubleshooting, with explicit documentation gaps.
@@ -132,23 +107,23 @@ Run the live tier against a public test-bed repository (network; never in CI):
 GH_TOKEN=$(gh auth token) pnpm test:live
 ```
 
-- packages/: workspace packages. core holds the policy module, shared
-  vocabularies, version-1 record schemas, the redaction module, the submission
-  module, the read-only GitHub adapter, git reads, the attachment fetcher, the
-  decision module, the report module, the evidence module, the phase sequence,
-  and invariant conformance tests; cli implements `steward policy`,
-  `steward preflight`, `steward screen`, and `steward report`; action and web
-  hold toolchain smoke code only.
+Check the test-bed scenario suite for GitHub-hosted screening, read-only (dedicated test-bed repositories only; procedures and safety rules in scenarios/README.md; never in CI):
+
+```sh
+bash scenarios/tools/audit.sh steady-orchard/patch-steward-testbed-public
+bash scenarios/tools/steady-state.sh steady-orchard/patch-steward-testbed-public plan
+```
+
+- packages/: workspace packages. core holds the policy module, shared vocabularies, version-1 record schemas, the redaction module, the submission module, the GitHub adapter (reads, App token minting, and the evidence-commit writer), git reads, the attachment fetcher, the ownership module, the decision module, the report module, the evidence module with the local, orphan-branch, and repository stores, the phase sequence with the GitHub-hosted gate and publish, and invariant conformance tests; cli implements `steward policy`, `steward preflight`, `steward screen`, and `steward report`; action runs the core's gate and publish inside workflow jobs; web holds toolchain smoke code only.
 - fixtures/: shared corpus for fixture-tier tests: valid, invalid, and hostile
   policies, submission bodies and diffs with expected contract results,
   recorded GitHub responses, golden reports and check summaries, and local
   screening scenarios.
-- templates/: files `steward init` is designed to install into target
-  repositories: the policy template and its editor JSON Schema, the defect and
-  proposal issue forms, and the PR template.
+- templates/: files `steward init` is designed to install into target repositories: the policy template and its editor JSON Schema, the defect and proposal issue forms, the PR template, and the pull request and issues wrapper workflows.
 - probes/: platform-assumption probes PA01–PA09 (sub-claims PA0N.M) against
   disposable test-bed repositories, with findings in probes/findings.md; not a
   workspace package and never run in CI.
+- scenarios/: the test-bed scenario suite for GitHub-hosted screening (tools, helper workflows, fixtures, and recorded results per test-bed); not a workspace package and never run in CI.
 - docs/problem-statement.md: review problems, evidence, and scope boundaries.
 - docs/whitepaper.md: methodology, goals, and a summary of the design.
 - docs/architecture.md: components, trust zones, topologies, GitHub features,
@@ -159,7 +134,7 @@ GH_TOKEN=$(gh auth token) pnpm test:live
   recording why it was made; the design documents govern.
 - docs/deferred.md: designs of features excluded from version 1 (DF01–DF10);
   the other documents assume they will not be implemented.
-- .github/workflows/: scaffold CI and release automation.
+- .github/workflows/: scaffold CI and release automation, and the reusable screening workflow steward-screening.yml, which has only a workflow_call trigger.
 
 ## Automation
 
@@ -175,8 +150,7 @@ is created. Both branches must exist
 on the remote and repository permissions/rules must allow these operations.
 No GitHub remote or API credentials are configured by this scaffold.
 
-These workflows validate this project's scaffold; they do not implement the
-proposed issue and PR screening service.
+CI and CD validate this project's scaffold. The reusable screening workflow has only a `workflow_call` trigger, so it never runs in this repository; wrapper workflows call it on dedicated test-bed repositories only.
 
 ## Trust boundaries
 

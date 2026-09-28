@@ -8,8 +8,9 @@ import {
   recordRepositorySchema,
   recordTimestampSchema,
   recordCountSchema,
+  recordContentHashSchema,
 } from './common.js';
-import { submissionTypeSchema, maintainerActionKindSchema } from '../vocabulary.js';
+import { submissionTypeSchema, maintainerActionKindSchema, resolutionKindSchema } from '../vocabulary.js';
 import { DISMISSAL_CODE_PATTERN } from '../policy/catalog.js';
 import { POLICY_ID_MAX_LENGTH } from '../policy/bounds.js';
 
@@ -66,6 +67,9 @@ export const metricsEventRecordSchema = z.discriminatedUnion('kind', [
     payload: z.strictObject({
       action_kind: maintainerActionKindSchema,
       dismissal_code: z.string().max(POLICY_ID_MAX_LENGTH).regex(DISMISSAL_CODE_PATTERN).nullable(),
+      resolution: resolutionKindSchema.optional(),
+      paired_run: z.strictObject({ run_id: recordPositiveIntSchema, run_attempt: recordPositiveIntSchema }).nullable().optional(),
+      paired_snapshot_hash: recordContentHashSchema.nullable().optional(),
     }),
   }),
   base.extend({

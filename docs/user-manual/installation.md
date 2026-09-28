@@ -93,9 +93,7 @@ Sources: [sample test](../../packages/core/src/index.test.ts), [package scripts]
 
 ## Target-repository installation (Proposed)
 
-The following is the documented adoption sequence. The policy template, issue
-forms, and PR template exist in `templates/`; `steward init`, which would install
-them, and the screening components do not exist yet.
+The following is the documented adoption sequence. The policy template, issue forms, PR template, and the pull request and issues wrapper workflows (`templates/workflows/steward-pr.yml` and `templates/workflows/steward-issues.yml`) exist in `templates/`, and the reusable screening workflow runs as a GitHub-hosted skeleton in observe mode at contract level on dedicated test-bed repositories only; `steward init`, which would install them, a steward release to pin, and the screening stages do not exist yet.
 
 ### Required resources
 
@@ -121,9 +119,7 @@ them, and the screening components do not exist yet.
    model, and authentication method. Existing-file changes are shown as a diff
    and require confirmation before overwriting.
 
-2. Register or install the GitHub App. Store its id and private key as secrets in
-   a GitHub Environment restricted to the default branch. Only the `gate` and
-   `publish` jobs receive these App credentials.
+2. Register or install the GitHub App. Create the Environment `steward-publication` with deployment branches restricted to the default branch, and store the App id and private key as its Environment secrets `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY`, never as repository or organization secrets. The wrapper workflows pass both by name; only the `gate` and `publish` jobs declare the Environment, with `deployment: false`, and receive these App credentials.
 
 3. Configure inference according to [the credential reference](configuration.md#credentials-and-deployment-proposed).
    Copilot uses the model jobs' `GITHUB_TOKEN` with `copilot-requests: write`.
@@ -167,11 +163,7 @@ them, and the screening components do not exist yet.
    code-owner review of policy and wrapper paths unavailable, and the
    installation is designed to report that as well.
 
-> **[NEEDS INPUT]** Completing these steps requires the CLI distribution,
-> version/commit to pin, App registration or installation details, Environment and
-> secret names, stable check name, runner image setup, and
-> exact self-test inputs. The sources describe their roles but do not provide a
-> runnable installation recipe.
+> **[NEEDS INPUT]** Completing these steps requires the CLI distribution, a steward release commit to pin, App registration or installation details, the stable check name, runner image setup, and exact self-test inputs. The sources describe their roles but do not provide a runnable installation recipe.
 
 Sources: [installation process SP02](../processes.md#sp02-adoption-and-installation),
 [architecture §6.4](../architecture.md#64-github-action-and-reusable-workflows),

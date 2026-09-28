@@ -1,0 +1,175 @@
+version: 1
+
+supported_behavior:
+  description: 'Describe the behavior this project supports, in the terms maintainers use to decide whether a report is a defect.'
+  environments: []
+  platforms: []
+  compatibility: []
+  versions: []
+  components: []
+  documents: []
+  decisions: []
+  design_rules: []
+
+trusted_paths:
+  additional: []
+
+execution_sensitive_paths:
+  additional: []
+
+categories:
+  bugfix:
+    required_fields: [category, problem, intended-behavior, linked-issue, reproduction-command, expected-result, regression-test]
+    linked_issue: required
+    references: optional
+    reproduction: required
+    regression_test: required
+  feature:
+    required_fields: [category, problem, benefit, intended-behavior, acceptance-criteria, linked-issue]
+    linked_issue: required
+    references: optional
+    reproduction: not-applicable
+    regression_test: not-applicable
+  refactor:
+    required_fields: [category, problem, benefit]
+    linked_issue: optional
+    references: optional
+    reproduction: not-applicable
+    regression_test: not-applicable
+  docs:
+    required_fields: [category, problem]
+    linked_issue: optional
+    references: optional
+    reproduction: not-applicable
+    regression_test: not-applicable
+  chore:
+    required_fields: [category, problem]
+    linked_issue: optional
+    references: optional
+    reproduction: not-applicable
+    regression_test: not-applicable
+  security:
+    required_fields: [category, problem, intended-behavior, reproduction-command, expected-result, regression-test]
+    linked_issue: optional
+    references: optional
+    reproduction: required
+    regression_test: required
+
+submission:
+  issue_fields:
+    defect: [expected-behavior, authoritative-basis, actual-behavior, affected-version, reproduction-command, expected-result]
+    proposal: [problem, benefit, proposed-scope]
+  reference_hosts:
+    mode: any-public
+    allowlist: []
+  attachments:
+    destinations: [github.com]
+    formats: [png, jpg, txt]
+
+execution:
+  commands:
+    - id: test
+      kind: test
+      run: [make, test]
+      working_directory: .
+      mandatory: true
+      result_files: []
+  platforms:
+    - id: linux
+      os: linux
+      required: true
+      source: container
+      ci_workflow: null
+      commands: [test]
+
+runner:
+  image:
+    source: registry
+    reference: docker.io/library/debian:stable-slim
+  dependency_step: null
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    pids: 512
+
+stages:
+  continue_after_blocking: false
+  per_category:
+    bugfix: [fix-verification, regression, challenge]
+    feature: [regression, challenge]
+    refactor: [regression]
+    docs: []
+    chore: [regression]
+    security: [fix-verification, regression, challenge]
+  challenge_rounds: 2
+  high_impact_paths: []
+  reproduction_as_before_evidence: true
+
+escalation:
+  sensitive_paths: []
+  security_terms: []
+  security_reporting_url: null
+
+limits:
+  caps:
+    daily_runs: 1
+    per_author_concurrent_runs: 20
+  github:
+    requests_per_run: 300
+    retries_per_request: 3
+  execution:
+    execution_seconds: 1800
+    run_execution_seconds: 7200
+    executions_per_run: 40
+    output_bytes: 1048576
+    result_file_bytes: 5242880
+    dependency_step_seconds: 600
+  attachments:
+    count: 5
+    file_bytes: 1048576
+    total_bytes: 5242880
+    decompressed_bytes: 10485760
+    redirects: 3
+    fetch_seconds: 20
+  references:
+    count: 50
+    fetches_per_run: 20
+    fetch_seconds: 10
+    fetch_bytes: 1048576
+    redirects: 3
+  evidence:
+    run_bytes: 10485760
+    write_retries: 5
+  stale_check_minutes: 1440
+  stage_seconds: 3600
+  audit_samples_per_week: 5
+
+modes:
+  default: observe
+  per_category: {}
+
+follow_through:
+  max_follow_ups_per_cycle: 1
+
+hygiene:
+  report_flagged: false
+  allowlist: []
+  heuristics:
+    automated_accounts: true
+    near_duplicates: true
+    unreferenced_reviews: true
+    automated_exchanges: true
+  max_flagged: 10
+
+evidence:
+  store:
+    type: orphan-branch
+    branch: steward-evidence
+  retention_days: 365
+  redaction_patterns: []
+  publication:
+    pages: false
+    private_repository: false
+    exclude: []
+
+dismissal_codes: []

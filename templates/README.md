@@ -18,3 +18,13 @@ Files here are meant to be copied into target repositories. This is a root direc
 - `pull-request/pull_request_template.md` — the pull request template: copy it to `.github/pull_request_template.md`. Its
   first line, `<!-- patch-steward:pr-template v1 -->`, names the template version; screening finds each field by its `##`
   heading, compared case-insensitively. Hint comments are ignored.
+- `workflows/steward-pr.yml` and `workflows/steward-issues.yml` — the wrapper workflows: copy them to `.github/workflows/` on
+  the default branch. Each calls the reusable screening workflow `.github/workflows/steward-screening.yml` of this repository,
+  pinned by a full commit SHA, and passes the same SHA as the `steward_ref` input; both placeholder SHAs (forty zeros) must be
+  replaced by the commit of one steward release, and no release exists yet. The pull request wrapper runs on
+  `pull_request_target` (opened, synchronize, edited, reopened, ready_for_review, closed) and the issue wrapper on `issues`
+  (opened, edited, reopened, closed, deleted). The `run-name` carries only the submission number, the author and sender ids,
+  the event and action names, and the sender type, which the run-count caps read. The job grants no token permissions and
+  passes the App secrets `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY` by explicit name mapping, never with
+  `secrets: inherit`; their values come from the Environment `steward-publication`, which only the reusable workflow's
+  `gate` and `publish` jobs declare.

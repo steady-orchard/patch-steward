@@ -1,19 +1,6 @@
 # Patch Steward User Manual
 
-Patch Steward is a work in progress. This repository contains a development
-scaffold, design documents, the policy module (loading, validation, revision
-identity, defaults, and the public subset), shared vocabularies, version-1
-record schemas, a redaction module, the submission module with its
-deterministic contract check, a read-only GitHub adapter, the decision, report,
-and evidence modules with a local evidence store, the issue forms and PR
-template, and the `steward policy`, `steward preflight`, `steward screen`, and
-`steward report` commands; preflight covers its deterministic checks only, and
-`steward screen` runs at contract level only (it checks the submission contract
-and records a local report and evidence, with no screening stage, container,
-model call, or publication). Not implemented: screening stages, the GitHub
-action and screening workflows, the browser app, the LLM adapters, GitHub
-writes, the evidence branch or repository store, the sandboxed runner,
-`steward init`, and `steward replay`.
+Patch Steward is a work in progress. This repository contains a development scaffold, design documents, the policy module (loading, validation, revision identity, defaults, and the public subset), shared vocabularies, version-1 record schemas, a redaction module, the submission module with its deterministic contract check, a GitHub adapter, the ownership module, the decision, report, and evidence modules with a local evidence store and the orphan-branch and repository stores, the issue forms, PR template, and wrapper workflow templates, the `steward policy`, `steward preflight`, `steward screen`, and `steward report` commands, and a GitHub-hosted skeleton. Preflight covers its deterministic checks only, and `steward screen` runs at contract level only (it checks the submission contract and records a local report and evidence, with no screening stage, container, model call, or publication). The GitHub-hosted skeleton runs the reusable screening workflow's `build`, `gate`, and `publish` jobs in observe mode at contract level and has run only on dedicated test-bed repositories; it creates no check run, report comment, or label. Not implemented: screening stages, check runs, report comments, labels, and review requests, the maintenance workflow, the browser app, the LLM adapters, the sandboxed runner, installation in a target repository, `steward init`, and `steward replay`.
 
 The installation guide covers the runnable scaffold. Sections marked
 **Available** describe what runs today; sections marked **Proposed** describe

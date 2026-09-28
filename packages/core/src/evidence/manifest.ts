@@ -12,10 +12,12 @@ import {
 } from '../records/common.js';
 import type { RedactionCount } from '../redaction/redact.js';
 import { EVIDENCE_LOG_FILES_MAX, EVIDENCE_LOG_FILE_MAX_BYTES, EVIDENCE_RUN_FILES_MAX } from '../policy/bounds.js';
-import { RUN_FILES, recordTypeForPath, runDirectoryName } from './layout.js';
+import { RUN_FILES, WAITING_RUN_FILES, recordTypeForPath, runDirectoryName } from './layout.js';
 import { contentHash, canonicalJsonHash } from '../hash.js';
 import { err, ok } from '../result.js';
 import type { Result } from '../result.js';
+import { runKindSchema } from '../vocabulary.js';
+import type { RunKind } from '../vocabulary.js';
 
 export const EVIDENCE_MANIFEST_VERSION = 1;
 
@@ -32,6 +34,7 @@ export const evidenceManifestSchema = z
     manifest_version: z.literal(1),
     run_id: recordRunIdSchema,
     run_attempt: recordPositiveIntSchema,
+    run_kind: runKindSchema.optional(),
     store_path: z.string().regex(/^runs\/(?:pr|issue)-[1-9][0-9]{0,9}\/[A-Za-z0-9-]{1,64}$/),
     created_at: recordTimestampSchema,
     files: z.array(manifestFileEntrySchema).max(EVIDENCE_RUN_FILES_MAX - 1),
@@ -100,7 +103,33 @@ export const evidenceManifestSchema = z
         }
       }
 
-      if (Object.values(RUN_FILES).includes(file.path as (typeof RUN_FILES)[keyof typeof RUN_FILES])) {
+      const runKind: RunKind = manifest.run_kind ?? 'outcome';
+
+      if (runKind === 'outcome' && file.path === WAITING_RUN_FILES.waiting) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'waiting record file in an outcome run',
+          path: ['files', index, 'path'],
+        });
+      }
+
+      if (
+        runKind === 'waiting' &&
+        (file.path === RUN_FILES.decision ||
+          file.path === RUN_FILES.report ||
+          file.path === RUN_FILES.reportMarkdown ||
+          file.path.startsWith('findings/'))
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'outcome file in a waiting run',
+          path: ['files', index, 'path'],
+        });
+      }
+
+      const requiredRunFiles: readonly string[] =
+        runKind === 'waiting' ? Object.values(WAITING_RUN_FILES) : Object.values(RUN_FILES);
+      if (requiredRunFiles.includes(file.path)) {
         seenRunFiles.add(file.path);
       }
     }
@@ -113,7 +142,10 @@ export const evidenceManifestSchema = z
       });
     }
 
-    for (const runFile of Object.values(RUN_FILES)) {
+    const requiredRunFilesForManifest: readonly string[] =
+      (manifest.run_kind ?? 'outcome') === 'waiting' ? Object.values(WAITING_RUN_FILES) : Object.values(RUN_FILES);
+
+    for (const runFile of requiredRunFilesForManifest) {
       if (!seenRunFiles.has(runFile)) {
         ctx.addIssue({
           code: 'custom',
@@ -156,6 +188,7 @@ export interface ManifestRedaction {
 export interface EvidenceManifestInput {
   readonly runId: string | number;
   readonly runAttempt: number;
+  readonly runKind?: RunKind;
   readonly storePath: string;
   readonly createdAt: string;
   readonly files: readonly { readonly path: string; readonly bytes: Uint8Array }[];
@@ -222,6 +255,7 @@ export function buildEvidenceManifest(input: EvidenceManifestInput): Result<Evid
     manifest_version: EVIDENCE_MANIFEST_VERSION,
     run_id: input.runId,
     run_attempt: input.runAttempt,
+    ...(input.runKind === undefined ? {} : { run_kind: input.runKind }),
     store_path: input.storePath,
     created_at: input.createdAt,
     files: fileEntries,

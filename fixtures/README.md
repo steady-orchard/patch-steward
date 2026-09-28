@@ -44,6 +44,21 @@ Current entries:
 - `github/policy-directory/` — hand-built responses for a synthetic repository whose policy directory holds one
   `policy.yml` (a copy of `policies/valid/minimal-no-llm.yml`); tests check that the published-policy revision
   equals the git tree id.
+- `github/hosted/` — REST responses recorded read-only with `gh api` from the public test-bed repository
+  `steady-orchard/patch-steward-testbed-public` on 2026-09-28 for the hosted adapters: one page of the artifact listing, one
+  page of the workflow run list and the in-progress run list (run items reduced to identifiers, name, display title, path,
+  event, status, conclusion, timestamps, attempt, and head branch and commit), the `master` branch ref, its commit (reduced
+  to the commit, tree, and parent ids and URLs), the comparison with its parent (reduced to status, counts, and per-file
+  name, status, blob id, and line counts), the `.github` subtree read as `<commit>:.github`, the `README.md` contents
+  response, the `.github` directory listing on the branch, and the App's bot user. Everything else is as served. Tests read
+  them through the hosted adapters and check that no file matches a built-in credential detector; write responses, token
+  responses, and artifact downloads are synthetic and built in test code.
+- `events/` — hand-built webhook payloads in the shapes GitHub delivers to the two wrapper workflows (`issues` and
+  `pull_request_target`), carrying the identifiers of the recorded test-bed issue 29 and pull request 26: opened, edited,
+  edited by the App's bot user, edited with hostile title and body text, reopened, closed by the author and by another user,
+  deleted, an issue event for a pull request, synchronize, a merged closure, and a pull request from a fork. The hosted gate
+  and publish tests authenticate them against a matching runner environment; control and format characters are generated in
+  test code, never committed.
 - `reports/` — golden screening reports and check-run summaries as byte-exact `.txt`, one pair per case listed in
   `reports/cases.json`: an unstructured issue, a complete defect issue, a pull request with a missing field and an attachment
   violation, an execution-sensitive change, a shared head commit, a run under a local policy file, more blockers than a
