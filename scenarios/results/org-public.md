@@ -710,3 +710,79 @@ d997b1e362c75af03942da0e7a1e8902ca5dbe51
 ```
 
 Result: pass
+
+## S07 unwritable evidence store: publish fails and publishes nothing
+
+Date (UTC): 2026-09-28. Edited pull request https://github.com/steady-orchard/patch-steward-testbed-public/pull/34
+while the trusted policy's evidence store pointed at a nonexistent repository. Run:
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36418649681.
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-pr-34   # before
+ARTIFACT id=10967883208 name=steward-ownership-pr-34 created_at=2026-09-28T11:44:36Z expires_at=2026-12-27T11:44:03Z expired=false run_id=36417413257 size=537
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-pr-34 count=11 unexpired=11
+$ gh api repos/steady-orchard/patch-steward-testbed-unwritable --jq .full_name
+{"message":"Not Found","documentation_url":"https://docs.github.com/rest/repos/repos#get-a-repository","status":"404"}
+```
+
+```text
+$ bash scenarios/tools/deploy-steward.sh org-public scenarios/fixtures/policies/unwritable-store.yml
+SCENARIO-DEPLOY repo=steady-orchard/patch-steward-testbed-public pin=7161cd20df662314d14cc7f2f4130102baee1e98 policy=scenarios/fixtures/policies/unwritable-store.yml result=ok
+$ gh api "repos/steady-orchard/patch-steward-testbed-public/contents/.github?ref=master" --jq '.[] | select(.name=="patch-steward") | .sha'
+8c61cbf35781fed2e85377b91b6facb720f2adaa
+```
+
+```text
+$ gh pr edit 34 -R steady-orchard/patch-steward-testbed-public --body "..."
+$ bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-pr.yml "steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User" 36418122598 1
+RUN id=36418649681 attempt=1 event=pull_request_target status=completed conclusion=failure created_at=2026-09-28T11:56:11Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36418649681 title=steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-pr.yml after=36418122598 count=1 completed=1 result=complete
+```
+
+```text
+$ gh run view 36418649681 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=failure
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36418649681 1 gate | grep -E 'text=(event |policy |listing |dedup |disposition |- )'
+LOG job=gate ts=2026-09-28T11:56:43.9072753Z text=event pull_request_target edited pr 34 sender User
+LOG job=gate ts=2026-09-28T11:56:43.9072753Z text=policy trusted-branch revision 8c61cbf35781fed2e85377b91b6facb720f2adaa
+LOG job=gate ts=2026-09-28T11:56:43.9073840Z text=listing unique owner 36417413257-1
+LOG job=gate ts=2026-09-28T11:56:43.9074639Z text=dedup commit snapshot-changed
+LOG job=gate ts=2026-09-28T11:56:43.9075375Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T11:56:43.9237779Z text=- Submission: `steady-orchard/patch-steward-testbed-public` pull request `34`
+LOG job=gate ts=2026-09-28T11:56:43.9239259Z text=- Run: `36418649681-1`
+LOG job=gate ts=2026-09-28T11:56:43.9239943Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T11:56:43.9241113Z text=- Snapshot: `sha256:adea3f560a4bbe67724be8821c765ef4e81184cf6bee1eac1b47699dfc64d2ab`
+LOG job=gate ts=2026-09-28T11:56:43.9242525Z text=- Policy revision: `8c61cbf35781fed2e85377b91b6facb720f2adaa`
+LOG job=gate ts=2026-09-28T11:56:43.9243239Z text=- Owner: committed `36418649681-1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36418649681 1 publish | grep -E 'text=(policy |ownership |evidence commit |freshness |steward job summary:|- |##\[error\])'
+LOG job=publish ts=2026-09-28T11:56:57.3602192Z text=policy revision 8c61cbf35781fed2e85377b91b6facb720f2adaa
+LOG job=publish ts=2026-09-28T11:56:57.3616583Z text=##[error]publish failed github.not-found
+LOG job=publish ts=2026-09-28T11:56:57.3701809Z text=steward job summary:
+LOG job=publish ts=2026-09-28T11:56:57.3708976Z text=- Submission: `steady-orchard/patch-steward-testbed-public` pull request `34`
+LOG job=publish ts=2026-09-28T11:56:57.3709329Z text=- Run: `36418649681-1`
+LOG job=publish ts=2026-09-28T11:56:57.3709631Z text=- Status: `failed`
+LOG job=publish ts=2026-09-28T11:56:57.3710160Z text=- Snapshot: `sha256:adea3f560a4bbe67724be8821c765ef4e81184cf6bee1eac1b47699dfc64d2ab`
+LOG job=publish ts=2026-09-28T11:56:57.3710792Z text=- Policy revision: `8c61cbf35781fed2e85377b91b6facb720f2adaa`
+LOG job=publish ts=2026-09-28T11:56:57.3711300Z text=- Failure: `github.not-found`
+LOG job=publish ts=2026-09-28T11:56:57.3714431Z text=##[error]Process completed with exit code 1.
+```
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-pr-34   # after
+ARTIFACT id=10967768810 name=steward-ownership-pr-34 created_at=2026-09-28T11:56:45Z expires_at=2026-12-27T11:56:11Z expired=false run_id=36418649681 size=533
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-pr-34 count=12 unexpired=12
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public pr 34 | grep -c "^RECORD run=36418649681-1 "
+0
+```
+
+```text
+$ bash scenarios/tools/deploy-steward.sh org-public
+SCENARIO-DEPLOY repo=steady-orchard/patch-steward-testbed-public pin=7161cd20df662314d14cc7f2f4130102baee1e98 policy=scenarios/fixtures/policies/orphan-branch.yml result=ok
+$ gh api "repos/steady-orchard/patch-steward-testbed-public/contents/.github?ref=master" --jq '.[] | select(.name=="patch-steward") | .sha'
+d997b1e362c75af03942da0e7a1e8902ca5dbe51
+```
+
+Result: pass
