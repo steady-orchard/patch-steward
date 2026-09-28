@@ -22,7 +22,7 @@ updates Steps and appends Revisions.
 | 1     | done    | Core contracts (pure): bounds K38-K51, records (ownership, waiting, supersession, resolution keys), event model, dedup, newest owner, run-name and caps, store path planning, blob id, zip entry reader, job summary renderer. Complete 2026-09-27; DoD D1-D8 re-verified by the supervisor in the main tree. |
 | 2     | done    | GitHub and evidence-store adapters: allowlisted writer, App tokens, artifacts list and download, run list, Git Data API store with retries and read-back, gate fallback read, recorded responses. Needs Phase 1. Complete 2026-09-27; DoD D1-D10 re-verified by the supervisor in the main tree. |
 | 3     | done    | Hosted gate and publish, action package entry, invariant 2, 4, 7, 8 extensions, write allowlist, fixture-tier hosted scenarios. Needs Phase 2. Complete 2026-09-28; DoD D1-D11 re-verified by the supervisor in the main tree. |
-| 4     | pending | Reusable workflow, wrapper templates (secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`), static workflow tests, live-test switch, scenarios skeleton incl. SC5 secret-scope pair, push to origin, test-bed deployment, OA1 verified on org-public, org-public smoke. Needs Phase 3 and OA1 on org-public (before the smoke step only). |
+| 4     | in-progress | Reusable workflow, wrapper templates (secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`), static workflow tests, live-test switch, scenarios skeleton incl. SC5 secret-scope pair, push to origin, test-bed deployment, OA1 verified on org-public, org-public smoke. Needs Phase 3 and OA1 on org-public (before the smoke step only). |
 | 5     | pending | Live test-bed scenarios S01-S17 (S17 = Environment-only secret delivery on all three test-beds) with recorded results, steady state. Needs Phase 4; OA1 on personal and org-private, OA2, OA3, OA4 verified before the scenarios that need them (S15, S16, S17). |
 | 6     | pending | ADR-0071 onward, governing documents, whitepaper, README, CLAUDE.md, user manual, project DoD. Needs Phase 5. |
 
@@ -119,14 +119,14 @@ updates Steps and appends Revisions.
 | 3.23 | 3 | done | packages/core/src/conformance/write-allowlist.test.ts, packages/core/src/conformance/zero-execution.fixture.test.ts, development-artifacts/patch-steward-m6-3.23-report.md | fffacdb9bf6424f360f8bfdb1db317acc64c203a |
 | 3.24 | 3 | done | packages/action/src/dispatch.ts, packages/action/src/dispatch.test.ts, packages/action/src/main.ts, development-artifacts/patch-steward-m6-3.24-report.md | d7ee54ab5d19d2f0211bcef0ed6a5bee8271738a |
 | 3.25 | 3 | done | development-artifacts/patch-steward-m6-3.25-report.md | 0d26033e0de83191f70bb6c536fcadf549d634af |
-| 4.1 | 4 | pending | templates/policy/policy.yml, packages/core/src/submission/default-checklist.ts, development-artifacts/patch-steward-m6-4.1-report.md | |
-| 4.2 | 4 | pending | .github/workflows/steward-screening.yml, packages/action/pack-runtime.sh, development-artifacts/patch-steward-m6-4.2-report.md | |
-| 4.3 | 4 | pending | templates/workflows/steward-pr.yml, templates/workflows/steward-issues.yml, templates/README.md, development-artifacts/patch-steward-m6-4.3-report.md | |
-| 4.4 | 4 | pending | packages/core/src/pipeline/hosted-verify.fixture.test.ts, development-artifacts/patch-steward-m6-4.4-report.md | |
-| 4.5 | 4 | pending | scenarios/fixtures/policies/orphan-branch.yml, scenarios/fixtures/policies/repository-store.yml, scenarios/fixtures/submissions/unstructured.txt, development-artifacts/patch-steward-m6-4.5-report.md | |
-| 4.6 | 4 | pending | scenarios/tools/deploy-steward.sh, scenarios/tools/environment-check.sh, scenarios/tools/steady-state.sh, development-artifacts/patch-steward-m6-4.6-report.md | |
-| 4.7 | 4 | pending | scenarios/tools/find-runs.sh, scenarios/tools/artifacts.sh, scenarios/tools/audit.sh, development-artifacts/patch-steward-m6-4.7-report.md | |
-| 4.8 | 4 | pending | scenarios/tools/evidence.sh, development-artifacts/patch-steward-m6-4.8-report.md | |
+| 4.1 | 4 | done | templates/policy/policy.yml, packages/core/src/submission/default-checklist.ts, development-artifacts/patch-steward-m6-4.1-report.md | 9f26b5bdc4786e24b17984f7791c5d3ea79be406 |
+| 4.2 | 4 | done | .github/workflows/steward-screening.yml, packages/action/pack-runtime.sh, development-artifacts/patch-steward-m6-4.2-report.md | 482507e8d641fea10816fc6cfc4e6a56a3c0c208 |
+| 4.3 | 4 | done | templates/workflows/steward-pr.yml, templates/workflows/steward-issues.yml, templates/README.md, development-artifacts/patch-steward-m6-4.3-report.md | efed5837c39d66cc1477c1effebd16612d59fe23 |
+| 4.4 | 4 | done | packages/core/src/pipeline/hosted-verify.fixture.test.ts, development-artifacts/patch-steward-m6-4.4-report.md | 668d7958f696b1b5584f889fdee85438eefcefc2 |
+| 4.5 | 4 | done | scenarios/fixtures/policies/orphan-branch.yml, scenarios/fixtures/policies/repository-store.yml, scenarios/fixtures/submissions/unstructured.txt, development-artifacts/patch-steward-m6-4.5-report.md | 8ee861fc62fbd27090f87daeb55c983f71fe1d96 |
+| 4.6 | 4 | done | scenarios/tools/deploy-steward.sh, scenarios/tools/environment-check.sh, scenarios/tools/steady-state.sh, development-artifacts/patch-steward-m6-4.6-report.md | df8fde31f2913f78846a7e89e05d92ed7eca73b2 |
+| 4.7 | 4 | done | scenarios/tools/find-runs.sh, scenarios/tools/artifacts.sh, scenarios/tools/audit.sh, development-artifacts/patch-steward-m6-4.7-report.md | b6135e84f3a45046f8c3cc39ac96a1645b95b894 |
+| 4.8 | 4 | done | scenarios/tools/evidence.sh, development-artifacts/patch-steward-m6-4.8-report.md | ac9df0d8a3ae37c6038788670fa6f9e03ccf7e95 |
 | 4.9 | 4 | pending | scenarios/workflows/scenario-secret-scope.yml, scenarios/workflows/scenario-secret-scope-called.yml, scenarios/tools/secret-scope.sh, development-artifacts/patch-steward-m6-4.9-report.md | |
 | 4.10 | 4 | pending | packages/core/src/conformance/workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.10-report.md | |
 | 4.11 | 4 | pending | packages/core/src/conformance/invariant-1-workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.11-report.md | |
