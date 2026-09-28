@@ -162,11 +162,11 @@ updates Steps and appends Revisions.
 | 5.23 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.23-report.md | 56b5c7129c3e47ebcb5fae65262bb13d689b0602 |
 | 5.24 | 5 | pending | scenarios/results/org-public.md, scenarios/results/personal.md, scenarios/results/org-private.md, development-artifacts/patch-steward-m6-5.24-report.md | |
 | 5.25 | 5 | pending | development-artifacts/patch-steward-m6-5.25-report.md | |
-| 5.26 | 5 | pending | .github/workflows/steward-screening.yml, packages/core/src/conformance/workflows.fixture.test.ts, development-artifacts/patch-steward-m6-5.26-report.md | |
-| 5.27 | 5 | pending | scenarios/workflows/scenario-secret-scope-called.yml, scenarios/workflows/scenario-app-edit.yml, development-artifacts/patch-steward-m6-5.27-report.md | |
-| 5.28 | 5 | pending | scenarios/tools/pins.sh, development-artifacts/patch-steward-m6-5.28-report.md | |
-| 5.29 | 5 | pending | scenarios/tools/audit.sh, development-artifacts/patch-steward-m6-5.29-report.md | |
-| 5.30 | 5 | pending | scenarios/README.md, development-artifacts/patch-steward-m6-5.30-report.md | |
+| 5.26 | 5 | done | .github/workflows/steward-screening.yml, packages/core/src/conformance/workflows.fixture.test.ts, development-artifacts/patch-steward-m6-5.26-report.md | 7498f4b2c76c98145ea1bfe5b84da39e25b1dfb8 |
+| 5.27 | 5 | done | scenarios/workflows/scenario-secret-scope-called.yml, scenarios/workflows/scenario-app-edit.yml, development-artifacts/patch-steward-m6-5.27-report.md | 70303bddf192b8f62b4c26582d2d886f6dd8dbaf |
+| 5.28 | 5 | done | scenarios/tools/pins.sh, development-artifacts/patch-steward-m6-5.28-report.md | 0abf52650bc7119e83f41683ea5c2a2e98699afe |
+| 5.29 | 5 | done | scenarios/tools/audit.sh, development-artifacts/patch-steward-m6-5.29-report.md | 365cc51ef06d28cfc80035b8b8e9267b1036efb7 |
+| 5.30 | 5 | done | scenarios/README.md, development-artifacts/patch-steward-m6-5.30-report.md | 50da8354949d7141223112b752f95d8c9c51b237 |
 | 5.31 | 5 | pending | development-artifacts/patch-steward-m6-5.31-report.md | |
 | 5.32 | 5 | pending | scenarios/workflows/steward-pr.yml, scenarios/workflows/steward-issues.yml, development-artifacts/patch-steward-m6-5.32-report.md | |
 | 5.33 | 5 | pending | development-artifacts/patch-steward-m6-5.33-report.md | |
