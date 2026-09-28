@@ -5,8 +5,13 @@ planning), then the GitHub adapters (allowlisted writes, App tokens, artifacts, 
 and `publish` phases and the `action` package entry with conformance extensions, then the reusable workflow, wrapper templates, and
 test-bed deployment, then the live scenario suite that demonstrates every exit criterion on the test-beds, and finally the ADRs and
 governing-document changes. Phases 1–3 need no network; phase 4 pushes the milestone branch and deploys to test-beds; phase 5 is the
-only phase that creates GitHub events. No phase may be decomposed while the ledger's `owner-gate` reads PENDING. All gate references
-(G1–G11, I1–I20, K38–K51, OA1–OA4, S01–S16) are in `development-artifacts/patch-steward-m6-brief.md`.
+only phase that creates GitHub events. Owner gate APPROVED 2026-09-27 (brief "Owner gate answers"). All gate references
+(G1–G11, I1–I21, K38–K51, OA1–OA4, S01–S17, SC1–SC5) are in `development-artifacts/patch-steward-m6-brief.md`. Owner actions are not yet
+confirmed: before the earliest phase or step that needs each OA (brief "Owner actions", column "Needed first by"), the pipeline runs
+the OA's verify command and returns `RESULT: needs-human` naming the missing action if it fails. Earliest needs: OA1 on org-public —
+Phase 4, org-public smoke step; OA1 on personal and org-private — Phase 5 (S15, S16, S17); OA2 — Phase 5, S16; OA3 — Phase 5, S16
+(verified by the S16 run); OA4 — Phase 5, S15 (verified by the S15 run). Product secret names: Environment `steward-publication`,
+Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the probe suite's `STEWARD_APP_*` secrets are never read.
 
 ## Phase 1 — Core contracts (pure)
 
@@ -52,7 +57,8 @@ only phase that creates GitHub events. No phase may be decomposed while the ledg
   extension passes.
 - **Scope:** `packages/core/src/pipeline/` (hosted gate DD8 order incl. closure EV4 and repository-gate refusal I5; hosted publish I2–I4,
   I10, I12, OW7 settle and verification, SS1 supersession commit, RS1 closure commit, EL2 waiting run directory), `packages/action/`
-  (package dependency on core, `tsconfig.test.json` paths mapping, entry, environment validation, outputs, masks, summaries, staging
+  (package dependency on core, `tsconfig.test.json` paths mapping, entry, environment validation incl. the App credentials read from
+  `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY`, outputs, masks, summaries, staging
   files under `RUNNER_TEMP`), `packages/core/src/conformance/` (invariant-2, -4, -7, -8 extensions, write-allowlist test, zero-execution
   scan extended to `packages/action/src`), fixture-tier hosted scenarios over recorded responses (including ambiguous and unavailable
   ownership and snapshot reads, I16), `fixtures/` payloads and `fixtures/README.md`.
@@ -73,17 +79,24 @@ only phase that creates GitHub events. No phase may be decomposed while the ledg
   and are deployed with a trusted policy on the three test-beds, and one smoke run on org-public commits evidence end to end.
 - **Scope:** `.github/workflows/steward-screening.yml` (WF1–WF11, WF14, G8 M1–M7), `templates/workflows/steward-pr.yml` and
   `steward-issues.yml` (WF12, RN1), static workflow tests and the invariant-1 workflow scan (fixture tier), `templates/policy/policy.yml`
-  and `default-checklist.ts` branch rename (ES1, if approved), live-test switch to the fork (I19), `scenarios/` skeleton (README, tools,
-  helper workflows, test-bed policies, fixtures; SC1–SC4), push of `milestone/6-*` to origin, verification of OA1–OA4, deployment of
-  wrappers (pinned to the pushed commit, with the test-bed guard) and policies to the three test-beds, org-public smoke.
-- **Depends on:** Phase 3; OA1–OA4 done (verify commands in the brief; a failing verify returns `needs-human`).
+  and `default-checklist.ts` branch rename (ES1), live-test switch to the fork (I19), `scenarios/` skeleton (README, tools,
+  helper workflows including the SC5 secret-scope pair, test-bed policies, fixtures; SC1–SC5), push of `milestone/6-*` to origin, deployment of
+  wrappers (pinned to the pushed commit, with the test-bed guard, secrets mapped as `PATCH_STEWARD_APP_ID`/`PATCH_STEWARD_APP_PRIVATE_KEY`)
+  and policies to the three test-beds, OA1 verify on org-public, org-public smoke.
+- **Depends on:** Phase 3. Owner action OA1 on org-public (Environment `steward-publication` with secrets `PATCH_STEWARD_APP_ID`,
+  `PATCH_STEWARD_APP_PRIVATE_KEY`, no same-named repository or organization secret) verified with the brief's OA1 commands immediately
+  before the org-public smoke step (the first step in the plan that uses the Environment); a failing verify returns `RESULT: needs-human`
+  naming OA1. Steps before the smoke (code, static tests, push, deploys) need no owner action. OA2–OA4 and OA1 on personal and
+  org-private are NOT needed in this phase.
 - **Definition of Done (phase):** toolchain command exits 0; `actionlint .github/workflows/steward-screening.yml
-  templates/workflows/steward-pr.yml templates/workflows/steward-issues.yml` exits 0; static workflow test titles pass; `GH_TOKEN=$(gh
+  templates/workflows/steward-pr.yml templates/workflows/steward-issues.yml` exits 0; static workflow test titles pass (including
+  `workflows use only the steward secret names`); brief project DoD item 18's `git grep` prints nothing; `GH_TOKEN=$(gh
   auth token) pnpm test:live` exits 0; the deployed wrapper blobs on each test-bed equal the canonical test-bed copies (blob ids) and pin a
   SHA that is an ancestor of `origin/milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish`; one org-public smoke (an
   unstructured `[scenario S00]` issue) produced: a successful `build`, `gate`, `publish`; one `steward-ownership-issue-<n>` artifact; one
   evidence commit on `steward-evidence` whose run directory verifies (manifest, blob ids); and a publish summary written after the
-  commit; no App-authored comment, label, or check on the issue.
+  commit; no App-authored comment, label, or check on the issue; the OA1 verify output for org-public recorded verbatim in the smoke
+  step's report.
 - **Risks:** platform differences in artifact download redirect, corepack, checkout of a public repository with an empty-permission job
   token, Environment deployment records appearing on submissions; pins dangling after re-push (re-deploy with the new SHA); public
   test-bed exposure (sender guard); org-private minutes.
@@ -91,13 +104,17 @@ only phase that creates GitHub events. No phase may be decomposed while the ledg
 ## Phase 5 — Test-bed scenarios
 
 - **Objective:** every M06 exit criterion is demonstrated live on the test-beds and recorded with verbatim evidence.
-- **Scope:** run S01–S16 (brief G10) with `scenarios/tools/`, record `scenarios/results/org-public.md`, `personal.md`, `org-private.md`;
+- **Scope:** run S01–S17 (brief G10; S17 is the live Environment-only delivery check, SC5 and I21) with `scenarios/tools/`, record `scenarios/results/org-public.md`, `personal.md`, `org-private.md`;
   defects found go back through the supervisor revision loop (re-push, re-deploy); steady state SC3 at the end.
-- **Depends on:** Phase 4.
-- **Definition of Done (phase):** each result file lists S01–S16 as applicable with result `pass` and evidence (run URLs, artifact
-  listings with `created_at`, evidence commit SHAs, compare outputs); the observe audit (S13) counts are all `0`; SC3 steady state
+- **Depends on:** Phase 4. Owner actions, each verified with the brief's command before the first scenario that needs it (a failing
+  verify returns `RESULT: needs-human` naming the action): OA1 on personal before S15 and S17 there; OA1 on org-private before S16 and S17
+  there; OA2 before S16; OA3 by the S16 run (store token minted for the evidence repository); OA4 by the S15 run (publish to the personal
+  `steward-evidence`). Scenarios on org-public (S01–S14, S17) need only OA1 on org-public, re-verified at the start of the phase.
+- **Definition of Done (phase):** each result file lists S01–S17 as applicable with result `pass` and evidence (run URLs, artifact
+  listings with `created_at`, evidence commit SHAs, compare outputs); the observe audit (S13) counts are all `0`; S17 on each of the three test-beds shows job `outside` logging both `length-zero=true`
+  and job `inside` logging both `length-zero=false`; SC3 steady state
   verified by `gh workflow list` and open-issue/PR queries on the three test-beds; `pnpm prettier --check scenarios` exits 0; no token or
-  key in any result file (grep for `ghs_`, `ghp_`, `-----BEGIN`).
+  key in any result file (grep for `ghs_`, `ghp_`, `-----BEGIN`); brief project DoD item 18's `git grep` prints nothing.
 - **Risks:** timing-dependent overlap for S04/S05 (bounded retries of the scenario, recorded); run-list freshness (22 s) making cap
   scenarios flaky (space runs, record counts); Actions minutes on org-private; a platform deviation requiring an owner decision
   (escalate, never work around).
@@ -110,7 +127,7 @@ only phase that creates GitHub events. No phase may be decomposed while the ledg
   `docs/whitepaper.md` §9–§14, `README.md`, `CLAUDE.md`, `docs/user-manual/` pages in the G11 inventory, `fixtures/README.md` if not
   already current, `scenarios/README.md` wording review.
 - **Depends on:** Phase 5 (documents state measured and delivered behavior).
-- **Definition of Done (phase):** brief project DoD items 1–17 all pass as pinned by the approval amendment; `pnpm prettier --check docs
+- **Definition of Done (phase):** brief project DoD items 1–18 all pass as pinned by the approval amendment of 2026-09-27; `pnpm prettier --check docs
   README.md CLAUDE.md` exits 0; link check over persistent docs passes; Status paragraphs of architecture, processes, README, CLAUDE.md,
   and the manual describe the hosted skeleton as observe-mode, contract-level, test-bed-only; `docs/deferred.md` and the plan documents
   unchanged since `S`.

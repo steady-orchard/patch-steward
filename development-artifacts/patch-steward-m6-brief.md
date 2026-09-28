@@ -11,9 +11,11 @@ store, waiting-state and supersession persistence, closure resolutions, job summ
 conformance at GitHub level, a test-bed scenario suite that demonstrates every exit criterion, and the governing-document,
 ADR, and manual changes.
 
-OWNER GATE: PENDING. Every item marked "(gate G<n>)", "I<n>", "K<n>", "OA<n>", and the ADR inventory is a DRAFT until the owner
-answers the questions in "Owner gate questions". The decomposer must not decompose any phase while the ledger's `owner-gate`
-field reads PENDING.
+OWNER GATE: APPROVED 2026-09-27 (answers recorded in "Owner gate answers"). Every gate item G1–G11, interpretation I1–I21,
+constant K38–K51, owner action OA1–OA4, scenario S01–S17, and the ADR inventory is BINDING exactly as written below. Rejected
+alternatives are never implemented. Owner actions OA1–OA4 are NOT yet confirmed done: the pipeline runs each OA's verify command
+before the earliest phase or step that needs it (see "Owner actions") and returns `RESULT: needs-human` naming the missing action if
+a check fails.
 
 ## Context
 
@@ -225,8 +227,11 @@ test-bed repositories only, with the test App; never this repository, never real
   `331019482` (type Bot). Organization installation 162868612 (`repository_selection: selected`) permissions: `actions: write`,
   `checks: write`, `contents: write`, `issues: write`, `metadata: read`, `pull_requests: write`, `statuses: write`; no `workflows`
   permission (the App cannot write workflow files). These cover every M06 need (gate G7); NO App permission change is required.
-- Test-bed secrets: repository secrets `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY` on all three (used by the probe suite); variable
-  `STEWARD_APP_CLIENT_ID`. The pipeline never holds the private key and cannot copy it into an Environment (owner action OA1).
+- Test-bed probe secrets: repository secrets `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY` on all three and variable
+  `STEWARD_APP_CLIENT_ID` belong to the probe suite ONLY; they stay untouched and the product (workflows, templates, `packages/**`,
+  `scenarios/**`) never reads or references them. The product's names are distinct (Q9 C, WF13): Environment `steward-publication`
+  with Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`. The pipeline never holds the private key and
+  cannot copy it into an Environment (owner action OA1).
 - Probe tooling reused: `probes/smoke/tools/deploy.sh` (SSH clone, one commit, push with 5 fetch-rebase retries, blob-id verification),
   `dispatch.sh` (nonce in run-name), `wait-run.sh`, `environment.sh` (DUMMY secrets only), `steady-state.sh` (disables `probe-*`
   workflows only). Probe safety rules (`probes/README.md` "Workflow safety rules") apply to every test-bed workflow this plan deploys.
@@ -286,7 +291,7 @@ test-bed repositories only, with the test App; never this repository, never real
 | Documentation describes only what was delivered | GitHub-hosted screening exists as an observe-mode, contract-level skeleton verified on test-beds only; installation stays Proposed (no `steward init`, adoption gate). |
 | Invariant conformance | invariant-2 and invariant-8 extended at GitHub level; invariant-1 gains the workflow expression scan; invariant-4, -5, -7 extended. |
 
-### Gate G1 — ownership record and artifact protocol (DRAFT; OW-rules)
+### Gate G1 — ownership record and artifact protocol (APPROVED; OW-rules)
 
 - OW1 Artifact name: `steward-ownership-pr-<n>` or `steward-ownership-issue-<n>` (`<n>` decimal, no leading zero). One file
   `ownership.json` inside. Uploaded by the `gate` job with `actions/upload-artifact` (pinned by full SHA), `retention-days: 90`,
@@ -343,7 +348,7 @@ test-bed repositories only, with the test App; never this repository, never real
   confirmed mismatch.
 - OW8 Expired owner: when no unexpired artifact exists, deduplication falls back to the latest published evidence snapshot (ES10).
 
-### Gate G2 — events, event identity, deduplication, echoes (DRAFT; EV- and DD-rules)
+### Gate G2 — events, event identity, deduplication, echoes (APPROVED; EV- and DD-rules)
 
 - EV1 Accepted events (wrapper `on:` filters; everything else never starts a run):
   - `steward-pr.yml`: `pull_request_target` types `opened`, `synchronize`, `edited`, `reopened`, `ready_for_review`, `closed`. (The
@@ -381,7 +386,7 @@ test-bed repositories only, with the test App; never this repository, never real
   `null` when none, uploads it as same-run artifact `steward-closure`, outputs `disposition=closure`, `record_only=true`. A closure
   never supersedes an owner and never cancels work.
 
-### Gate G3 — caps from the tagged run list (DRAFT; RN- and CP-rules)
+### Gate G3 — caps from the tagged run list (APPROVED; RN- and CP-rules)
 
 - RN1 Wrapper `run-name` (only numeric ids and platform enums; no titles, bodies, logins, or refs):
   - `steward-pr.yml`: `steward pr ${{ github.event.pull_request.number }} author ${{ github.event.pull_request.user.id }} event ${{
@@ -389,7 +394,7 @@ test-bed repositories only, with the test App; never this repository, never real
   - `steward-issues.yml`: the same with `issue`, `github.event.issue.number`, `github.event.issue.user.id`.
   - Grammar (parser, ≤ K44 chars): `^steward (pr|issue) ([1-9][0-9]{0,9}) author ([1-9][0-9]{0,19}) event ([a-z_]{1,64})
     ([a-z_]{1,64}) sender ([1-9][0-9]{0,19}) (User|Bot|Organization|Mannequin)$`.
-  - DRAFT addition beyond D3: `sender <id>` is included next to sender type, because "runs sent by this installation's App bot"
+  - Approved addition beyond D3 (Q4 A): `sender <id>` is included next to sender type, because "runs sent by this installation's App bot"
     needs the bot's id (type `Bot` alone also matches other bots such as dependabot).
 - CP1 Source: `GET /repos/{o}/{r}/actions/runs?created=>=<today UTC date>&per_page=100` (paginated ≤ K42 pages), plus
   `?status=in_progress` and `?status=queued` (each ≤ K42 pages): 3 requests when each listing fits one page. App token (`actions: read`).
@@ -401,12 +406,12 @@ test-bed repositories only, with the test App; never this repository, never real
 - CP4 Per-author count: counted runs with status `queued` or `in_progress` whose `display_title` parses with author id = this
   submission's author id, this run included. Queued when count > `limits.caps.per_author_concurrent_runs`.
 - CP5 Duplicates, closures, and early exits appear in the run list and are counted by other gates (approximate overcount, documented).
-  "No cap debit" for a duplicate (D4) is implemented as: no cap evaluation, no queueing, and no work for the duplicate itself (Q3).
+  "No cap debit" for a duplicate (D4) is implemented as: no cap evaluation, no queueing, and no work for the duplicate itself (Q4 A).
 - CP6 Any run-list read failure or a listing over K42 pages → gate fails before commitment (`caps.run-list-unavailable`); never an
   under-count.
 - CP7 A total over the API's 1000-result ceiling is treated as over the daily cap (hard maximum of `daily_runs` is 1000).
 
-### Gate G4 — evidence store commit protocol (DRAFT; ES-rules)
+### Gate G4 — evidence store commit protocol (APPROVED; ES-rules)
 
 - ES1 Store: `evidence.store` of the trusted policy. `orphan-branch` → repository = target, ref `refs/heads/<branch>`;
   `repository` → repository = `evidence.store.repository`, ref `refs/heads/<branch>`. Every store path is prefixed `<owner>/<repo>/` of
@@ -438,7 +443,7 @@ test-bed repositories only, with the test App; never this repository, never real
   that run's `submission.json` (≤ K46 bytes, validated) and use its snapshot hash and policy revision. Any other failure → treated as
   unavailable (DD6).
 
-### Gate G5 — evidence layout additions and records (DRAFT; EL-, WS-, SS-, RS-rules)
+### Gate G5 — evidence layout additions and records (APPROVED; EL-, WS-, SS-, RS-rules)
 
 - EL1 Outcome runs (`runnable`, `early-exit`): unchanged M05 run directory at `runs/<pr|issue>-<n>/<run_id>-<run_attempt>/`, metrics at
   `metrics/<YYYY-MM>/<run_id>-<run_attempt>.json`. Report evidence locations become code spans of
@@ -462,26 +467,28 @@ test-bed repositories only, with the test App; never this repository, never real
 - RS2 `maintainer-resolution` payload gains OPTIONAL keys (additive, version 1): `resolution` (`merged`, `closed-by-author`,
   `closed-by-maintainer`, `deleted`), `paired_run` {run_id, run_attempt} or null, `paired_snapshot_hash` or null. `action_kind`
   `resolution`, `dismissal_code` null (coded resolutions are `/steward resolve`, M15). Attribution: PR `merged: true` → `merged`; else
-  sender id = author id → `closed-by-author`; else `closed-by-maintainer`; issues `deleted` → `deleted` (DRAFT extension of SP03 step 2,
+  sender id = author id → `closed-by-author`; else `closed-by-maintainer`; issues `deleted` → `deleted` (approved extension of SP03 step 2, Q6 A,
   which lists no deletion).
 - EL3 Architecture §9 record types gain `ownership`, `waiting`, `supersession` (version 1).
 
-### Gate G6 — workflow structure (DRAFT; WF-rules)
+### Gate G6 — workflow structure (APPROVED; WF-rules)
 
 - WF1 Reusable workflow: `.github/workflows/steward-screening.yml` in this repository, `on: workflow_call` only, inputs `steward_ref`
-  (string, required: the same 40-hex SHA the caller pins; WF8), secrets `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY` (both
+  (string, required: the same 40-hex SHA the caller pins; WF8), secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY` (both
   `required: false`, delivered from the caller's Environment, PA04.1). No other trigger, so it never runs in this repository.
 - WF2 Jobs (M06): `build` → `gate` → `publish`. NO `intake`, `execute`, `assess` jobs yet (they arrive with M13's job table); `publish`
   applies the M05 decision to the gate handoff, so a runnable run ends `inconclusive` with `stage-incomplete` exactly as the local
-  runner's pass-throughs do (Q6).
+  runner's pass-throughs do (Q7 A).
 - WF3 Permissions: workflow-level `permissions: {}`; every job `permissions: {}` (job tokens need nothing: the steward repository is
   public, same-run artifacts use the runtime token, every GitHub API call uses a scoped App token). Wrappers grant `permissions: {}` too
   (equal to the jobs' requests, ADR-0027).
 - WF4 Environment: only `gate` and `publish` declare `environment: steward-publication`; only their steps reference
-  `secrets.STEWARD_APP_ID`/`secrets.STEWARD_APP_PRIVATE_KEY`, and only as `env:` of the one step that runs the core; `build` declares
-  none and references no secret.
+  `secrets.PATCH_STEWARD_APP_ID`/`secrets.PATCH_STEWARD_APP_PRIVATE_KEY`, and only as `env:` of the one step that runs the core, under
+  the identical environment variable names `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY` (the names the action reads);
+  `build` declares none and references no secret. No product file references `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY`, or
+  `STEWARD_APP_CLIENT_ID` (the probe names).
 - WF5 Publish condition: `if: ${{ always() && needs.gate.result == 'success' && (needs.gate.outputs.committed == 'true' ||
-  needs.gate.outputs.record_only == 'true') }}` (the architecture §6.4 condition extended for closures; Q7).
+  needs.gate.outputs.record_only == 'true') }}` (the architecture §6.4 condition extended for closures; Q8 A).
 - WF6 Concurrency: only `publish` has job-level `concurrency: { group: ${{ needs.gate.outputs.concurrency_group }}, cancel-in-progress:
   false }`; the group string is built by the core as `steward-<repository id>-<pr|issue>-<n>` (digits and fixed words only). No
   workflow-level concurrency. A pending publish replaced by a newer committed run's publish (PA05.3) leaves that run without evidence;
@@ -491,8 +498,7 @@ test-bed repositories only, with the test App; never this repository, never real
   attempt (I12), snapshot hash, and policy revision against its own ownership record and the gate outputs.
 - WF8 Steward code: every job checks out `steady-orchard/patch-steward` at `inputs.steward_ref` (full 40-hex SHA; the core rejects any
   other form) into `steward/`, with `persist-credentials: false`. The wrapper's `uses:` pin and its `steward_ref` input are equal (static
-  test on templates; deploy check on test-beds). Alternative (Q10 B): read the called workflow's own SHA from a runner context after
-  a platform check.
+  test on templates; deploy check on test-beds). (Q11 A approved; the runner-context alternative is rejected.)
 - WF9 Pins: every `uses:` in the reusable workflow and wrappers is `owner/repo[/path]@<40 hex>` with a trailing comment naming the
   tag; only `actions/*` actions (`checkout`, `setup-node`, `upload-artifact`, `download-artifact`). No `pnpm/action-setup` (pnpm through
   corepack, M4). No `actions/cache`.
@@ -505,22 +511,27 @@ test-bed repositories only, with the test App; never this repository, never real
 - WF12 Wrapper templates: `templates/workflows/steward-pr.yml` and `templates/workflows/steward-issues.yml` (Prettier-clean YAML):
   `name`, `run-name` (RN1), `on` (EV1), `permissions: {}`, one job `screen` with `uses:
   steady-orchard/patch-steward/.github/workflows/steward-screening.yml@<40 hex>`, `with: { steward_ref: <same 40 hex> }`, `secrets:`
-  mapping exactly `STEWARD_APP_ID: ${{ secrets.STEWARD_APP_ID }}` and `STEWARD_APP_PRIVATE_KEY: ${{ secrets.STEWARD_APP_PRIVATE_KEY }}`
+  mapping exactly `PATCH_STEWARD_APP_ID: ${{ secrets.PATCH_STEWARD_APP_ID }}` and
+  `PATCH_STEWARD_APP_PRIVATE_KEY: ${{ secrets.PATCH_STEWARD_APP_PRIVATE_KEY }}`
   (never `inherit`), `permissions: {}`. The template pin is the placeholder `0000000000000000000000000000000000000000` (a later `steward
   init` substitutes the release SHA). Test-bed copies substitute the pushed milestone commit and ADD a test-bed-only guard on the `screen`
   job: `if: ${{ github.event.sender.id == 2095171 || github.event.sender.id == <bot id> }}` (probe safety rule: public test-beds accept
   events from anyone); the guard is not part of the template.
-- WF13 Names (Q8): publication Environment `steward-publication` (deployment branch policy: the default branch only); secrets
-  `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY`. On test-beds, repository secrets of the same names already exist for the probe suite,
-  so the caller-side mapping passes the repository value; test-beds therefore cannot distinguish Environment delivery from repository
-  delivery (PA04 proved the Environment path); the static WF4 test is the M06 proof.
+- WF13 Names (Q9 C, distinct names): publication Environment `steward-publication` (deployment branch policy: the default branch
+  only); Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`, set ONLY as Environment secrets, never as
+  repository or organization secrets. The probe suite's repository secrets `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY` and variable
+  `STEWARD_APP_CLIENT_ID` stay on the test-beds untouched; the product never reads them. Because no repository secret named
+  `PATCH_STEWARD_APP_*` exists, the wrapper's caller-side expressions evaluate empty and only the Environment-declaring jobs resolve
+  the values (PA04.1 mechanism). Proof: statically by the WF4 tests, live by scenario S17 (a job that does not declare the
+  Environment receives both secrets empty; I21).
 - WF14 Job timeouts (hard, in YAML): `build` 15 min, `gate` 10 min, `publish` 20 min; `runs-on: ubuntu-latest`.
 
-### Gate G7 — App tokens (DRAFT; AT-rules)
+### Gate G7 — App tokens (APPROVED; AT-rules)
 
 - AT1 The core mints tokens itself: RS256 JWT with `node:crypto` (`iat` = now − 60 s, `exp` = `iat` + K49), `GET
   /repos/{o}/{r}/installation` for the installation id, `POST /app/installations/{id}/access_tokens` with explicit `repositories` and
-  `permissions`, `DELETE /installation/token` in a `finally` path. Alternative (Q9 B): `actions/create-github-app-token` steps.
+  `permissions`, `DELETE /installation/token` in a `finally` path. (Q10 A approved; `actions/create-github-app-token` is rejected.)
+  The private key and App id are read from environment variables `PATCH_STEWARD_APP_PRIVATE_KEY` and `PATCH_STEWARD_APP_ID` (WF4).
 - AT2 Scopes (each token names exactly its repositories):
   - `gate` target token: target repository; `actions: read`, `contents: read`, `issues: read`, `pull_requests: read` (metadata read is
     implicit). Gate never writes through the API (its only write is the artifact upload, which uses the runner's runtime token).
@@ -534,7 +545,7 @@ test-bed repositories only, with the test App; never this repository, never real
   between jobs.
 - AT4 Tokens and the JWT count against the bootstrap budget (K19) before the policy is loaded.
 
-### Gate G8 — runtime build: consequences and mitigations (DRAFT; D5 stays: build at runtime)
+### Gate G8 — runtime build: consequences and mitigations (APPROVED; D5 stays: build at runtime)
 
 Consequences of D5 (stated as required): (C1) every run installs dependencies from the npm registry and compiles TypeScript on the
 runner before the steward runs, adding about 1–2 minutes of billed Actions time per job that builds and a registry-availability
@@ -543,7 +554,7 @@ dependency (typescript, vitest, eslint, prettier, and their transitive packages)
 key and in the same filesystem the core then runs from; (C3) the executed code equals the pinned commit plus the lockfile's resolved
 packages, so the pin still fixes the steward version, but package tarballs are fetched at run time.
 
-Mitigations (each separately approvable; all recommended):
+Mitigations (all approved, Q12 A; binding):
 
 - M1 Credential-free `build` job: only `build` checks out, installs, and compiles; it produces a runtime directory (`packages/core/dist`,
   `packages/action/dist`, their `package.json` files, and production dependencies only: `zod`, `yaml`, the core workspace link),
@@ -561,7 +572,7 @@ Mitigations (each separately approvable; all recommended):
 - M7 `timeout-minutes` on every job (WF14).
 - M8 A static test asserts M1–M7 on the reusable workflow text.
 
-### Gate G9 — hard-only constants (DRAFT; continue K1–K37; listed in architecture §12.1 when delivered)
+### Gate G9 — hard-only constants (APPROVED; continue K1–K37; listed in architecture §12.1 when delivered)
 
 | Row | Constant | Value | Basis |
 | --- | --- | --- | --- |
@@ -582,24 +593,39 @@ Mitigations (each separately approvable; all recommended):
 
 No new policy key. `limits.caps.*`, `limits.evidence.*`, `limits.github.*` keep their M03 bounds.
 
-### Gate G10 — test-bed scenario suite (DRAFT; SC-rules and scenarios)
+### Gate G10 — test-bed scenario suite (APPROVED; SC-rules and scenarios)
 
 - SC1 Location: new top-level directory `scenarios/` (persistent: no planning ids; not a workspace package; never runs in CI; Prettier-
   checked): `scenarios/README.md` (procedure per scenario, safety rules, budgets), `scenarios/tools/*.sh` (bash + `gh`; reuse
   `probes/smoke/tools/deploy.sh`, `dispatch.sh`, `wait-run.sh` by path), `scenarios/workflows/scenario-*.yml` (test-bed helper
-  workflows, e.g. an App-token title edit for the echo case, `workflow_dispatch` only, allowlisted sender, nonce in run-name),
+  workflows, e.g. an App-token title edit for the echo case, `workflow_dispatch` only, allowlisted sender, nonce in run-name; plus the
+  S17 pair `scenario-secret-scope.yml` and `scenario-secret-scope-called.yml`, SC5),
   `scenarios/fixtures/` (test-bed policies, submission bodies), `scenarios/results/<testbed-key>.md` (verbatim evidence in `text`
   fences, like probe results). Scenario fixtures on test-beds: issue/PR titles start `[scenario S<nn>]`, branches `scenario-s<nn>-*`.
-  Alternative (Q13 B): place it under `probes/`.
+  (Q14 A approved; placement under `probes/` is rejected.)
 - SC2 Test-bed setup: deploy the two wrappers (WF12 test-bed copies) and a valid all-observe policy (no `llm` section;
   `evidence.store` orphan-branch `steward-evidence` on org-public and personal, repository store on org-private) to each test-bed's
   `master` with `deploy.sh`; runnable-path scenarios use contract-met bodies (derived from `fixtures/submissions/`) under a scenario
   policy whose category requirements they satisfy.
 - SC3 Steady state after the scenario phase: `steward-pr.yml`, `steward-issues.yml`, and `scenario-*.yml` disabled on every test-bed
-  (`gh workflow disable`); no open `[scenario` issue or PR; evidence branches, the evidence repository, the policy, and the Environment
+  (`gh workflow disable`; `scenario-secret-scope-called.yml` has no trigger of its own and may read `active` if the API does not
+  disable it); no open `[scenario` issue or PR; evidence branches, the evidence repository, the policy, and the Environment
   stay (listed in `scenarios/README.md`).
 - SC4 Budgets: poll no more often than every 20 s; bounded waits (15 min per run); stop if core rate limit remaining < 500; org-private at
   most 30 billed Actions minutes for M06; never delete repositories or issues; never print secrets.
+- SC5 Secret-scope helper pair (S17; I21). Both files are Prettier-clean, pinned and guarded like every scenario workflow, and deployed
+  with `deploy.sh` to each test-bed's `master`:
+  - `scenarios/workflows/scenario-secret-scope-called.yml`: `on: workflow_call` only, declaring secrets `PATCH_STEWARD_APP_ID` and
+    `PATCH_STEWARD_APP_PRIVATE_KEY` exactly as `steward-screening.yml` does (both `required: false`); workflow and jobs
+    `permissions: {}`; no checkout, no install, no action. Job `outside` declares NO `environment:`; job `inside` declares
+    `environment: steward-publication`. Each job has one `run:` step whose step-level `env:` maps both secrets, and whose script
+    prints only `PATCH_STEWARD_APP_ID length-zero=<true or false>` and `PATCH_STEWARD_APP_PRIVATE_KEY length-zero=<true or false>`
+    (from `${#VAR}`; never the value, never the length number, never a prefix or hash) and exits 0.
+  - `scenarios/workflows/scenario-secret-scope.yml`: `on: workflow_dispatch` only; run-name carries the `dispatch.sh` nonce;
+    `permissions: {}`; one job `call` guarded `if: ${{ github.event.sender.id == 2095171 }}` with
+    `uses: ./.github/workflows/scenario-secret-scope-called.yml` and a `secrets:` block byte-identical to the WF12 wrapper mapping
+    (`PATCH_STEWARD_APP_ID: ${{ secrets.PATCH_STEWARD_APP_ID }}`, `PATCH_STEWARD_APP_PRIVATE_KEY: ${{ secrets.PATCH_STEWARD_APP_PRIVATE_KEY }}`;
+    never `inherit`). The scenario tool checks that byte identity against `templates/workflows/steward-pr.yml` before dispatching.
 
 | Scenario | Test-bed | Procedure (summary) | Pass condition | Exit criterion |
 | --- | --- | --- | --- | --- |
@@ -616,16 +642,17 @@ No new policy key. `limits.caps.*`, `limits.evidence.*`, `limits.github.*` keep 
 | S11 | org-public | scenario policy with `daily_runs: 1` then `per_author_concurrent_runs: 1`; open contract-met submissions | over-cap run disposition `queued`; waiting run directory with `waiting.json`; restore policy | caps and waiting states |
 | S12 | org-public | re-run a completed run (`gh run rerun`) | new attempt commits a new owner (newest `created_at`) | explicit rerun replaces |
 | S13 | all | audit every scenario submission | App-authored comments 0, labels 0, App check runs on head SHAs 0, requested reviewers 0, no deployment status on the PR | observe writes nothing |
-| S14 | all | static: fetch deployed wrappers and the pinned reusable workflow | only `gate`/`publish` declare `steward-publication`; every `uses:` pinned by 40-hex SHA reachable on origin; `steward_ref` equals the pin | Environment and pins |
+| S14 | all | static: fetch deployed wrappers and the pinned reusable workflow | only `gate`/`publish` declare `steward-publication` and only they reference `secrets.PATCH_STEWARD_APP_ID`/`secrets.PATCH_STEWARD_APP_PRIVATE_KEY`; no deployed product file (wrappers, pinned reusable workflow) contains `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY`, or `STEWARD_APP_CLIENT_ID` other than as part of `PATCH_STEWARD_APP_*`; every `uses:` pinned by 40-hex SHA reachable on origin; `steward_ref` equals the pin | Only gate and publish reference the publication Environment; wrappers and action pinned by immutable SHA |
 | S15 | personal | one contract-met issue | outcome run directory on `steward-evidence` of the personal test-bed; secrets arrived through the explicit mapping (gate minted a token) | cross-owner smoke |
 | S16 | org-private | one contract-met issue | run directory committed to the private evidence repository (OA2), none in the target | separate repository store smoke |
+| S17 | all | verify OA1 on the test-bed; deploy the SC5 pair; `dispatch.sh` `scenario-secret-scope.yml`; wait; read both job logs | job `outside` (no Environment) logs `PATCH_STEWARD_APP_ID length-zero=true` and `PATCH_STEWARD_APP_PRIVATE_KEY length-zero=true`; job `inside` (`steward-publication`) logs both `length-zero=false`; no secret value, length number, or `-----BEGIN` in either log; result file records the two log lines verbatim | Only gate and publish reference the publication Environment (live proof of Environment-only delivery) |
 
 "An ambiguous or unavailable ownership or snapshot read fails publication" cannot be forced live without platform manipulation: it is
 proved at fixture tier with recorded responses (ties, pagination beyond K41, 5xx, invalid zip, recapture failure), I16.
 
-### Gate G11 — ADR inventory and documentation stance (DRAFT)
+### Gate G11 — ADR inventory and documentation stance (APPROVED)
 
-ADRs (MADR; `Status: accepted`; `Date` = gate approval date; `Deciders: project owner`; `Source` = governing location; no planning ids;
+ADRs (MADR; `Status: accepted`; `Date` = `2026-09-27` (gate approval date); `Deciders: project owner`; `Source` = governing location; no planning ids;
 More Information "The project owner decided this on <date>."):
 
 | ADR | Title | Records |
@@ -635,9 +662,9 @@ More Information "The project owner decided this on <date>."):
 | ADR-0073 | Approximate caps from a tagged run list | D3, G3, K42, K44 |
 | ADR-0074 | Evidence store commits through the Git Data API | D2, G4, K45, K46, template branch name |
 | ADR-0075 | Waiting, supersession, and closure records | G5 |
-| ADR-0076 | Reusable screening workflow, publication Environment, and App tokens | G6, G7, K47, K49, K51 |
+| ADR-0076 | Reusable screening workflow, publication Environment, and App tokens | G6, G7, K47, K49, K51; names `steward-publication`, `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY` as Environment-only secrets (distinct from any other workflow's secret names) |
 | ADR-0077 | Steward built at runtime inside jobs | D5, G8, K50; ADR-0011's status becomes `superseded by ADR-0077` (ADR-0077 restates its unchanged parts: npm CLI, `steward init`, reusable workflows from this repository) |
-| ADR-0078 | Test-bed scenario suite | G10 SC-rules |
+| ADR-0078 | Test-bed scenario suite | G10 SC-rules incl. SC5 and the live Environment-only delivery check |
 
 `docs/adr/README.md` Records table 70 → 78 rows; ADR-0011 row status updated; no other existing record changes.
 
@@ -651,7 +678,8 @@ Documentation change inventory (governing document first; persistence and deferr
 - `docs/architecture.md`: Status; §6.1 layout (action package: runs the core inside jobs from a runtime built by the credential-free
   `build` job; `scenarios/`); §6.2 Ownership row (implemented, observe, no checks), Evidence row; §6.3 GitHub row (writes: Git Data API
   evidence commits only; artifacts listing/download; run list; App token minting), Evidence store row (branch and repository stores
-  implemented), Clock and ids row (Actions run ids); §6.4 (reusable workflow name and jobs, publication Environment and secret names,
+  implemented), Clock and ids row (Actions run ids); §6.4 (reusable workflow name and jobs, publication Environment
+  `steward-publication` and its Environment-only secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`,
   publish condition with record-only runs, concurrency group key, ownership record, dedup and event identity, settle delay, runtime
   build, test-bed guard not part of templates); §6.7 (wrapper template paths); §7 rows (Artifacts, Actions runs API run-name tagging,
   Actions artifacts API, Job summaries, Environments, JavaScript action → action package); §9 (record types `ownership`, `waiting`,
@@ -665,14 +693,15 @@ Documentation change inventory (governing document first; persistence and deferr
 - `docs/whitepaper.md` §9–§14 (implemented-so-far, decisions paragraph for ADR-0071–ADR-0078, open-decision list synced with §15).
 - `README.md` Status; `CLAUDE.md` Project state (action package no longer smoke code; hosted skeleton; `scenarios/`), Commands (scenario
   suite entry point), invariants reviewed.
-- User manual: `configuration.md` ("Credentials and deployment": Environment and secret names; "Evidence and visibility": store layout
+- User manual: `configuration.md` ("Credentials and deployment": Environment `steward-publication` restricted to the default branch,
+  Environment secrets `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY`, never repository or organization secrets; "Evidence and visibility": store layout
   and commit protocol, template branch name), `overview.md` (execution options, waiting state `queued` recorded in evidence),
   `troubleshooting.md` ("Waiting states and checks": queued, duplicates, gate failures before commitment), `installation.md` (still
   Proposed; wrapper templates named), `README.md` TOC if headings change.
 - `templates/policy/policy.yml` (`steward-evidence`), `templates/workflows/steward-pr.yml`, `templates/workflows/steward-issues.yml`,
   `fixtures/README.md` (new corpora), `scenarios/README.md`.
 
-### I-list — interpretations (DRAFT)
+### I-list — interpretations (APPROVED)
 
 - I1 Run existence (mirrors M05 I1): a T1 run exists once its ownership artifact uploads. Before that, every failure (event, token, policy
   missing or invalid, repository gate active, capture, listing, caps, handoff upload, ownership upload) fails the `gate` job visibly
@@ -711,6 +740,14 @@ Documentation change inventory (governing document first; persistence and deferr
 - I19 Live tests: the "no published policy" assertions move to the fork `jambolo/patch-steward-testbed-public` (never synced, so it has
   no policy); org-public gains a live assertion that its published policy loads and validates.
 - I20 Wrapper templates are persistent files under `templates/workflows/`; the steward's own repository runs no wrapper (adoption gate).
+- I21 Environment-only delivery check (owner addition with Q9 C): the approved `build` job stays secret-free (M1, M6, M8, WF4) and the
+  approved job set stays `build`, `gate`, `publish` (Q7 A), so the live check does not add a secret reference or a job to
+  `steward-screening.yml`. It runs in the SC5 helper pair, which reproduces the product's secret path exactly: the same caller-side
+  `secrets:` mapping as the WF12 wrapper, the same callee `secrets:` declarations as WF1, and the same Environment name; its
+  no-Environment job `outside` stands in for every product job that does not declare `steward-publication`. What it proves is a
+  property of each test-bed's configuration: no repository or organization secret named `PATCH_STEWARD_APP_*` exists, so the values
+  reach only Environment-declaring jobs. Placing the check inside `steward-screening.yml` itself would contradict M6/M8 and needs a new
+  owner decision.
 
 ### Module layout (recommended; the decomposer may refine names, not responsibilities)
 
@@ -724,7 +761,7 @@ Documentation change inventory (governing document first; persistence and deferr
 - `packages/core/src/evidence/`: `git-store.ts` (ES-rules), `blob-id.ts`, `fallback-read.ts` (ES10), layout and manifest additions
   (`run_kind`), waiting and supersession assembly, closure file.
 - `packages/core/src/pipeline/`: `hosted-gate.ts`, `hosted-publish.ts`, `job-summary.ts`.
-- `packages/action/src/`: `main.ts` (entry: `gate`, `publish`), `environment.ts` (runner variables, zod), `outputs.ts`
+- `packages/action/src/`: `main.ts` (entry: `gate`, `publish`), `environment.ts` (runner variables and `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`, zod), `outputs.ts`
   (`GITHUB_OUTPUT`, `GITHUB_STEP_SUMMARY`, masks), `files.ts` (artifact staging paths under `RUNNER_TEMP`). Module names avoid the
   zero-execution forbidden words (`runner`, `container`, ...). `packages/action/package.json` gains dependency `@patch-steward/core:
   workspace:*` (lockfile change limited to that workspace link); `tsconfig.test.json` gains the cli-style `paths` mapping.
@@ -750,64 +787,81 @@ Documentation change inventory (governing document first; persistence and deferr
 - `never-pass*`: every new failure-code union in compile-time exhaustive tables.
 - Write allowlist test (I15) and static workflow tests (WF3, WF4, WF9, WF12, M8), titles `only gate and publish declare the publication
   environment`, `every action and reusable workflow is pinned by full commit sha`, `wrappers pass secrets by explicit mapping`, `every
-  job declares empty permissions`, `the credential-free build job holds no secret`.
+  job declares empty permissions`, `the credential-free build job holds no secret`, `workflows use only the steward secret names` (no
+  probe secret name except inside `PATCH_STEWARD_APP_*` in `steward-screening.yml` and both templates; the test builds the probe
+  names by concatenation, see Constraints "Secret names").
 
-### Owner actions (DRAFT; the pipeline performs none of these; each has a verifying command run by the pipeline)
+### Owner actions (APPROVED; owner performs them and reports completion to the lead; NOT yet confirmed; the pipeline performs none of these)
 
-| Id | Action | Verify (expected output) |
-| --- | --- | --- |
-| OA1 | On each of the three test-beds create Environment `steward-publication` with deployment branches restricted to `master` only, and Environment secrets `STEWARD_APP_ID` and `STEWARD_APP_PRIVATE_KEY` holding the test App's real id and private key | `gh api repos/<r>/environments/steward-publication/secrets --jq '[.secrets[].name]'` → `["STEWARD_APP_ID","STEWARD_APP_PRIVATE_KEY"]`; `gh api repos/<r>/environments/steward-publication/deployment-branch-policies --jq '[.branch_policies[].name]'` → `["master"]` |
-| OA2 | Create PRIVATE repository `steady-orchard/patch-steward-testbed-evidence` initialized with one commit (a README) | `gh api repos/steady-orchard/patch-steward-testbed-evidence --jq '[.private, .size >= 0]'` → `[true,true]` and `gh api repos/steady-orchard/patch-steward-testbed-evidence/commits --jq length` ≥ `1` |
-| OA3 | Add `steady-orchard/patch-steward-testbed-evidence` to the selected repositories of the organization installation 162868612 of `patch-steward-testbed` | S16 smoke run mints a store token for it (gate/publish log line `token repositories=...evidence`); no local read is possible without the App key |
-| OA4 | Confirm the personal installation 162875728 has accepted the App's current permissions (actions, checks, contents, issues, pull requests, statuses write; metadata read) | S15 smoke run publishes to the personal test-bed's `steward-evidence` branch |
+Rule (binding): before the earliest phase or step listed in "Needed first by", the pipeline runs the OA's verify command (and re-runs
+it at the start of every later step that depends on it). If a check fails, it stops and returns `RESULT: needs-human` naming the
+missing action (e.g. "OA1 not done on steady-orchard/patch-steward-testbed-private: Environment secrets are ..."); it never works
+around a missing action. Verify output is compared literally; never print a secret value.
+
+| Id | Action | Verify | Needed first by |
+| --- | --- | --- | --- |
+| OA1 | On each of the three test-beds create Environment `steward-publication` with deployment branches restricted to `master` only, and Environment secrets `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY` holding the test App's real id and private key. Do NOT create repository or organization secrets with these names. Leave the probe secrets `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY` and variable `STEWARD_APP_CLIENT_ID` untouched. | block OA1 below, per test-bed | org-public part: Phase 4, before the org-public smoke step (the first run that uses the Environment). personal and org-private parts: Phase 5, before the first scenario on that test-bed (S15 personal; S16 and S17 org-private); S17 needs all three. |
+| OA2 | Create PRIVATE repository `steady-orchard/patch-steward-testbed-evidence` initialized with one commit (a README) | block OA2 below | Phase 5, before S16. Phase 4 may deploy the org-private policy naming this repository without it (no org-private run occurs in phase 4). |
+| OA3 | Add `steady-orchard/patch-steward-testbed-evidence` to the selected repositories of the organization installation 162868612 of `patch-steward-testbed` | OA2 verify passes first; then the S16 run itself: publish mints a store token for the evidence repository (log line `token repositories=...evidence`) and commits there. A token-mint or installation-lookup failure for that repository in S16 means OA3 is missing. No local read is possible without the App key. | Phase 5, S16 |
+| OA4 | Confirm the personal installation 162875728 has accepted the App's current permissions (actions, checks, contents, issues, pull requests, statuses write; metadata read) | The S15 run itself publishes to the personal test-bed's `steward-evidence` branch. A token-mint failure or an HTTP 403 permission refusal in S15 means OA4 is missing. | Phase 5, S15 |
+
+OA1 verify, run once per test-bed `<r>` in {`steady-orchard/patch-steward-testbed-public`, `jambolo/patch-steward-testbed-personal`,
+`steady-orchard/patch-steward-testbed-private`}; each line prints the expected value on the right of `# ->`:
+
+```bash
+gh api repos/<r>/environments/steward-publication/secrets --jq '[.secrets[].name] | sort'        # -> ["PATCH_STEWARD_APP_ID","PATCH_STEWARD_APP_PRIVATE_KEY"]
+gh api repos/<r>/environments/steward-publication/deployment-branch-policies --jq '[.branch_policies[].name]'   # -> ["master"]
+gh api repos/<r>/actions/secrets --jq '[.secrets[].name | select(startswith("PATCH_STEWARD_"))]'   # -> []
+# steady-orchard/* test-beds only:
+gh api repos/<r>/actions/organization-secrets --jq '[.secrets[].name | select(startswith("PATCH_STEWARD_"))]'   # -> []
+```
+
+OA2 verify:
+
+```bash
+gh api repos/steady-orchard/patch-steward-testbed-evidence --jq '[.private, .size >= 0]'   # -> [true,true]
+gh api repos/steady-orchard/patch-steward-testbed-evidence/commits --jq length              # -> a number >= 1
+```
 
 No App permission change is needed (G7 scopes are within the organization installation's current permissions). Rulesets restricting
 evidence-branch pushes are NOT configured in M06 (a later installation concern; unavailable on org-private anyway).
 
-### Owner gate questions (return with `RESULT: needs-human`)
+### Owner gate answers (APPROVED 2026-09-27; applied in place throughout this brief)
 
-The final message of the planner lists these questions verbatim; answers are applied by amendment before decomposition. Each has
-options and a recommendation (R); "all R" is a valid answer.
-
-1. Ownership record and protocol (G1: OW1–OW8; `disposition` without `awaiting-approval`; `cap` object; record `created_at`
-   informational; effective retention logged, not stored in the record). A approve (R). B amend (say what).
-2. Reopen (DD2). A `reopened` always commits a new owner (SP03 step 2, SP19 step 3) (R). B unchanged snapshot keeps the owner.
-3. Tie or incomplete ownership listing seen by `gate` (DD5). A gate commits anyway; only publish is blocked by ties (R). B gate fails.
-4. Caps (G3). A RN1 run-name with `sender <id>` added to D3's fields, CP1–CP7; duplicates still counted by other gates, "no cap debit"
-   meaning the duplicate itself is never cap-checked or queued (R). B count committed runs via a repository-wide ownership-artifact
-   listing (exact "no debit", more requests, departs from D3's run-list source).
-5. Evidence store (G4: ES1–ES10; compare-based append-only check; blob-id read-back; publish creates the orphan branch). Template branch
-   name: A rename `patch-steward-evidence` to `steward-evidence` (R). B keep the template value (D2's name used only on test-beds).
-6. Layout additions (G5). A approve waiting run directories with manifest `run_kind`, supersession record and metrics paths,
-   metrics-only closure commits, resolution keys including `deleted` (R). B same without `deleted` (issue deletions unrecorded).
-7. Jobs in M06 (WF2). A `build`, `gate`, `publish` only; stage jobs arrive in M13 (R). B also add pass-through `intake`, `execute`,
-   `assess` jobs with artifact handoffs now.
-8. Closures (WF5). A extend the publish condition to record-only runs (architecture §6.4 change) (R). B `gate` writes closure
-   evidence itself (a second writer job).
-9. Names (WF13). A Environment `steward-publication`, secrets `STEWARD_APP_ID` and `STEWARD_APP_PRIVATE_KEY`; test-bed repository
-   secrets of the same names stay for the probe suite (R). B same names, and you delete the test-bed repository secrets (probe drift
-   re-runs then need rework). C distinct names (you choose).
-10. App tokens (G7). A the core mints per-job scoped tokens (JWT with `node:crypto`, explicit repositories and permissions, masked,
-    revoked) (R). B `actions/create-github-app-token` steps.
-11. Steward SHA inside the reusable workflow (WF8). A wrapper passes `steward_ref` equal to its pin, checked statically (R). B first
-    verify a runner context that exposes the called workflow's own SHA, then drop the input.
-12. Runtime-build mitigations (G8). A approve M1–M8 (R). B name the ones rejected (without M1, `gate` and `publish` install and build
-    themselves while holding the key).
-13. Hard-only constants K38–K51 (G9). A approve (R). B amend values.
-14. Scenario suite (G10). A new persistent `scenarios/` directory, S01–S16, test-bed-only sender guard, ambiguous and unavailable reads
-    proved at fixture tier (R). B place the suite under `probes/`.
-15. ADRs and docs (G11). A ADR-0071–ADR-0078 as listed, ADR-0011 `superseded by ADR-0077`, documentation stance and inventory as
-    drafted (R). B amend.
-16. Interpretations I1–I20. A accept all (R). B name rejects (notable: I5 advise/enforce policies fail `gate`; I8 duplicates leave no
-    evidence; I11 replaced pending publish leaves no evidence; I19 live tests move to the fork).
-17. Owner actions OA1–OA4: perform them and reply "done", or name any declined.
+| Q | Topic | Answer | Applied as |
+| --- | --- | --- | --- |
+| 1 | Ownership record and protocol (G1) | A | OW1–OW8 as written |
+| 2 | Reopen (DD2) | A | `reopened` always commits a new owner |
+| 3 | Tie or incomplete listing in `gate` (DD5) | A | gate commits; only publish is blocked |
+| 4 | Caps (G3) | A | RN1 with `sender <id>`, CP1–CP7; "no cap debit" = the duplicate itself is never cap-checked or queued |
+| 5 | Evidence store (G4) | A | ES1–ES10; template branch renamed `patch-steward-evidence` → `steward-evidence` |
+| 6 | Layout additions (G5) | A | waiting run directories with `run_kind`, supersession records, metrics-only closures, resolution `deleted` |
+| 7 | Jobs in M06 (WF2) | A | `build`, `gate`, `publish` only |
+| 8 | Closures (WF5) | A | publish condition extended to record-only runs |
+| 9 | Names (WF13) | C | distinct names: Environment `steward-publication` (default branch only); Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; probe secrets `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY`, variable `STEWARD_APP_CLIENT_ID` untouched and never read by the product; live Environment-only delivery check S17 (SC5, I21) wired to the exit criterion "Only gate and publish reference the publication Environment" |
+| 10 | App tokens (G7) | A | core mints per-job scoped tokens |
+| 11 | Steward SHA (WF8) | A | `steward_ref` input equal to the pin, checked statically |
+| 12 | Runtime-build mitigations (G8) | A | M1–M8 all binding |
+| 13 | Constants (G9) | A | K38–K51 as listed |
+| 14 | Scenario suite (G10) | A | persistent `scenarios/`, S01–S16 plus S17 from Q9, test-bed-only sender guard, ambiguous and unavailable reads at fixture tier |
+| 15 | ADRs and docs (G11) | A | ADR-0071–ADR-0078; ADR-0011 `superseded by ADR-0077`; stance and inventory as written |
+| 16 | Interpretations | A | I1–I20 accepted; I21 added by this amendment to implement Q9's live check |
+| 17 | Owner actions | owner will perform OA1–OA4 (OA1 with the Q9 names) and report to the lead | NOT yet confirmed; verified per the Owner actions rule |
 
 ## Constraints
 
 - Branch: all commits on `milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish`; worktrees base on its current local HEAD.
   The pipeline MAY push this branch (and only `milestone/6-*` branches) to origin, never force-push, never push `develop` or `master`.
-- OWNER GATE PENDING: no decomposition until the ledger's `owner-gate` reads APPROVED; after approval, every approved gate item is
-  binding exactly as written; rejected alternatives are never implemented; changes need a planner amendment with owner approval.
+- OWNER GATE APPROVED 2026-09-27 (ledger `owner-gate`): every gate item is binding exactly as written; rejected alternatives are never
+  implemented; changes need a planner amendment with owner approval. Owner actions are verified per "Owner actions" before the step
+  that first needs each; a failed verify returns `RESULT: needs-human` naming the missing OA.
+- Secret names: the product (`.github/workflows/steward-screening.yml`, `templates/**`, `packages/**`, `scenarios/**`) uses only
+  `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY` from Environment `steward-publication`; it never references or reads the
+  probe suite's `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY`, or `STEWARD_APP_CLIENT_ID`, and the pipeline never modifies those probe
+  secrets or the probe workflows that use them. Tests and scenario tools that check for the probe names never write them as contiguous
+  literals (build them by concatenation, e.g. `'STEWARD_' + 'APP_ID'`, or match with the alternation pattern
+  `(?<!PATCH_)STEWARD_APP_(ID|PRIVATE_KEY|CLIENT_ID)`), so project DoD item 18's grep stays empty; `scenarios/README.md` refers to
+  them only as "the probe suite's App secrets".
 - Adoption gate: steward workflows run only on the three test-beds listed above; never in this repository (no wrapper here) and never
   on any other repository.
 - Test-bed writes only through `probes/smoke/tools/*.sh`, `scenarios/tools/*.sh`, and `gh` commands on the three test-beds and the fork
@@ -841,8 +895,9 @@ options and a recommendation (R); "all R" is a valid answer.
 
 ## Assumptions
 
-- The owner answers the gate before decomposition; OA1–OA4 are completed before the scenario phase (the scenario phase escalates with
-  `needs-human` if a verify command fails).
+- The owner answered the gate on 2026-09-27 (all recommendations except Q9 C). The owner completes OA1–OA4 before the phase or step
+  each is "Needed first by" (OA1 org-public: phase 4 smoke; the rest: phase 5); the pipeline escalates with `needs-human` naming the
+  action if a verify command fails.
 - GitHub keeps the probed semantics (PA02–PA09) during the milestone; a deviation observed in a scenario is recorded verbatim and
   escalated, never worked around.
 - `actions/upload-artifact`, `actions/download-artifact`, `actions/checkout`, `actions/setup-node` current major versions (v7, v8, v7, v7
@@ -865,7 +920,7 @@ options and a recommendation (R); "all R" is a valid answer.
 
 ## Definition of Done (project)
 
-DRAFT until the gate is approved (items referring to gate text are re-pinned by the approval amendment). Run in the main tree
+Pinned by the approval amendment of 2026-09-27 (owner gate APPROVED). Run in the main tree
 (`cd /c/Users/John/Projects/steady-orchard/patch-steward`), Git Bash, after the last phase. `S` =
 `6418129c7b104fd93d9162efcda6fe08373287ee`.
 
@@ -885,16 +940,21 @@ DRAFT until the gate is approved (items referring to gate text are re-pinned by 
 6. Action package: `pnpm vitest run packages/action` passes (environment validation, outputs single-line and escaped, masks emitted
    before other output, summary bounded, entry dispatch).
 7. Live tier (read-only): `GH_TOKEN=$(gh auth token) pnpm test:live` exits 0 with the I19 changes.
-8. Scenarios: `scenarios/results/org-public.md`, `personal.md`, `org-private.md` record S01–S16 each with result `pass` and verbatim
+8. Scenarios: `scenarios/results/org-public.md`, `personal.md`, `org-private.md` record S01–S17 (as applicable per test-bed; S13, S14,
+   S17 in all three) each with result `pass` and verbatim
    evidence (run URLs, artifact listings, evidence commit SHAs); every exit criterion row of G10 maps to at least one passing scenario.
 9. Observe audit (S13) re-run by the final gate: for every `[scenario` issue and PR on the three test-beds, App-authored comments,
    labels, App check runs on their head SHAs, and requested reviewers all count `0`.
 10. Steady state (SC3): `gh workflow list -R <r> --all --json path,state` shows `steward-pr.yml`, `steward-issues.yml`, `scenario-*`
-    all `disabled_manually` on the three test-beds; no open `[scenario` issue or PR.
+    all `disabled_manually` on the three test-beds (`scenario-secret-scope-called.yml` may instead read `active`, SC3); no open
+    `[scenario` issue or PR.
 11. Pins: the reusable workflow SHA pinned by the deployed test-bed wrappers is an ancestor of the pushed
     `origin/milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish` (`git merge-base --is-ancestor <sha> <remote ref>` exits 0).
-12. ADRs: exactly the approved inventory exists; `grep -c '^| \[ADR-' docs/adr/README.md` equals 70 plus the approved count; ADR-0011
-    status line and README row as approved; no other pre-existing record changes.
+12. ADRs: exactly ADR-0071 through ADR-0078 are new (`ls docs/adr/007[1-8]-*.md` lists 8 files; no `docs/adr/0079-*`);
+    `grep -c '^| \[ADR-' docs/adr/README.md` prints `78`; `docs/adr/0011-distribution.md` contains the line
+    `- Status: superseded by ADR-0077` and its README row status cell reads `superseded by ADR-0077`; no other pre-existing record
+    changes (`git diff --name-only S HEAD -- docs/adr` lists only `docs/adr/README.md`, `docs/adr/0011-distribution.md`, and the 8 new
+    files).
 13. §15: `grep -c 'Ownership artifact naming, retention' docs/architecture.md` prints `0`; `grep -c 'the artifact schema for the
     ownership record' docs/architecture.md` prints `0`.
 14. Persistence: `git grep -n -P 'development-artifacts|\bM0[0-9]\b|\bM1[0-9]\b|\bM2[01]\b|\bPD0[1-8]\b|owner decision|\b(OW|DD|EV|RN|CP|ES|EL|WS|SS|RS|WF|AT|SC|OA)[0-9]{1,2}\b' HEAD -- docs README.md CLAUDE.md fixtures templates scenarios ':!docs/project-development-plan.md' ':!docs/astra-plan.md'`
@@ -904,6 +964,10 @@ DRAFT until the gate is approved (items referring to gate text are re-pinned by 
 16. Documentation truth: README Status, CLAUDE.md Project state, architecture and processes Status paragraphs describe the hosted
     skeleton as observe-mode, contract-level, test-bed-only; none describes a check, comment, label, stage, container, model call, or
     installation as working; `docs/user-manual/installation.md` target-repository installation stays Proposed; the configuration callout
-    no longer lists App-secret names or Environment names.
+    no longer lists App-secret names or Environment names, and `docs/user-manual/configuration.md` names Environment
+    `steward-publication` and Environment secrets `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY`.
 17. Prettier and characters: `pnpm prettier --check docs README.md CLAUDE.md fixtures templates scenarios .github` exits 0; no control,
     bidi, or zero-width character in any file changed since `S`.
+18. Secret names: `git grep -n -P '(?<!PATCH_)STEWARD_APP_(ID|PRIVATE_KEY|CLIENT_ID)' HEAD -- .github/workflows/steward-screening.yml templates packages scenarios docs README.md CLAUDE.md ':!docs/project-development-plan.md' ':!docs/astra-plan.md'`
+    prints nothing (exit 1); `git grep -c 'PATCH_STEWARD_APP_PRIVATE_KEY' HEAD -- .github/workflows/steward-screening.yml` prints a
+    count ≥ 1; `scenarios/results/*.md` record S17 `pass` on all three test-beds.

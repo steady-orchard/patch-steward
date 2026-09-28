@@ -12,7 +12,8 @@ updates Steps and appends Revisions.
 - starting-commit: 6418129c7b104fd93d9162efcda6fe08373287ee
 - default-branch: develop
 - artifacts-dir: development-artifacts
-- owner-gate: PENDING (brief "Owner gate questions" 1-17; G1-G11, I1-I20, K38-K51, OA1-OA4 are drafts). No phase may be decomposed until this field reads APPROVED.
+- owner-gate: APPROVED 2026-09-27. Answers: Q1-Q8 A; Q9 C (distinct names: Environment `steward-publication` restricted to the default branch; Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; test-bed probe secrets `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY` and variable `STEWARD_APP_CLIENT_ID` untouched and never read by the product; added live check S17: a job of a called reusable workflow that does not declare the Environment receives both secrets empty, wired to the exit criterion "Only gate and publish reference the publication Environment"); Q10-Q16 A (incl. M1-M8, K38-K51, `scenarios/` suite, ADR-0071-ADR-0078 with ADR-0011 superseded by ADR-0077, I1-I20; I21 added); Q17 owner will perform OA1-OA4 and report to the lead. Brief "Owner gate answers" holds the full record.
+- owner-actions: OA1-OA4 NOT yet confirmed. Verify each with the brief "Owner actions" command before the step that first needs it (OA1 org-public: phase 4 org-public smoke; OA1 personal and org-private, OA2, OA3, OA4: phase 5 per the roadmap); a failed verify returns `RESULT: needs-human` naming the missing action.
 
 ## Phases
 
@@ -21,8 +22,8 @@ updates Steps and appends Revisions.
 | 1     | pending | Core contracts (pure): bounds K38-K51, records (ownership, waiting, supersession, resolution keys), event model, dedup, newest owner, run-name and caps, store path planning, blob id, zip entry reader, job summary renderer. Blocked on owner gate. |
 | 2     | pending | GitHub and evidence-store adapters: allowlisted writer, App tokens, artifacts list and download, run list, Git Data API store with retries and read-back, gate fallback read, recorded responses. Needs Phase 1. |
 | 3     | pending | Hosted gate and publish, action package entry, invariant 2, 4, 7, 8 extensions, write allowlist, fixture-tier hosted scenarios. Needs Phase 2. |
-| 4     | pending | Reusable workflow, wrapper templates, static workflow tests, live-test switch, scenarios skeleton, push to origin, OA1-OA4 verified, test-bed deployment, org-public smoke. Needs Phase 3 and owner actions. |
-| 5     | pending | Live test-bed scenarios S01-S16 with recorded results, steady state. Needs Phase 4. |
+| 4     | pending | Reusable workflow, wrapper templates (secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`), static workflow tests, live-test switch, scenarios skeleton incl. SC5 secret-scope pair, push to origin, test-bed deployment, OA1 verified on org-public, org-public smoke. Needs Phase 3 and OA1 on org-public (before the smoke step only). |
+| 5     | pending | Live test-bed scenarios S01-S17 (S17 = Environment-only secret delivery on all three test-beds) with recorded results, steady state. Needs Phase 4; OA1 on personal and org-private, OA2, OA3, OA4 verified before the scenarios that need them (S15, S16, S17). |
 | 6     | pending | ADR-0071 onward, governing documents, whitepaper, README, CLAUDE.md, user manual, project DoD. Needs Phase 5. |
 
 ## Pipeline rules (from earlier milestones plus M06 outward actions; binding for every agent in this plan)
@@ -66,3 +67,7 @@ updates Steps and appends Revisions.
 ## Revisions
 
 <!-- supervisor appends: phase | failed step | revision note | outcome -->
+
+| Phase | Trigger step | Amendment | Outcome |
+| --- | --- | --- | --- |
+| all (before phase 1) | owner gate (2026-09-27) | Owner gate answered: Q1-Q8 and Q10-Q16 A, Q9 C, Q17 owner performs OA1-OA4. Brief: gate items, I-list, owner actions marked APPROVED and binding; product secret names changed to `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY` in WF1, WF4, WF12, WF13, AT1, OA1, G11 inventory, module layout, conformance titles, constraints; added SC5, S17, I21, project DoD item 18; re-pinned DoD items 8, 10, 12, 16; owner actions gained verify blocks and a needed-first-by column. Roadmap: gate APPROVED, S01-S17, earliest phase per OA, phase 4 needs OA1 on org-public only, phase 5 names the rest, phase 6 DoD items 1-18. | brief amended |
