@@ -1,0 +1,19 @@
+name: steward-issues
+run-name: steward issue ${{ github.event.issue.number }} author ${{ github.event.issue.user.id }} event ${{ github.event_name }} ${{ github.event.action }} sender ${{ github.event.sender.id }} ${{ github.event.sender.type }}
+
+on:
+  issues:
+    types: [opened, edited, reopened, closed, deleted]
+
+permissions: {}
+
+jobs:
+  screen:
+    name: screen
+    permissions: {}
+    uses: steady-orchard/patch-steward/.github/workflows/steward-screening.yml@0000000000000000000000000000000000000000 # replace with a steward release commit
+    with:
+      steward_ref: '0000000000000000000000000000000000000000'
+    secrets:
+      PATCH_STEWARD_APP_ID: ${{ secrets.PATCH_STEWARD_APP_ID }}
+      PATCH_STEWARD_APP_PRIVATE_KEY: ${{ secrets.PATCH_STEWARD_APP_PRIVATE_KEY }}
