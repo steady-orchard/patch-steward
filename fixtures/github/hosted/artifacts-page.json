@@ -1,0 +1,65 @@
+{
+  "total_count": 4,
+  "artifacts": [
+    {
+      "id": 10842905286,
+      "node_id": "MDg6QXJ0aWZhY3QxMDg0MjkwNTI4Ng==",
+      "name": "probe-pa02-retention-0",
+      "size_in_bytes": 254,
+      "url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/actions/artifacts/10842905286",
+      "archive_download_url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/actions/artifacts/10842905286/zip",
+      "expired": false,
+      "digest": "sha256:a6021ec005b6bb12e26271fdd9d9141d8be05a48f327af8ba367f1deccd65e57",
+      "created_at": "2026-09-25T01:26:09Z",
+      "updated_at": "2026-09-25T01:26:09Z",
+      "expires_at": "2026-12-24T01:26:05Z",
+      "workflow_run": {
+        "id": 36081988862,
+        "repository_id": 1376317064,
+        "head_repository_id": 1376317064,
+        "head_branch": "master",
+        "head_sha": "f93139ccdd42cc331a7390acf12328e57114883a"
+      }
+    },
+    {
+      "id": 10842800390,
+      "node_id": "MDg6QXJ0aWZhY3QxMDg0MjgwMDM5MA==",
+      "name": "probe-pa02-retention-400",
+      "size_in_bytes": 254,
+      "url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/actions/artifacts/10842800390",
+      "archive_download_url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/actions/artifacts/10842800390/zip",
+      "expired": false,
+      "digest": "sha256:a6021ec005b6bb12e26271fdd9d9141d8be05a48f327af8ba367f1deccd65e57",
+      "created_at": "2026-09-25T01:26:12Z",
+      "updated_at": "2026-09-25T01:26:12Z",
+      "expires_at": "2026-12-24T01:26:05Z",
+      "workflow_run": {
+        "id": 36081988862,
+        "repository_id": 1376317064,
+        "head_repository_id": 1376317064,
+        "head_branch": "master",
+        "head_sha": "f93139ccdd42cc331a7390acf12328e57114883a"
+      }
+    },
+    {
+      "id": 10841874867,
+      "node_id": "MDg6QXJ0aWZhY3QxMDg0MTg3NDg2Nw==",
+      "name": "probe-pa02-retention-90",
+      "size_in_bytes": 254,
+      "url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/actions/artifacts/10841874867",
+      "archive_download_url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/actions/artifacts/10841874867/zip",
+      "expired": false,
+      "digest": "sha256:a6021ec005b6bb12e26271fdd9d9141d8be05a48f327af8ba367f1deccd65e57",
+      "created_at": "2026-09-25T01:26:11Z",
+      "updated_at": "2026-09-25T01:26:11Z",
+      "expires_at": "2026-12-24T01:26:05Z",
+      "workflow_run": {
+        "id": 36081988862,
+        "repository_id": 1376317064,
+        "head_repository_id": 1376317064,
+        "head_branch": "master",
+        "head_sha": "f93139ccdd42cc331a7390acf12328e57114883a"
+      }
+    }
+  ]
+}

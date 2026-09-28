@@ -1,0 +1,10 @@
+{
+  "ref": "refs/heads/master",
+  "node_id": "REF_kwDOUgjuiLFyZWZzL2hlYWRzL21hc3Rlcg",
+  "url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/git/refs/heads/master",
+  "object": {
+    "sha": "1809582794e9aa5a3c4e4eab03e99933d83e9fb3",
+    "type": "commit",
+    "url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/git/commits/1809582794e9aa5a3c4e4eab03e99933d83e9fb3"
+  }
+}
