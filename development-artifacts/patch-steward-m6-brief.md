@@ -440,8 +440,10 @@ test-bed repositories only, with the test App; never this repository, never real
 - ES9 A failed evidence write fails the publish job: no job summary outcome, no supersession record, nothing else (SP18 failure handling).
 - ES10 Gate fallback read (OW8, DD4): `GET /repos/{s}/contents/<owner>/<repo>/runs/<pr|issue>-<n>?ref=<branch>` (directory listing ≤
   K46 entries; 404 = no published run); latest = greatest `(run_id, run_attempt)` numerically among names `<digits>-<digits>`; then read
-  that run's `submission.json` (≤ K46 bytes, validated) and use its snapshot hash and policy revision. Any other failure → treated as
-  unavailable (DD6).
+  that run's `run.json` (≤ K46 bytes, validated with `runRecordSchema` from `packages/core/src/records/run.ts`; `subject.kind` must be
+  `submission` with `repository`, `type`, `number` equal to the event's) and use its `subject.snapshot_hash` and `policy_revision`.
+  (`submission.json` carries `snapshot_hash` but no policy revision, so it is never the fallback source.) Any other failure, including a
+  schema or subject mismatch → treated as unavailable (DD6).
 
 ### Gate G5 — evidence layout additions and records (APPROVED; EL-, WS-, SS-, RS-rules)
 
