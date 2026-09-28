@@ -1,0 +1,20 @@
+name: steward-pr
+run-name: steward pr ${{ github.event.pull_request.number }} author ${{ github.event.pull_request.user.id }} event ${{ github.event_name }} ${{ github.event.action }} sender ${{ github.event.sender.id }} ${{ github.event.sender.type }}
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, edited, reopened, ready_for_review, closed]
+
+permissions: {}
+
+jobs:
+  screen:
+    name: screen
+    if: ${{ github.event.sender.id == 2095171 || github.event.sender.id == 331019482 }}
+    permissions: {}
+    uses: steady-orchard/patch-steward/.github/workflows/steward-screening.yml@7161cd20df662314d14cc7f2f4130102baee1e98 # pushed steward commit
+    with:
+      steward_ref: '7161cd20df662314d14cc7f2f4130102baee1e98'
+    secrets:
+      PATCH_STEWARD_APP_ID: ${{ secrets.PATCH_STEWARD_APP_ID }}
+      PATCH_STEWARD_APP_PRIVATE_KEY: ${{ secrets.PATCH_STEWARD_APP_PRIVATE_KEY }}
