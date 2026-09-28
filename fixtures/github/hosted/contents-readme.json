@@ -1,0 +1,18 @@
+{
+  "name": "README.md",
+  "path": "README.md",
+  "sha": "116605f9c2635eb377a0101dbe332b99adfda976",
+  "size": 112,
+  "url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/contents/README.md?ref=master",
+  "html_url": "https://github.com/steady-orchard/patch-steward-testbed-public/blob/master/README.md",
+  "git_url": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/git/blobs/116605f9c2635eb377a0101dbe332b99adfda976",
+  "download_url": "https://raw.githubusercontent.com/steady-orchard/patch-steward-testbed-public/master/README.md",
+  "type": "file",
+  "content": "IyBwYXRjaC1zdGV3YXJkLXRlc3RiZWQtcHVibGljCkRpc3Bvc2FibGUgdGVz\ndC1iZWQgZm9yIHBhdGNoLXN0ZXdhcmQgcGxhdGZvcm0gcHJvYmVzIChNMDIp\nLiBOb3QgYSByZWFsIHByb2plY3QuCg==\n",
+  "encoding": "base64",
+  "_links": {
+    "self": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/contents/README.md?ref=master",
+    "git": "https://api.github.com/repos/steady-orchard/patch-steward-testbed-public/git/blobs/116605f9c2635eb377a0101dbe332b99adfda976",
+    "html": "https://github.com/steady-orchard/patch-steward-testbed-public/blob/master/README.md"
+  }
+}
