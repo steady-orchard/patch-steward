@@ -1108,3 +1108,82 @@ EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=pr-37 runs=1
 ```
 
 Result: pass
+
+## S11 daily run cap: over-cap work waits
+
+Date (UTC): 2026-09-28. Deployed a policy with `limits.caps.daily_runs: 1`, filed two complete defect issues on the test-bed, and confirmed both runs were queued as over the daily cap with a persisted waiting evidence record; the issues are https://github.com/steady-orchard/patch-steward-testbed-public/issues/38 and https://github.com/steady-orchard/patch-steward-testbed-public/issues/39, the runs are https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36422412647 and https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36422572569; the valid policy was restored afterward.
+
+```text
+$ bash scenarios/tools/deploy-steward.sh org-public scenarios/fixtures/policies/caps-daily.yml
+SCENARIO-DEPLOY repo=steady-orchard/patch-steward-testbed-public pin=7161cd20df662314d14cc7f2f4130102baee1e98 policy=scenarios/fixtures/policies/caps-daily.yml result=ok
+```
+
+```text
+$ gh issue create -R steady-orchard/patch-steward-testbed-public --title "[scenario S11] daily cap, first issue" --body-file fixtures/submissions/defect-complete.txt
+https://github.com/steady-orchard/patch-steward-testbed-public/issues/38
+$ gh issue create -R steady-orchard/patch-steward-testbed-public --title "[scenario S11] daily cap, second issue" --body-file fixtures/submissions/defect-complete.txt
+https://github.com/steady-orchard/patch-steward-testbed-public/issues/39
+```
+
+```text
+$ gh run view 36422412647 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36422412647 1 gate | grep -E 'text=(event |policy |listing |dedup |caps |disposition |- Status|- Caps)'
+LOG job=gate ts=2026-09-28T12:32:24.4721142Z text=event issues opened issue 38 sender User
+LOG job=gate ts=2026-09-28T12:32:24.4722349Z text=policy trusted-branch revision b1916b8f26073a908208c9e5afa66fdd067f68a8
+LOG job=gate ts=2026-09-28T12:32:24.4723078Z text=listing none
+LOG job=gate ts=2026-09-28T12:32:24.4723438Z text=dedup commit no-owner
+LOG job=gate ts=2026-09-28T12:32:24.4723878Z text=caps daily-runs daily 28 of 1 author 1 of 20
+LOG job=gate ts=2026-09-28T12:32:24.4724324Z text=disposition queued
+LOG job=gate ts=2026-09-28T12:32:24.4858738Z text=- Status: `queued`
+LOG job=gate ts=2026-09-28T12:32:24.4862659Z text=- Caps: daily `28` of `1`, author `1` of `20`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36422412647 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence)'
+LOG job=publish ts=2026-09-28T12:32:48.4562214Z text=evidence commit 17014464085e4fea68a62ddbfa26aef1ed5b53ed rebuilds 0
+LOG job=publish ts=2026-09-28T12:32:48.4562828Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:32:48.4563388Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:32:48.4563916Z text=freshness current
+LOG job=publish ts=2026-09-28T12:32:48.4653291Z text=- Status: `queued`
+LOG job=publish ts=2026-09-28T12:32:48.4658472Z text=- Evidence: commit `17014464085e4fea68a62ddbfa26aef1ed5b53ed` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/issue-38/36422412647-1`
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public issue 38
+RECORD run=36422412647-1 kind=waiting state=queued reason=daily-runs daily=28/1 author=1/20 arrival_at=2026-09-28T12:32:27Z policy_revision=b1916b8f26073a908208c9e5afa66fdd067f68a8 snapshot=sha256:4007e73d96b9257681ce78747da7953e1a1b3471d53e9b3477c026f601ea8434
+RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public subject=issue-38 runs=1 supersessions=0
+$ bash scenarios/tools/evidence.sh steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public issue 38
+EVIDENCE run=36422412647-1 kind=waiting manifest=verified
+EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=issue-38 runs=1 verified=1 result=ok
+```
+
+```text
+$ gh run view 36422572569 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36422572569 1 gate | grep -E 'text=(event |policy |listing |dedup |caps |disposition |- Status|- Caps)'
+LOG job=gate ts=2026-09-28T12:33:50.5437080Z text=event issues opened issue 39 sender User
+LOG job=gate ts=2026-09-28T12:33:50.5437837Z text=policy trusted-branch revision b1916b8f26073a908208c9e5afa66fdd067f68a8
+LOG job=gate ts=2026-09-28T12:33:50.5438274Z text=listing none
+LOG job=gate ts=2026-09-28T12:33:50.5438567Z text=dedup commit no-owner
+LOG job=gate ts=2026-09-28T12:33:50.5438801Z text=caps daily-runs daily 29 of 1 author 1 of 20
+LOG job=gate ts=2026-09-28T12:33:50.5439030Z text=disposition queued
+LOG job=gate ts=2026-09-28T12:33:50.5556682Z text=- Status: `queued`
+LOG job=gate ts=2026-09-28T12:33:50.5558186Z text=- Caps: daily `29` of `1`, author `1` of `20`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36422572569 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence)'
+LOG job=publish ts=2026-09-28T12:34:15.5958483Z text=evidence commit 9bc21b43643ad7c9f83f377598b51fddd0efd469 rebuilds 0
+LOG job=publish ts=2026-09-28T12:34:15.5959217Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:34:15.5959780Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:34:15.5960290Z text=freshness current
+LOG job=publish ts=2026-09-28T12:34:15.6129635Z text=- Status: `queued`
+LOG job=publish ts=2026-09-28T12:34:15.6134300Z text=- Evidence: commit `9bc21b43643ad7c9f83f377598b51fddd0efd469` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/issue-39/36422572569-1`
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public issue 39
+RECORD run=36422572569-1 kind=waiting state=queued reason=daily-runs daily=29/1 author=1/20 arrival_at=2026-09-28T12:33:52Z policy_revision=b1916b8f26073a908208c9e5afa66fdd067f68a8 snapshot=sha256:e39982efb57eadf9973d4aad52fcea001e6b46f58a4f1a9ff4455123b2de5a16
+RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public subject=issue-39 runs=1 supersessions=0
+$ bash scenarios/tools/evidence.sh steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public issue 39
+EVIDENCE run=36422572569-1 kind=waiting manifest=verified
+EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=issue-39 runs=1 verified=1 result=ok
+```
+
+```text
+$ bash scenarios/tools/deploy-steward.sh org-public
+SCENARIO-DEPLOY repo=steady-orchard/patch-steward-testbed-public pin=7161cd20df662314d14cc7f2f4130102baee1e98 policy=scenarios/fixtures/policies/orphan-branch.yml result=ok
+$ gh api "repos/steady-orchard/patch-steward-testbed-public/contents/.github?ref=master" --jq '.[] | select(.name=="patch-steward") | .sha'
+d997b1e362c75af03942da0e7a1e8902ca5dbe51
+```
+
+Result: pass
