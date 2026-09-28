@@ -7,7 +7,7 @@ updates Steps and appends Revisions.
 ## Plan
 
 - plan-name: patch-steward-m6
-- current-phase: 3
+- current-phase: 4
 - working-branch: milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish
 - starting-commit: 6418129c7b104fd93d9162efcda6fe08373287ee
 - default-branch: develop
@@ -21,7 +21,7 @@ updates Steps and appends Revisions.
 | ----: | ------- | ----- |
 | 1     | done    | Core contracts (pure): bounds K38-K51, records (ownership, waiting, supersession, resolution keys), event model, dedup, newest owner, run-name and caps, store path planning, blob id, zip entry reader, job summary renderer. Complete 2026-09-27; DoD D1-D8 re-verified by the supervisor in the main tree. |
 | 2     | done    | GitHub and evidence-store adapters: allowlisted writer, App tokens, artifacts list and download, run list, Git Data API store with retries and read-back, gate fallback read, recorded responses. Needs Phase 1. Complete 2026-09-27; DoD D1-D10 re-verified by the supervisor in the main tree. |
-| 3     | pending | Hosted gate and publish, action package entry, invariant 2, 4, 7, 8 extensions, write allowlist, fixture-tier hosted scenarios. Needs Phase 2. |
+| 3     | done    | Hosted gate and publish, action package entry, invariant 2, 4, 7, 8 extensions, write allowlist, fixture-tier hosted scenarios. Needs Phase 2. Complete 2026-09-28; DoD D1-D11 re-verified by the supervisor in the main tree. |
 | 4     | pending | Reusable workflow, wrapper templates (secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`), static workflow tests, live-test switch, scenarios skeleton incl. SC5 secret-scope pair, push to origin, test-bed deployment, OA1 verified on org-public, org-public smoke. Needs Phase 3 and OA1 on org-public (before the smoke step only). |
 | 5     | pending | Live test-bed scenarios S01-S17 (S17 = Environment-only secret delivery on all three test-beds) with recorded results, steady state. Needs Phase 4; OA1 on personal and org-private, OA2, OA3, OA4 verified before the scenarios that need them (S15, S16, S17). |
 | 6     | pending | ADR-0071 onward, governing documents, whitepaper, README, CLAUDE.md, user manual, project DoD. Needs Phase 5. |
@@ -118,7 +118,7 @@ updates Steps and appends Revisions.
 | 3.22 | 3 | done | packages/core/src/conformance/invariant-7-hosted.test.ts, development-artifacts/patch-steward-m6-3.22-report.md | 9603a9b28059e73f78392b48ac48782256f266f8 |
 | 3.23 | 3 | done | packages/core/src/conformance/write-allowlist.test.ts, packages/core/src/conformance/zero-execution.fixture.test.ts, development-artifacts/patch-steward-m6-3.23-report.md | fffacdb9bf6424f360f8bfdb1db317acc64c203a |
 | 3.24 | 3 | done | packages/action/src/dispatch.ts, packages/action/src/dispatch.test.ts, packages/action/src/main.ts, development-artifacts/patch-steward-m6-3.24-report.md | d7ee54ab5d19d2f0211bcef0ed6a5bee8271738a |
-| 3.25 | 3 | pending | development-artifacts/patch-steward-m6-3.25-report.md | |
+| 3.25 | 3 | done | development-artifacts/patch-steward-m6-3.25-report.md | 0d26033e0de83191f70bb6c536fcadf549d634af |
 
 ### Phase 1 notes
 
@@ -442,6 +442,28 @@ updates Steps and appends Revisions.
     `github.budget-exhausted`, never pass (test-bed policies keep 300; phase 6 documents it); (4) evidence/verify.ts still verifies
     outcome run directories only (the CLI is unchanged in M06; waiting directories are checked by manifest schema and read-back);
     (5) the OW7 successor attempt is read from the newer artifact's validated record (amendment item 5).
+- Execution (supervisor, 2026-09-27 to 2026-09-28):
+  - Waves run: W1 3.1-3.12 in worktrees C:/w/m6-<id> at 4f5d5ab; W2 3.13-3.15 at 1d27f69 (3.13 retried at 32fec2c); W3 3.16, 3.17
+    at f45ee79; W4 3.18-3.23 at 15fae5a; W5 3.24 at 344e5d2; 3.25 in the main tree at 325b652. After the 3.9 merge,
+    `pnpm install --frozen-lockfile` in the main tree linked packages/action/node_modules/@patch-steward/core; lockfile diff is the
+    action -> core link only (D4).
+  - One in-flight correction (option b), no decomposer revision, no amendment: 3.13 first attempt (fdf0b5d, discarded) failed
+    explicit reruns and reopened events on an unavailable listing, contrary to brief DD7 and DD1, DD2; the step file gained the rule
+    "Early listing failure (non-closure events)" (fail before capture only when appliesListingDeduplication is true) and the test
+    'a rerun or reopen commits despite an unavailable listing'; retry 1 passed (see Revisions).
+  - Worker deviations accepted (behavior per brief, no contract affected): 3.4, 3.23 test artifacts given distinct workflow run
+    ids or later createdAt to avoid unintended duplicates or ties; 3.9 edited the existing packages/action/tsconfig.test.json in
+    place (rootDir '..', core paths alias); 3.14 'the report points at the hosted evidence location' uses the early-exit scenario
+    (report.md carries the location only inside a rendered finding); 3.15 slices recorded requests from a count taken before the
+    call; 3.17 asserts `'files' in result` false on failure paths; 3.20 invariant-2 hosted drives publish down the newer-owner path
+    (a same-owner publish recaptures, and M04 capturePullRequest reads the head's proposed policy tree as data for the
+    policy-change finding, so "no head tree request during publish" holds only on non-recapture paths; the proposed policy never
+    governs: publish loads the trusted tree id and run.json records it); 3.20 invariant-8 'unknown freshness' override fails every
+    artifacts listing from the second call on (the client retries once on 500); 3.24 test helper readTextOrEmpty for lint.
+  - Post-merge integration after each wave (main tree): full vitest, typecheck, lint, format:check exit 0; final 186 files, 3440
+    tests. Phase DoD D1-D11 re-run by the supervisor in the main tree: all PASS (D2 64 titles, D3 31 titles, D5 fetch-blocked test
+    run exit 0, D7 leak check clean with 17 tolerated cli entries, D10 usage then exit 2, D11 114 export lines).
+  - All C:/w/m6-* worktrees and wt/patch-steward-m6-* branches removed. C:/w/m5-3.4 directory (M05 leftover) untouched.
 
 ## Revisions
 
