@@ -81,6 +81,19 @@ updates Steps and appends Revisions.
 | 1.13 | 1 | done | packages/core/src/pipeline/job-summary.ts, packages/core/src/pipeline/job-summary.test.ts, development-artifacts/patch-steward-m6-1.13-report.md | e02c34475f3c42f56f387d257c0f3dc8d715647b |
 | 1.14 | 1 | done | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/invariant-5.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-1.14-report.md | facfbf79e4d03b7a8cf341b8b2b1ed54c6c8a9b5 |
 | 1.15 | 1 | done | development-artifacts/patch-steward-m6-1.15-report.md | 57ddd023d7535a34c5eaa0dbcb57b3106235da6a |
+| 2.1 | 2 | pending | packages/core/src/github/client.ts, packages/core/src/github/client-lists.test.ts, development-artifacts/patch-steward-m6-2.1-report.md |  |
+| 2.2 | 2 | pending | packages/core/src/github/writer.ts, packages/core/src/github/writer.test.ts, development-artifacts/patch-steward-m6-2.2-report.md |  |
+| 2.3 | 2 | pending | packages/core/src/evidence/publish.ts, packages/core/src/evidence/prepare.test.ts, development-artifacts/patch-steward-m6-2.3-report.md |  |
+| 2.4 | 2 | pending | fixtures/github/hosted/artifacts-page.json, fixtures/github/hosted/runs-page.json, fixtures/github/hosted/runs-in-progress.json, fixtures/github/hosted/ref-heads-master.json, fixtures/github/hosted/git-commit-master.json, fixtures/github/hosted/compare-parent-master.json, fixtures/github/hosted/tree-master-github.json, fixtures/github/hosted/contents-readme.json, fixtures/github/hosted/contents-github-directory.json, fixtures/github/hosted/user-app-bot.json, fixtures/README.md, development-artifacts/patch-steward-m6-2.4-report.md |  |
+| 2.5 | 2 | pending | packages/core/src/evidence/fallback-read.ts, packages/core/src/evidence/fallback-read.test.ts, development-artifacts/patch-steward-m6-2.5-report.md |  |
+| 2.6 | 2 | pending | packages/core/src/github/app-auth.ts, packages/core/src/github/app-auth.test.ts, development-artifacts/patch-steward-m6-2.6-report.md |  |
+| 2.7 | 2 | pending | packages/core/src/github/artifacts.ts, packages/core/src/github/artifacts.test.ts, development-artifacts/patch-steward-m6-2.7-report.md |  |
+| 2.8 | 2 | pending | packages/core/src/github/runs.ts, packages/core/src/github/runs.test.ts, development-artifacts/patch-steward-m6-2.8-report.md |  |
+| 2.9 | 2 | pending | packages/core/src/evidence/git-store.ts, packages/core/src/evidence/git-store.test.ts, development-artifacts/patch-steward-m6-2.9-report.md |  |
+| 2.10 | 2 | pending | packages/core/src/evidence/store-readback.ts, packages/core/src/evidence/store-readback.test.ts, development-artifacts/patch-steward-m6-2.10-report.md |  |
+| 2.11 | 2 | pending | packages/core/src/github/hosted-responses.fixture.test.ts, development-artifacts/patch-steward-m6-2.11-report.md |  |
+| 2.12 | 2 | pending | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-2.12-report.md |  |
+| 2.13 | 2 | pending | development-artifacts/patch-steward-m6-2.13-report.md |  |
 
 ### Phase 1 notes
 
@@ -202,6 +215,98 @@ updates Steps and appends Revisions.
     RunListQueryResult shapes and `now` as a Date, per the real evaluateCaps signature.
   - Post-merge integration after each wave (main tree): full vitest, typecheck, lint exit 0; final 153 files, 2928 tests.
   - All C:/w/m6-* worktrees and wt/patch-steward-m6-* branches removed. C:/w/m5-3.4 is a pre-existing M05 leftover, untouched.
+
+### Phase 2 notes
+
+- Decomposed at the commit that adds this block (message `decompose(patch-steward-m6): phase 2 steps`), base 78a6c7d (phase 1
+  complete). The gate 2.13 uses 78a6c7d0831c350da98aa89e783a7ef1e333cace as the phase base (this decomposition commit touches only
+  development-artifacts/). No new dependency; no file under packages/cli/, packages/action/, .github/, templates/, docs/ is in any
+  scope. All steps route mechanical. No planner amendment was needed.
+- Dependency graph (scopes pairwise disjoint within each wave; merge order within a wave is free):
+  - W1 (parallel, no deps): 2.1 client object-list pagination and redirect read; 2.2 allowlisted writer; 2.3 prepared run
+    evidence (publish.ts split) and hosted evidence location input; 2.4 read-only recordings (gh api) plus fixtures/README.md;
+    2.5 ES10 fallback read.
+  - W2 (each starts once its own dep is merged): 2.6 App auth (2.2); 2.7 ownership artifact adapter (2.1); 2.8 run list adapter
+    (2.1); 2.9 git store commit ES1-ES5, ES7 (2.2).
+  - W3: 2.10 store read-back ES6 and writeEvidenceCommit (2.9); 2.11 fixture test over the recordings (2.4 to 2.9).
+  - W4: 2.12 root exports, exports test, never-pass-hosted (2.1 to 2.3, 2.5 to 2.10).
+  - W5: 2.13 gate (verification only; MAIN tree; after 2.11 and 2.12 merged).
+  - Critical path: 2.2 -> 2.9 -> 2.10 -> 2.12 -> 2.13.
+- Environment / bootstrap:
+  - Worker worktrees on short paths (C:/w/m6-<id>); `pnpm install --frozen-lockfile` per new worktree, sequentially.
+  - Acceptance runs Vitest with the JSON reporter to node_modules/.m6-p2-<id>.json and checks rendered titles with node (all
+    titles are plain it(...), none over it.each). jq is not installed. Greps never use a `$` anchor on CRLF files.
+  - 2.4 is the only step with GitHub access: read-only `gh api` GETs on org-public and the public users endpoint; it never calls a
+    /zip endpoint (signed URLs) and never prints a token. Recorded values are whatever GitHub serves at run time; 2.11 derives its
+    expectations from the files.
+  - 2.13 D5 blocks global fetch in every test process with NODE_OPTIONS='--import=data:text/javascript,globalThis.fetch=async()=>{throw(0)}'
+    (dry-run at the base: 153 files, 2928 tests pass; a probe test proved the preload reaches Vitest workers).
+  - 2.13 D10 greps packages and fixtures/github/hosted only: fixtures/github/testbed/pull-27-files.json (M05 recording) contains
+    probe workflow patch text naming the probe secrets.
+- Couplings:
+  - client.ts is edited only by 2.1 (GitHubFetchInit.method stays the literal 'GET'; GITHUB_FAILURE_CODES stays 17); 2.7 and 2.8
+    base-check its new methods.
+  - writer.ts (2.2) is used by 2.6 and 2.9; githubRepositoryPath and githubBranchRefPath are the shared path builders the allowlist
+    compares against.
+  - 2.10 copies the fakeStore test helper from 2.9's test file (content coupling covered by depends_on).
+  - Only 2.12 edits index.ts (98 -> 105 `export *` lines), exports.test.ts, and never-pass-hosted.test.ts. client.ts and publish.ts
+    are already root-exported, so the names 2.1 and 2.3 add surface at their merge; every new name was checked unique across core
+    and cli, and none starts with load, validate, resolve, parse, capture, or check (invariant-5 unchanged).
+  - fixtures/README.md is edited by 2.4 now and by phase 3 later (sequential).
+- Emergent contracts for phase 3 (pinned in the step files; names exact):
+  - Client (2.1): getPaginatedList(path, listKey, itemSchema, query?, maxPages?) -> { items, totalCount, complete } (pages beyond
+    maxPages give complete false, not a failure); getRedirectLocation(path, query?) -> absolute href (never followed).
+  - Writer (2.2): createGitHubWriter({ token, scope, budget, fetch?, sleep?, now? }) with send(request, schema) and
+    sendNoContent(request); scopes { kind: 'app' } and { kind: 'installation', store: { repository, branch } or null };
+    isAllowedGitHubWrite is the I15 allowlist including body shape (force false, blob-only 100644 tree entries, at most one parent,
+    one repository per token, read or write permissions); GITHUB_WRITE_FAILURE_CODES 'github.write-not-allowed' (steward-defect)
+    and 'github.write-conflict' (HTTP 422, github-unavailable, never retried by the writer); GitHubAnyFetch (global fetch fits).
+  - App auth (2.6): createAppJwt, lookupInstallationId, mintInstallationToken(credentials, repository, role, { budget, fetch? })
+    with roles gate-target, store-read, publish-target, publish-store, publish-target-and-store (orphan-branch publish uses the
+    merged role); InstallationToken.secret() keeps the token out of JSON; revokeInstallationToken; lookupAppBotUserId; failure
+    codes app-auth.credentials-invalid and app-auth.token-scope-mismatch (credential-unusable). Phase 3 registers the private key
+    and every token.secret() for redaction and masks them (a PEM key needs one ::add-mask:: per line).
+  - Artifacts (2.7): listOwnershipArtifacts (OW6 own-artifact retention, OW7 re-list), downloadOwnershipRecord,
+    readOwnershipListing (DD8 step 2 for every event kind; kinds unavailable, incomplete, none, ambiguous, unique with record
+    valid, invalid, or unavailable), dedupListingRead -> DedupListingRead. Deps { resolver, transport }: phase 3 passes
+    systemAttachmentResolver and httpsAttachmentTransport.
+  - Runs (2.8): readCapRunLists(client, repository, now) -> { createdToday, inProgress, queued, failure } feeding evaluateCaps.
+  - Store (2.9, 2.10): evidenceStoreLocation(policy.evidence.store, targetRepository); writeEvidenceCommit(input, { client, writer,
+    sleep? }) = commitEvidence then readBackEvidence, input { store, targetRepository, subject, runId, runAttempt (the gate
+    attempt, I12), groups, maxBytes (limits.evidence.run_bytes), writeRetries (limits.evidence.write_retries) } -> { commit, tree,
+    parent, rebuilds, paths, head }. Groups: the run directory runs/<pr or issue>-<n>/<run-dir> in exact mode (prepared files plus
+    manifest.json), metrics/<YYYY-MM> and runs/<pr or issue>-<n>/supersessions in contains mode. The writer must use scope
+    installation with the same store. evidenceCommitMessage; hostedEvidenceLocation(store, targetRepository, storePath) gives the
+    report location URL. Failure codes include evidence.store-conflict (infrastructure), evidence.store-not-append-only,
+    evidence.readback-mismatch (detail tokens blob-create, commit-create, ref-update, tip, truncated, blob-id, missing, extra),
+    evidence.layout-invalid, evidence.too-large, evidence.too-many-files, and pass-through GitHub codes.
+  - Prepare (2.3): prepareRunEvidence(input with optional evidenceLocation, localRun false for hosted runs) -> files
+    (run-relative, manifest excluded, log last), metrics { path, bytes }, manifestBytes, and the PublishedRun records; bytes equal
+    the local store's. Waiting, supersession, and closure file sets are phase 3 work.
+  - Fallback (2.5): readPublishedSnapshot(client, { store, targetRepository, subject }) -> DedupFallbackRead (none only for a 404
+    submission directory or no run directory; everything else unexpected is unavailable).
+- Decisions taken at decomposition (within the brief's latitude; no gate, DoD, or brief text changed):
+  - The GET-only client gained two GET methods instead of a new module because pagination and redirect reads need its private
+    transport; no failure code was added. The writer duplicates the transport so the client never gains a write method.
+  - OW5 second hop reuses fetchAttachment (destinations = the Location host, maxRedirects 0, K40 bytes): an http Location is
+    ownership.record-invalid (detail download-scheme); a non-public address is ownership.listing-unavailable (detail
+    download-private-address). Both fail closed.
+  - ES6 reads each committed directory with GET git/trees/<commit>:<path> (verified live on org-public before decomposition),
+    recursive only for the run directory; the root commit of an absent branch has no ES4 compare (nothing exists to preserve),
+    and a 422 on POST refs (branch created concurrently) is handled like a non-fast-forward.
+  - Blob, commit, and ref-update responses are checked against locally computed ids (evidence.readback-mismatch).
+  - ES10 treats a directory listing of 1000 or more entries as unavailable (the contents API truncates at 1000) and requires
+    run.json's run id and attempt to equal its directory name.
+  - EL1 is supported now (prepareRunEvidence evidenceLocation plus hostedEvidenceLocation); the M05 golden reports stay unchanged.
+  - The recorded run list confirmed `path` has no '@' suffix on org-public; the tolerant match in ownership/caps.ts stays.
+- Open items for phase 3 (not resolved here; no phase 2 step depends on them):
+  - A publish re-run of the same gate attempt after its evidence commit succeeded rewrites the same paths and fails
+    evidence.store-not-append-only; phase 3 decides whether to detect an existing run directory first.
+  - Compare responses carry patches: evidence near limits.evidence.run_bytes could exceed GITHUB_RESPONSE_MAX_BYTES (5 MiB), and
+    the compare API lists at most 300 files; both fail closed. M06 contract-level runs are small.
+  - One committed outcome run costs about 2 + (file count) + 4 requests plus 1 + (group count) for read-back; a policy at the
+    limits.github.requests_per_run minimum (10) cannot publish a run directory (exhaustion fails the job, never pass).
+  - evidence/verify.ts still cannot verify a waiting run directory (phase 1 open item); OW7 successor attempt still open.
 
 ## Revisions
 
