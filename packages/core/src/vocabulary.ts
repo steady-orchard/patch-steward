@@ -117,3 +117,47 @@ export type BuiltInDismissalCode = z.infer<typeof builtInDismissalCodeSchema>;
 export const LABEL_FAMILIES = ['status', 'classification'] as const;
 export const labelFamilySchema = z.enum(LABEL_FAMILIES);
 export type LabelFamily = z.infer<typeof labelFamilySchema>;
+
+export const GATE_DISPOSITIONS = ['runnable', 'early-exit', 'queued', 'duplicate', 'closure'] as const;
+export const gateDispositionSchema = z.enum(GATE_DISPOSITIONS);
+export type GateDisposition = z.infer<typeof gateDispositionSchema>;
+
+export const OWNERSHIP_DISPOSITIONS = ['runnable', 'early-exit', 'queued'] as const;
+export const ownershipDispositionSchema = z.enum(OWNERSHIP_DISPOSITIONS);
+export type OwnershipDisposition = z.infer<typeof ownershipDispositionSchema>;
+
+export const CAP_STATES = ['within', 'daily-runs', 'per-author-concurrent-runs'] as const;
+export const capStateSchema = z.enum(CAP_STATES);
+export type CapState = z.infer<typeof capStateSchema>;
+
+export const WAITING_REASONS = ['daily-runs', 'per-author-concurrent-runs'] as const;
+export const waitingReasonSchema = z.enum(WAITING_REASONS);
+export type WaitingReason = z.infer<typeof waitingReasonSchema>;
+
+export const SUPERSESSION_REASONS = ['newer-owner', 'snapshot-changed'] as const;
+export const supersessionReasonSchema = z.enum(SUPERSESSION_REASONS);
+export type SupersessionReason = z.infer<typeof supersessionReasonSchema>;
+
+export const RESOLUTION_KINDS = ['merged', 'closed-by-author', 'closed-by-maintainer', 'deleted'] as const;
+export const resolutionKindSchema = z.enum(RESOLUTION_KINDS);
+export type ResolutionKind = z.infer<typeof resolutionKindSchema>;
+
+export const RUN_KINDS = ['outcome', 'waiting'] as const;
+export const runKindSchema = z.enum(RUN_KINDS);
+export type RunKind = z.infer<typeof runKindSchema>;
+
+export const WRAPPER_EVENT_NAMES = ['pull_request_target', 'issues'] as const;
+export const wrapperEventNameSchema = z.enum(WRAPPER_EVENT_NAMES);
+export type WrapperEventName = z.infer<typeof wrapperEventNameSchema>;
+
+export const PULL_REQUEST_EVENT_ACTIONS = ['opened', 'synchronize', 'edited', 'reopened', 'ready_for_review', 'closed'] as const;
+export const pullRequestEventActionSchema = z.enum(PULL_REQUEST_EVENT_ACTIONS);
+export type PullRequestEventAction = z.infer<typeof pullRequestEventActionSchema>;
+
+export const ISSUE_EVENT_ACTIONS = ['opened', 'edited', 'reopened', 'closed', 'deleted'] as const;
+export const issueEventActionSchema = z.enum(ISSUE_EVENT_ACTIONS);
+export type IssueEventAction = z.infer<typeof issueEventActionSchema>;
+
+export const SENDER_TYPES = ['User', 'Bot', 'Organization', 'Mannequin'] as const;
+export const senderTypeSchema = z.enum(SENDER_TYPES);
+export type SenderType = z.infer<typeof senderTypeSchema>;

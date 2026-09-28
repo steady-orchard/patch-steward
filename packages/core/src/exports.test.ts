@@ -239,6 +239,17 @@ describe('package root exports', () => {
     'FAILURE_CAUSES',
     'BUILT_IN_DISMISSAL_CODES',
     'LABEL_FAMILIES',
+    'GATE_DISPOSITIONS',
+    'OWNERSHIP_DISPOSITIONS',
+    'CAP_STATES',
+    'WAITING_REASONS',
+    'SUPERSESSION_REASONS',
+    'RESOLUTION_KINDS',
+    'RUN_KINDS',
+    'WRAPPER_EVENT_NAMES',
+    'PULL_REQUEST_EVENT_ACTIONS',
+    'ISSUE_EVENT_ACTIONS',
+    'SENDER_TYPES',
     'BUILT_IN_TRUSTED_PATHS',
     'BUILT_IN_EXECUTION_SENSITIVE_PATHS',
     'PATH_CLASS_TEST_GLOBS',
@@ -304,6 +315,18 @@ describe('package root exports', () => {
     'failureCauseSchema',
     'builtInDismissalCodeSchema',
     'labelFamilySchema',
+    'gateDispositionSchema',
+    'ownershipDispositionSchema',
+    'capStateSchema',
+    'waitingReasonSchema',
+    'supersessionReasonSchema',
+    'resolutionKindSchema',
+    'runKindSchema',
+    'wrapperEventNameSchema',
+    'pullRequestEventActionSchema',
+    'issueEventActionSchema',
+    'senderTypeSchema',
+    'recordTreeIdSchema',
     'policySchema',
     'resolvedPolicySchema',
     'resolvedDismissalCodeSchema',
@@ -413,7 +436,7 @@ describe('package root exports', () => {
     expect(Array.isArray(core.BUILT_IN_DETECTORS)).toBe(true);
     expect(core.POLICY_FILE_NAME).toBe('policy.yml');
     expect(Array.isArray(core.RECORD_TYPES)).toBe(true);
-    expect(core.RECORD_TYPES).toHaveLength(9);
+    expect(core.RECORD_TYPES).toHaveLength(12);
     expect(core.POLICY_FILE_MAX_BYTES).toBe(262144);
   });
 

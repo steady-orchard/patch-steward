@@ -5,6 +5,7 @@ import {
   recordTextSchema,
   recordTimestampSchema,
   policyRevisionIdSchema,
+  recordTreeIdSchema,
   recordList,
   recordIdentifierSchema,
 } from './common.js';
@@ -40,7 +41,7 @@ describe('record common', () => {
     expect(recordIdentifierSchema.safeParse('valid-id').success).toBe(true);
   });
 
-  it('record types list the nine records', () => {
+  it('record types list the twelve records', () => {
     expect(RECORD_TYPES).toEqual([
       'submission',
       'run',
@@ -51,6 +52,18 @@ describe('record common', () => {
       'maintainer-action',
       'metrics-event',
       'policy-revision',
+      'ownership',
+      'waiting',
+      'supersession',
     ]);
+  });
+
+  it('tree ids reject local revisions', () => {
+    expect(recordTreeIdSchema.safeParse('a'.repeat(40)).success).toBe(true);
+    expect(recordTreeIdSchema.safeParse('a'.repeat(64)).success).toBe(true);
+    expect(recordTreeIdSchema.safeParse(`local:${'a'.repeat(64)}`).success).toBe(false);
+    expect(recordTreeIdSchema.safeParse('A'.repeat(40)).success).toBe(false);
+    expect(recordTreeIdSchema.safeParse('a'.repeat(39)).success).toBe(false);
+    expect(recordTreeIdSchema.safeParse('HEAD').success).toBe(false);
   });
 });

@@ -4,14 +4,20 @@ import {
   admissibilitySchema,
   BUILT_IN_DISMISSAL_CODES,
   builtInDismissalCodeSchema,
+  CAP_STATES,
+  capStateSchema,
   CATEGORIES,
   categorySchema,
   FAILURE_CAUSES,
   failureCauseSchema,
   FINDING_SEVERITIES,
   findingSeveritySchema,
+  GATE_DISPOSITIONS,
+  gateDispositionSchema,
   ISSUE_CLASSIFICATIONS,
   issueClassificationSchema,
+  ISSUE_EVENT_ACTIONS,
+  issueEventActionSchema,
   ISSUE_KINDS,
   issueKindSchema,
   LABEL_FAMILIES,
@@ -24,18 +30,34 @@ import {
   modeSchema,
   OUTCOMES,
   outcomeSchema,
+  OWNERSHIP_DISPOSITIONS,
+  ownershipDispositionSchema,
   PIPELINE_STAGES,
   pipelineStageSchema,
   PR_CLAIM_CLASSIFICATIONS,
   prClaimClassificationSchema,
+  PULL_REQUEST_EVENT_ACTIONS,
+  pullRequestEventActionSchema,
   REFERENCE_STATUSES,
   referenceStatusSchema,
+  RESOLUTION_KINDS,
+  resolutionKindSchema,
+  RUN_KINDS,
+  runKindSchema,
+  SENDER_TYPES,
+  senderTypeSchema,
   STAGE_IDS,
   stageIdSchema,
   SUBMISSION_TYPES,
   submissionTypeSchema,
+  SUPERSESSION_REASONS,
+  supersessionReasonSchema,
+  WAITING_REASONS,
+  waitingReasonSchema,
   WAITING_STATES,
   waitingStateSchema,
+  WRAPPER_EVENT_NAMES,
+  wrapperEventNameSchema,
 } from './vocabulary.js';
 
 const vocabularies: ReadonlyArray<{
@@ -156,6 +178,67 @@ const vocabularies: ReadonlyArray<{
     ],
   },
   { name: 'LABEL_FAMILIES', tuple: LABEL_FAMILIES, schema: labelFamilySchema, expected: ['status', 'classification'] },
+  {
+    name: 'GATE_DISPOSITIONS',
+    tuple: GATE_DISPOSITIONS,
+    schema: gateDispositionSchema,
+    expected: ['runnable', 'early-exit', 'queued', 'duplicate', 'closure'],
+  },
+  {
+    name: 'OWNERSHIP_DISPOSITIONS',
+    tuple: OWNERSHIP_DISPOSITIONS,
+    schema: ownershipDispositionSchema,
+    expected: ['runnable', 'early-exit', 'queued'],
+  },
+  {
+    name: 'CAP_STATES',
+    tuple: CAP_STATES,
+    schema: capStateSchema,
+    expected: ['within', 'daily-runs', 'per-author-concurrent-runs'],
+  },
+  {
+    name: 'WAITING_REASONS',
+    tuple: WAITING_REASONS,
+    schema: waitingReasonSchema,
+    expected: ['daily-runs', 'per-author-concurrent-runs'],
+  },
+  {
+    name: 'SUPERSESSION_REASONS',
+    tuple: SUPERSESSION_REASONS,
+    schema: supersessionReasonSchema,
+    expected: ['newer-owner', 'snapshot-changed'],
+  },
+  {
+    name: 'RESOLUTION_KINDS',
+    tuple: RESOLUTION_KINDS,
+    schema: resolutionKindSchema,
+    expected: ['merged', 'closed-by-author', 'closed-by-maintainer', 'deleted'],
+  },
+  { name: 'RUN_KINDS', tuple: RUN_KINDS, schema: runKindSchema, expected: ['outcome', 'waiting'] },
+  {
+    name: 'WRAPPER_EVENT_NAMES',
+    tuple: WRAPPER_EVENT_NAMES,
+    schema: wrapperEventNameSchema,
+    expected: ['pull_request_target', 'issues'],
+  },
+  {
+    name: 'PULL_REQUEST_EVENT_ACTIONS',
+    tuple: PULL_REQUEST_EVENT_ACTIONS,
+    schema: pullRequestEventActionSchema,
+    expected: ['opened', 'synchronize', 'edited', 'reopened', 'ready_for_review', 'closed'],
+  },
+  {
+    name: 'ISSUE_EVENT_ACTIONS',
+    tuple: ISSUE_EVENT_ACTIONS,
+    schema: issueEventActionSchema,
+    expected: ['opened', 'edited', 'reopened', 'closed', 'deleted'],
+  },
+  {
+    name: 'SENDER_TYPES',
+    tuple: SENDER_TYPES,
+    schema: senderTypeSchema,
+    expected: ['User', 'Bot', 'Organization', 'Mannequin'],
+  },
 ];
 
 describe('vocabularies', () => {
@@ -199,5 +282,17 @@ describe('vocabularies', () => {
 
   it('BUILT_IN_DISMISSAL_CODES has 9 entries', () => {
     expect(BUILT_IN_DISMISSAL_CODES.length).toBe(9);
+  });
+
+  it('committed dispositions are gate dispositions', () => {
+    const gateSet = new Set<string>(GATE_DISPOSITIONS);
+    for (const value of OWNERSHIP_DISPOSITIONS) {
+      expect(gateSet.has(value)).toBe(true);
+    }
+  });
+
+  it('waiting reasons are the exceeded cap states', () => {
+    expect(WAITING_REASONS).toEqual(CAP_STATES.filter((state) => state !== 'within'));
+    expect(WAITING_STATES).toContain('queued');
   });
 });
