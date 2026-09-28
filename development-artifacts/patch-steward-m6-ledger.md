@@ -109,8 +109,8 @@ updates Steps and appends Revisions.
 | 3.13 | 3 | done | packages/core/src/pipeline/hosted-gate.ts, packages/core/src/pipeline/hosted-gate.test.ts, development-artifacts/patch-steward-m6-3.13-report.md | 9bb0a997b82a36cd1d29a6cff2876f08ddf4e3f0 |
 | 3.14 | 3 | done | packages/core/src/pipeline/hosted-evidence.ts, packages/core/src/pipeline/hosted-evidence.test.ts, development-artifacts/patch-steward-m6-3.14-report.md | 9af2ecd4bd037b67e151cf27c0111388dfc41e36 |
 | 3.15 | 3 | done | packages/core/src/pipeline/hosted-freshness.ts, packages/core/src/pipeline/hosted-freshness.test.ts, development-artifacts/patch-steward-m6-3.15-report.md | 48b5fdf93575c41d94d6fc0f497b0fdf41751f9b |
-| 3.16 | 3 | pending | packages/core/src/pipeline/hosted-publish.ts, packages/core/src/pipeline/hosted-publish.test.ts, development-artifacts/patch-steward-m6-3.16-report.md | |
-| 3.17 | 3 | pending | packages/core/src/pipeline/hosted-gate-scenarios.fixture.test.ts, development-artifacts/patch-steward-m6-3.17-report.md | |
+| 3.16 | 3 | done | packages/core/src/pipeline/hosted-publish.ts, packages/core/src/pipeline/hosted-publish.test.ts, development-artifacts/patch-steward-m6-3.16-report.md | 83a8c4608d9a4c438de393861fd21f5647561446 |
+| 3.17 | 3 | done | packages/core/src/pipeline/hosted-gate-scenarios.fixture.test.ts, development-artifacts/patch-steward-m6-3.17-report.md | 0f329dbcff3c1ccdacdd8f096ab1da5f39c4cc09 |
 | 3.18 | 3 | pending | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-3.18-report.md | |
 | 3.19 | 3 | pending | packages/core/src/pipeline/hosted-publish-scenarios.fixture.test.ts, development-artifacts/patch-steward-m6-3.19-report.md | |
 | 3.20 | 3 | pending | packages/core/src/conformance/invariant-2-hosted.test.ts, packages/core/src/conformance/invariant-8-hosted.test.ts, development-artifacts/patch-steward-m6-3.20-report.md | |
