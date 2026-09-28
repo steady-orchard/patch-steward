@@ -137,6 +137,31 @@ updates Steps and appends Revisions.
 | 4.16 | 4 | done | packages/core/src/github/github.live.test.ts, packages/cli/src/steward-commands.live.test.ts, development-artifacts/patch-steward-m6-4.16-report.md | ebf4e7ba2e96e7a93c80d80745d8bbbf2bec4ff6 |
 | 4.17 | 4 | done | development-artifacts/patch-steward-m6-4.17-report.md | 2da1d63c0e876d6fb32fa5f64d49a63d650fd809 |
 | 4.18 | 4 | done | development-artifacts/patch-steward-m6-4.18-report.md | 9ef8fb1bfe46764c3626c33d694796b5e04880b9 |
+| 5.1 | 5 | pending | scenarios/tools/run-log.sh, scenarios/tools/await-runs.sh, scenarios/tools/find-runs.sh, development-artifacts/patch-steward-m6-5.1-report.md | |
+| 5.2 | 5 | pending | scenarios/tools/run-records.sh, scenarios/tools/evidence.sh, development-artifacts/patch-steward-m6-5.2-report.md | |
+| 5.3 | 5 | pending | scenarios/workflows/scenario-app-edit.yml, scenarios/tools/app-edit.sh, development-artifacts/patch-steward-m6-5.3-report.md | |
+| 5.4 | 5 | pending | scenarios/tools/pins.sh, scenarios/tools/results-check.sh, development-artifacts/patch-steward-m6-5.4-report.md | |
+| 5.5 | 5 | pending | scenarios/fixtures/policies/invalid-limit.yml, scenarios/fixtures/policies/unwritable-store.yml, scenarios/fixtures/policies/caps-daily.yml, scenarios/fixtures/policies/caps-author.yml, scenarios/fixtures/pull-requests/steward-pr-modified.yml, development-artifacts/patch-steward-m6-5.5-report.md | |
+| 5.6 | 5 | pending | scenarios/README.md, development-artifacts/patch-steward-m6-5.6-report.md | |
+| 5.7 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.7-report.md | |
+| 5.8 | 5 | pending | scenarios/results/personal.md, development-artifacts/patch-steward-m6-5.8-report.md | |
+| 5.9 | 5 | pending | scenarios/results/org-private.md, development-artifacts/patch-steward-m6-5.9-report.md | |
+| 5.10 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.10-report.md | |
+| 5.11 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.11-report.md | |
+| 5.12 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.12-report.md | |
+| 5.13 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.13-report.md | |
+| 5.14 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.14-report.md | |
+| 5.15 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.15-report.md | |
+| 5.16 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.16-report.md | |
+| 5.17 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.17-report.md | |
+| 5.18 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.18-report.md | |
+| 5.19 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.19-report.md | |
+| 5.20 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.20-report.md | |
+| 5.21 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.21-report.md | |
+| 5.22 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.22-report.md | |
+| 5.23 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.23-report.md | |
+| 5.24 | 5 | pending | scenarios/results/org-public.md, scenarios/results/personal.md, scenarios/results/org-private.md, development-artifacts/patch-steward-m6-5.24-report.md | |
+| 5.25 | 5 | pending | development-artifacts/patch-steward-m6-5.25-report.md | |
 
 ### Phase 1 notes
 
@@ -590,6 +615,116 @@ updates Steps and appends Revisions.
   - Minor wording defect noted, not blocking: scenarios/tools/find-runs.sh header and scenarios/README.md say it lists
     "completed" runs; the tool lists runs of any status (4.17 relies on that to find an in-progress run). Fix in a later
     wording pass (phase 6 scenarios/README.md review).
+
+### Phase 5 notes
+
+- Decomposed at the commit that adds this block (message `decompose(patch-steward-m6): phase 5 steps`), base d1af537
+  (planner amendment: OA3 verify names the real gate and publish signals). Phase base PB = d1af5375321637fe8b1e9b325b6ababb62ee6b58 (the decomposition commit touches only
+  development-artifacts/). All 25 steps route mechanical. Only scenarios/ and development-artifacts/ change; no product code,
+  no dependency, no push of this repository; test-bed wrappers keep pin 7161cd20df662314d14cc7f2f4130102baee1e98.
+- S10 merge closure (the previous decomposition attempt stopped on a planner needs-human; the item-1 row in Revisions): the
+  lead resolved it without an amendment or owner decision. The planner's premise (pull_request_target runs with
+  GITHUB_REF refs/heads/<base>, so a PR into a scenario-* base fails EV2 and the Environment rule) is refuted by
+  probes/findings.md PA03.1 and PA03.5 and probes/pa03-trusted-triggers/results/org-public.md E5 (PR 16 into
+  probe-pa03-base: ref=refs/heads/master, default-branch definition, Environment admitted). The brief S10 procedure stays
+  (merge into `scenario-s10-base`). Step 5.20 classifies both runs of that PR (pass, refused-event-invalid,
+  refused-environment, other-failure) and its acceptance 1 prints the live case next to the reported one; a refused case is
+  a platform-change finding for the supervisor's revision loop (5.20 then stops without merging).
+- Dependency graph (scopes pairwise disjoint within each wave):
+  - W1 (parallel, no deps, no GitHub write): 5.1 tools run-log.sh and await-runs.sh, find-runs.sh header wording; 5.2
+    run-records.sh and evidence.sh waiting-run verification; 5.3 App edit helper workflow (verbatim FILE BLOCK) and
+    app-edit.sh; 5.4 pins.sh and results-check.sh; 5.5 fixtures (four policy variants, modified wrapper).
+  - W2 (parallel; live steps on different test-beds): 5.6 scenarios/README.md (needs 5.1-5.5; no GitHub access); 5.7
+    org-public OA1 re-verify plus S17, creates org-public.md (needs 5.1, 5.4); 5.8 personal OA1 re-verify, S17, S15 (OA4
+    proof), creates personal.md (needs 5.1, 5.2, 5.4); 5.9 org-private OA1 and OA2 re-verify, S17, S16 (OA3 proof), creates
+    org-private.md (needs 5.1, 5.2, 5.4).
+  - org-public chain, strictly sequential (every step writes org-public.md; caps and timing need an otherwise idle
+    test-bed): 5.10 S09 (first: runnable, caps-sensitive) -> 5.11 S01+S02 -> 5.12 S03 (+5.3) -> 5.13 S04 -> 5.14 S08
+    (read-only) -> 5.15 S05 -> 5.16 S06 -> 5.17 S07 -> 5.18 S10 issue part one -> 5.19 S10 issue part two (+5.3) -> 5.20 S10
+    pull requests -> 5.21 S11 daily -> 5.22 S11 per-author -> 5.23 S12.
+  - 5.24 S13 and S14 on all three test-beds plus steady state (needs 5.23, 5.8, 5.9, 5.4); 5.25 gate (verification only,
+    MAIN tree; needs 5.6, 5.24).
+  - Critical path: 5.4 -> 5.7 -> 5.10 -> ... -> 5.23 -> 5.24 -> 5.25 (about 14 live steps of 5-15 minutes each).
+- Owner actions (placement of the brief's re-verify rule): OA1 org-public in 5.7 (start of the phase); OA1 personal in 5.8
+  before S17 and S15; OA1 org-private and OA2 in 5.9 before S17 and S16; OA4 proved by the S15 publish commit (5.8); OA3
+  proved by the S16 gate `listing none` then `dedup commit no-owner` and the publish commit in the evidence repository
+  (5.9). A failing verify or proof makes the step write a report line `OA<n> not done on <repository>: <evidence>` with
+  status fail and no results file; the supervisor returns `RESULT: needs-human` naming the action. Results files never name
+  owner actions ("the publication Environment check", "the evidence repository check").
+- Outward actions (all authorized: test-bed issues, PRs incl. the fork PR, branches, workflow and policy deploys through
+  deploy tools, dispatches, one rerun, workflow disable, merges into scenario-* bases): 5.7-5.9 deploy the secret-scope pair
+  to each test-bed master and dispatch it; 5.8, 5.9 one issue each; 5.10 branches scenario-s09-same (org-public) and
+  scenario-s09-fork (fork; its master untouched) and two PRs; 5.11 branch scenario-s01-head and PR P1 (edited by 5.11-5.17);
+  5.12 and 5.19 deploy scenario-app-edit.yml to org-public master and dispatch it (title edit of P1; close of the S10
+  issue); 5.16, 5.17, 5.21, 5.22 deploy a policy variant to org-public master and restore orphan-branch.yml after all runs of
+  the scenario completed (tree id back to d997b1e362c75af03942da0e7a1e8902ca5dbe51; checked by the next step too); 5.18,
+  5.19 one issue lifecycle; 5.20 branches scenario-s10-close, scenario-s10-base, scenario-s10-merge, two PRs, one merge into
+  scenario-s10-base; 5.21, 5.22 two to four contract-met issues; 5.23 `gh run rerun 36397673122` (the S00 run, issue 31);
+  5.24 steady-state.sh apply on the three test-beds (disables steward-pr.yml, steward-issues.yml, scenario-*; closes every
+  open `[scenario S` issue and PR, including issue 31, P1, the S09, S11, S15, S16 submissions). Never touched: org-public
+  issue 29, PRs 26 and 27 (closed or merged probe items), the fork's master. org-private: two runs only (S17, S16).
+- Couplings:
+  - Results files: org-public.md is written only by the chain 5.7 -> 5.10 ... 5.23 -> 5.24 (append-only sections);
+    personal.md by 5.8 then 5.24; org-private.md by 5.9 then 5.24. A scenario may have several sections (`## S10 ...` three,
+    `## S11 ...` two); results-check.sh requires every section of a listed id to contain `Result: pass`.
+  - Report key lines read by later steps (column 0): 5.7 `s17_run`; 5.8 `s17_run`, `s15_issue`, `s15_run`, `s15_commit`; 5.9
+    `s17_run`, `s16_issue`, `s16_run`, `s16_commit`; 5.10 `s09_master_tree`, `s09_same_pr`, `s09_same_run`, `s09_fork_pr`,
+    `s09_fork_run`; 5.11 `s01_pr`, `s01_run`, `s01_commit`, `s02_run`; 5.12 `s03_helper_run`, `s03_run`; 5.13 `s04_try`,
+    `s04_old_run`, `s04_new_run`, `s04_new_commit`; 5.15 `s05_try`, `s05_runs`; 5.16 `s06_run`, `s06_newest_artifact`; 5.17
+    `s07_run`, `s07_failure`; 5.18 `s10_issue`, `s10_open_run`, `s10_title_run`, `s10_body_run`; 5.19 `s10_close_run`,
+    `s10_reopen_run`, `s10_app_close_run`; 5.20 `s10_close_pr`, `s10_close_pr_run`, `s10_merge_pr`, `s10_merge_opened_run`,
+    `s10_merge_closed_run`, `s10_merge_opened_case`, `s10_merge_closed_case`; 5.21 `s11_daily_issue`, `s11_daily_run`; 5.22
+    `s11_author_issue`, `s11_author_run`; 5.23 `s12_newest_artifact_created_at`. 5.14 reads 5.11 and 5.13; 5.19 reads 5.18;
+    5.25 D11 reads 5.8 and 5.9.
+  - Time-bound acceptance: 5.11 acceptance 3 (one artifact, one run directory for P1) and 5.15 acceptance 2 (newest owner of
+    P1) hold only until the next scenario touches P1: verify each step right after it, before launching the next.
+  - Live acceptance re-derives facts read-only (run logs via run-log.sh, run-records.sh, artifacts.sh, evidence.sh); none
+    writes to GitHub. The phase gate 5.25 re-runs audit, pins, steady-state plan, results-check.
+- Environment facts (measured on the S00 run 36397673122): `gh run view --log` lines are job TAB step TAB `<timestamp>
+  <text>`; the job column is `screen / <job>` (called workflow) or `<job>`; a byte order mark precedes the timestamp on each
+  job's first line; the step's own script is echoed with text starting `^[` (two literal characters, no raw escape);
+  masked values print `***`. run-log.sh normalizes this (echo lines dropped, credential-like lines withheld). Git Bash
+  rewrites `gh api` endpoints starting with `/`. Bash tool calls stop at 600 s: waiting tools run with PROBE_WAIT_SECONDS=540
+  and are repeated once on exit 3. Live steps run `pnpm install --frozen-lockfile && pnpm build` in their worktree
+  (evidence.sh needs the built CLI; results-check.sh calls prettier).
+- Decisions taken at decomposition (within the brief; no gate, DoD, or brief text changed):
+  - New scenario tools (persistent, scenarios/tools/): run-log.sh, await-runs.sh, run-records.sh (SSH shallow clone of the
+    store branch or a local root), app-edit.sh, pins.sh, results-check.sh. evidence.sh gains waiting-run verification
+    against the manifest (it counted waiting runs as unverified, so any submission with a queued run ended result=failed).
+    The find-runs.sh wording defect from the phase 4 notes is fixed in 5.1 and in the README (5.6).
+  - S03 and the closed-by-maintainer closure use the helper workflow scenario-app-edit.yml: workflow_dispatch only, sender
+    2095171 only, Environment steward-publication for PATCH_STEWARD_APP_ID and PATCH_STEWARD_APP_PRIVATE_KEY, mints a
+    repository-scoped installation token with node:crypto (no third-party action; actions/create-github-app-token is not
+    used, as for the product), one PATCH, token revoked, status codes only. Decomposer verified it with actionlint, Prettier,
+    node --check, and a mocked-fetch run.
+  - S04 timing: the second body edit is made right after the older run's gate job completes (20 s polls), because the gate
+    captures the body live about 30 s after the event; two edits seconds apart are captured identically and the second run
+    ends duplicate. Up to 3 tries. S05: three back-to-back edits; runs that captured an unchanged snapshot end duplicate and
+    count as neither committed nor superseded; pass = the newest committed owner is the only current publish, others
+    superseded or cancelled pending; up to 3 tries (a created_at tie makes publish fail freshness-unknown: retry).
+  - S09 uses caps-daily.yml as the proposed policy (it would queue the run if it governed) and steward-pr-modified.yml as the
+    proposed wrapper (a run defined by it would be named `modified steward pr <n>`); master's definition shows as run name
+    `steward-pr` and the RN1 display title. S09 runs first in the chain (daily cap 50 counts every non-bot wrapper run of the
+    UTC day; per-author cap 2 counts the run itself, so the two PRs run sequentially on an idle test-bed).
+  - S07 targets P1 (already owned), so the gate never reads the separate store; the expected publish failure is at the store
+    installation lookup (`github.not-found`), before any evidence request.
+  - S11 daily opens two contract-met issues (the second is always over a daily cap of 1 within one UTC day; a third only
+    across a date change); S11 per-author opens two back to back under per-author cap 1 (one retry pair if they do not
+    overlap). Policy variants are restored only after every run completed (publish recaptures with the live default-branch
+    policy; an early restore would supersede the run as snapshot-changed).
+  - Results format: `## S<nn> <title>` sections with `$ <command>` plus verbatim output in `text` fences and a final
+    `Result: pass` line; S17 sections keep the four exact `SECRET-SCOPE job=... line=PATCH_STEWARD_APP_... length-zero=...`
+    lines and drop the echoed-script `line=^[...` lines. results-check.sh rejects planning ids, probe secret names, token or
+    key text, `^[`, and control characters.
+- Dry runs by the decomposer (scratch worktree C:/w/m6-p5dry, removed): reference implementations of the W1 tools passed
+  every acceptance of 5.1-5.5; the fixtures generator reproduces the verified files; every acceptance command of 5.7-5.25
+  passes `bash -n`; the verbatim action snippets of 5.13 and 5.15 pass `bash -n`; the S04, S05, S08, S15-style, and merge-case
+  checks were run against the S00 run (or synthetic data for S05) to confirm their parsing.
+- Open risks (handled through the revision loop, never worked around): fork PR capture with a target-scoped token (S09);
+  deployments on PR head commits (S13 head_deployments); Environment refusal for a non-default base (S10, classified);
+  GitHub timing (S04, S05 retries); the replaced-artifact behavior of a rerun (S12 accepts count 1 or 2 via the newest
+  artifact); a product defect found live needs local checks, a non-forced push, regenerated wrapper copies with the new pin,
+  and redeploys (phase 4 procedure; pins.sh derives the pin from scenarios/workflows/steward-pr.yml).
 
 ## Revisions
 
