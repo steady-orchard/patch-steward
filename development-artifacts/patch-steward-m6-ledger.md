@@ -119,6 +119,24 @@ updates Steps and appends Revisions.
 | 3.23 | 3 | done | packages/core/src/conformance/write-allowlist.test.ts, packages/core/src/conformance/zero-execution.fixture.test.ts, development-artifacts/patch-steward-m6-3.23-report.md | fffacdb9bf6424f360f8bfdb1db317acc64c203a |
 | 3.24 | 3 | done | packages/action/src/dispatch.ts, packages/action/src/dispatch.test.ts, packages/action/src/main.ts, development-artifacts/patch-steward-m6-3.24-report.md | d7ee54ab5d19d2f0211bcef0ed6a5bee8271738a |
 | 3.25 | 3 | done | development-artifacts/patch-steward-m6-3.25-report.md | 0d26033e0de83191f70bb6c536fcadf549d634af |
+| 4.1 | 4 | pending | templates/policy/policy.yml, packages/core/src/submission/default-checklist.ts, development-artifacts/patch-steward-m6-4.1-report.md | |
+| 4.2 | 4 | pending | .github/workflows/steward-screening.yml, packages/action/pack-runtime.sh, development-artifacts/patch-steward-m6-4.2-report.md | |
+| 4.3 | 4 | pending | templates/workflows/steward-pr.yml, templates/workflows/steward-issues.yml, templates/README.md, development-artifacts/patch-steward-m6-4.3-report.md | |
+| 4.4 | 4 | pending | packages/core/src/pipeline/hosted-verify.fixture.test.ts, development-artifacts/patch-steward-m6-4.4-report.md | |
+| 4.5 | 4 | pending | scenarios/fixtures/policies/orphan-branch.yml, scenarios/fixtures/policies/repository-store.yml, scenarios/fixtures/submissions/unstructured.txt, development-artifacts/patch-steward-m6-4.5-report.md | |
+| 4.6 | 4 | pending | scenarios/tools/deploy-steward.sh, scenarios/tools/environment-check.sh, scenarios/tools/steady-state.sh, development-artifacts/patch-steward-m6-4.6-report.md | |
+| 4.7 | 4 | pending | scenarios/tools/find-runs.sh, scenarios/tools/artifacts.sh, scenarios/tools/audit.sh, development-artifacts/patch-steward-m6-4.7-report.md | |
+| 4.8 | 4 | pending | scenarios/tools/evidence.sh, development-artifacts/patch-steward-m6-4.8-report.md | |
+| 4.9 | 4 | pending | scenarios/workflows/scenario-secret-scope.yml, scenarios/workflows/scenario-secret-scope-called.yml, scenarios/tools/secret-scope.sh, development-artifacts/patch-steward-m6-4.9-report.md | |
+| 4.10 | 4 | pending | packages/core/src/conformance/workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.10-report.md | |
+| 4.11 | 4 | pending | packages/core/src/conformance/invariant-1-workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.11-report.md | |
+| 4.12 | 4 | pending | scenarios/README.md, development-artifacts/patch-steward-m6-4.12-report.md | |
+| 4.13 | 4 | pending | development-artifacts/patch-steward-m6-4.13-report.md | |
+| 4.14 | 4 | pending | scenarios/workflows/steward-pr.yml, scenarios/workflows/steward-issues.yml, development-artifacts/patch-steward-m6-4.14-report.md | |
+| 4.15 | 4 | pending | development-artifacts/patch-steward-m6-4.15-report.md | |
+| 4.16 | 4 | pending | packages/core/src/github/github.live.test.ts, packages/cli/src/steward-commands.live.test.ts, development-artifacts/patch-steward-m6-4.16-report.md | |
+| 4.17 | 4 | pending | development-artifacts/patch-steward-m6-4.17-report.md | |
+| 4.18 | 4 | pending | development-artifacts/patch-steward-m6-4.18-report.md | |
 
 ### Phase 1 notes
 
@@ -464,6 +482,105 @@ updates Steps and appends Revisions.
     tests. Phase DoD D1-D11 re-run by the supervisor in the main tree: all PASS (D2 64 titles, D3 31 titles, D5 fetch-blocked test
     run exit 0, D7 leak check clean with 17 tolerated cli entries, D10 usage then exit 2, D11 114 export lines).
   - All C:/w/m6-* worktrees and wt/patch-steward-m6-* branches removed. C:/w/m5-3.4 directory (M05 leftover) untouched.
+
+### Phase 4 notes
+
+- Decomposed at the commit that adds this block (message `decompose(patch-steward-m6): phase 4 steps`), base 414ad77 (the planner
+  amendment this decomposition triggered: WF6 publish group `needs.gate.outputs.concurrency_group` with the per-run fallback
+  `format('steward-{0}-run-{1}', github.repository_id, github.run_id)` because the gate outputs an empty group for closures;
+  WF8 only `build` checks out, after a steward_ref shell check, since G8 M1 forbids checkout in gate and publish; see Revisions).
+  Phase base PB = 414ad77be6c63d4ccd5ea33d710285cc3a8c1014 (the decomposition commit touches only development-artifacts/). All
+  steps route mechanical.
+- Dependency graph (scopes pairwise disjoint within each wave):
+  - W1 (parallel, no deps): 4.1 template evidence branch rename (template plus default-checklist.ts); 4.2 reusable workflow
+    .github/workflows/steward-screening.yml plus packages/action/pack-runtime.sh (verbatim FILE BLOCKS); 4.3 wrapper templates plus
+    templates/README.md (verbatim); 4.4 hosted run-directory verification fixture test (pre-flight for the smoke); 4.5 test-bed
+    policies plus the smoke body; 4.6 tools deploy-steward, environment-check, steady-state; 4.7 tools find-runs, artifacts, audit;
+    4.8 tool evidence.
+  - W2: 4.9 secret-scope pair (verbatim) plus secret-scope.sh (4.2, 4.3); 4.10 static workflow tests (4.2, 4.3); 4.11 invariant-1
+    workflow scan (4.2, 4.3).
+  - W3 (parallel): 4.12 scenarios/README.md (4.5-4.9); 4.13 push of the milestone branch (4.1-4.11; report only). The pushed commit
+    is the tree HEAD 4.13 starts from; it need not contain 4.12.
+  - W4: 4.14 test-bed wrapper copies pinned to the 4.13 SHA (4.13, 4.3).
+  - W5: 4.15 deploy wrappers and policies to the three test-beds (4.14, 4.5, 4.6; report only).
+  - W6 (parallel): 4.16 live-test switch to the fork (4.15); 4.17 OA1 re-verify on org-public plus the org-public smoke (4.15,
+    4.6-4.8; report only).
+  - W7: 4.18 gate (verification only; MAIN tree; after all).
+  - Critical path: 4.2 -> 4.10 -> 4.13 -> 4.14 -> 4.15 -> 4.17 -> 4.18.
+- Outward actions (owner-authorized; the only GitHub writes of the phase): 4.13 pushes `HEAD:refs/heads/milestone/6-github-hosted-
+  skeleton-gate-ownership-evidence-publish` once, never force; 4.15 writes .github/workflows/steward-pr.yml,
+  .github/workflows/steward-issues.yml, .github/patch-steward/policy.yml on master of org-public, personal, org-private through
+  scenarios/tools/deploy-steward.sh (probes deploy.sh); 4.17 creates exactly one issue `[scenario S00] hosted screening smoke` on
+  org-public (GitHub then runs build, gate, publish; publish creates branch `steward-evidence` there). Read-only live calls: the
+  acceptance of 4.6-4.8 (org-public, the private evidence repository over SSH, one `steward screen` of org-public issue 29),
+  4.16 `pnpm test:live`, 4.18. No secret, Environment, App, or repository setting is touched; nothing on personal or org-private
+  runs in this phase.
+- OA1 on org-public is re-verified by 4.17 action 3 with the brief's four commands immediately before the smoke issue is created;
+  a mismatch makes 4.17 report status fail with a line `OA1 not done on steady-orchard/patch-steward-testbed-public: ...`, which the
+  supervisor returns as `needs-human` naming OA1. OA2-OA4 and OA1 on personal and org-private are not needed in this phase.
+- Environment / bootstrap:
+  - Worker worktrees on short paths (C:/w/m6-<id>); `pnpm install --frozen-lockfile` per new worktree, sequentially. 4.13 may run
+    in its own worktree (it pushes the worktree HEAD) or the main tree; 4.15-4.17 need `pnpm build` in their tree (they run it).
+  - actionlint 1.7.12 is installed locally (chocolatey); shellcheck is not, so actionlint skips script linting. Scenario workflows
+    that call a local `./.github/workflows/...` reusable workflow lint with `-ignore 'could not read reusable workflow file'`.
+  - Git Bash runs CRLF shell scripts; committed blobs are LF. Deployed files are compared by git blob id only.
+  - Verbatim files: 4.2, 4.3, 4.9 extract FILE BLOCKS from their own step files with a node one-liner (4-space indentation
+    stripped) and acceptance 1 prints `verbatim ok`. The decomposer verified every block with actionlint 1.7.12 and Prettier, the
+    pack script by packing, extracting, and running `node .../packages/action/dist/main.js` (usage, exit 2), and dry-ran the
+    acceptance of 4.1-4.3, 4.5, 4.9, 4.14, and the shell quoting of 4.15, 4.17, 4.18 in a scratch worktree (removed).
+- Couplings:
+  - Byte identity: the `secrets:` declaration block of steward-screening.yml (4.2) equals that of scenario-secret-scope-called.yml
+    (4.9); the wrapper `secrets:` mapping of templates/workflows/steward-pr.yml (4.3) equals that of scenario-secret-scope.yml
+    (4.9); `bash scenarios/tools/secret-scope.sh check` proves both (4.9 acceptance; `run` re-checks before every live use).
+  - 4.10 and 4.11 pin exact strings of 4.2 and 4.3 (publish if, publish concurrency group, gate outputs, upload order, run-names,
+    `main.js" gate`); a revision of either workflow file must revise its FILE BLOCK and re-check these tests.
+  - 4.14 derives the copies from the templates by three edits (pin, trailing comment ` # pushed steward commit`, guard line after
+    `    name: screen`) and reads PIN from 4.13's report line `pushed: <sha>`; deploy-steward.sh (4.6) extracts the pin from the copies.
+  - 4.17 records `smoke_issue:`, `smoke_run:`, `evidence_commit:`; 4.17 acceptance and 4.18 D7 read them.
+  - 4.6-4.8 acceptance holds only in the pre-deploy, pre-smoke state (copies absent, no `[scenario` submission, no
+    `steward-evidence` on org-public); the graph verifies them in W1, long before 4.15 and 4.17.
+  - Tool output formats (SCENARIO-DEPLOY, ENVIRONMENT, SCENARIO-STEADY, RUN and RUNS, ARTIFACT and ARTIFACTS, AUDIT, EVIDENCE,
+    SECRET-SCOPE) are contracts for 4.15, 4.17, 4.18 and phase 5.
+- Emergent contracts for phase 5:
+  - Run shape: jobs listed as `screen / build`, `screen / gate`, `screen / publish`; each core step prints its log lines, then
+    `steward job summary:` and the job summary (between `::stop-commands::` markers), so `gh run view --log` shows the summary
+    (there is no REST API for job summaries); the publish summary names the evidence commit, and the commit's committer date
+    precedes the log timestamp of the summary (S08 evidence).
+  - Publish concurrency groups: `steward-<repository id>-<pr or issue>-<n>` for committed runs; `steward-<repository id>-run-<run
+    id>` for closures (record-only) and whenever the gate output is empty.
+  - Same-run artifacts `steward-runtime`, `steward-handoff`, `steward-closure` (1 day) appear in the repository artifact listing;
+    ownership artifacts `steward-ownership-<pr or issue>-<n>` (90 days).
+  - Test-bed files on master of all three test-beds: the two wrappers (pin = 4.13 SHA, guard for 2095171 and 331019482) and
+    `.github/patch-steward/policy.yml`. A defect fix needs a new fast-forward push, regenerated copies (the 4.14 node command with
+    the new PIN), and `deploy-steward.sh <key>` per test-bed.
+  - Not created in phase 4 (phase 5 adds them as needed): scenario policy variants for S06 (invalid), S07 (unwritable store), S11
+    (caps), deployed with `deploy-steward.sh <key> <policy file>` and restored afterwards; the S03 App-token title-edit helper (it
+    must take App credentials from the Environment secrets PATCH_STEWARD_APP_*, never the probe suite's secrets; choosing how it
+    mints a token is phase 5 work, noting the brief rejects actions/create-github-app-token for the product); contract-met
+    submission bodies; scenarios/results/*.md.
+  - Phase 4 end state (4.18 records it): wrappers and policies deployed and active on the three test-beds; issue `[scenario S00]`
+    left OPEN on org-public (closing it starts a closure run; phase 5 closes it within a scenario or at steady state);
+    `steward-evidence` on org-public holds the smoke commit; no scenario helper deployed; nothing run on personal or org-private.
+- Decisions taken at decomposition (within the brief after amendment 414ad77; no gate, DoD, or brief text changed by them):
+  - Action pins read from the upstream tags on 2026-09-28: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 (v7.0.1),
+    actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 (v7.0.0), actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+    (v7.0.1), actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c (v8.0.1).
+  - Runtime packing in packages/action/pack-runtime.sh (run by build; testable locally): packages/{core,action}/{package.json,dist},
+    node_modules/{zod,yaml} dereferenced, node_modules/@patch-steward/core symlink to ../../packages/core; about 1.9 MB; size and
+    SHA-256 checked before `tar -x` in gate and publish.
+  - setup-node `package-manager-cache: false`; `COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'` for corepack.
+  - Core steps run with `set +e`, then print the summary between stop-commands markers and exit with the steward's status.
+  - Template `steward_ref` is a quoted string (YAML reads forty zeros as the integer 0). Templates carry no header comment and no
+    guard.
+  - Test-bed policies derived from fixtures/policies/valid/minimal-no-llm.yml (orphan-branch.yml for org-public and personal,
+    repository-store.yml for org-private; limits.github.requests_per_run 300).
+  - Tool names carry no planning ids (environment-check.sh runs the OA1 verify commands).
+  - Live-test switch: the unsynced fork has no `.github` directory (contents 404) and issues disabled; screen loads the policy
+    before any issue read, so `--issue 29` on the fork stops at screen.policy-missing.
+- Open risks (surface in 4.17; handled through the supervisor revision loop, never worked around): checkout of the public steward
+  repository with an empty-permission job token; corepack under setup-node Node 24; setup-node's version-manifest read with an
+  empty-permission token; the artifact download redirect host (OW5); `gh run view --log` job-name column for called workflows
+  (4.17 acceptance 5 matches job names ending in `publish`).
 
 ## Revisions
 
