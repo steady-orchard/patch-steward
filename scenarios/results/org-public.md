@@ -1187,3 +1187,93 @@ d997b1e362c75af03942da0e7a1e8902ca5dbe51
 ```
 
 Result: pass
+
+## S11 per-author concurrent cap: over-cap work waits
+
+Date (UTC): 2026-09-28. With a policy whose per-author concurrent cap is 1, two issues opened back to back on
+`steady-orchard/patch-steward-testbed-public` (https://github.com/steady-orchard/patch-steward-testbed-public/issues/40,
+https://github.com/steady-orchard/patch-steward-testbed-public/issues/41) produced one queued run
+(https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36423270119) with a persisted waiting run
+directory whose reason is per-author-concurrent-runs; the valid policy was restored afterward.
+
+```text
+$ bash scenarios/tools/deploy-steward.sh org-public scenarios/fixtures/policies/caps-author.yml
+DEPLOY repo=steady-orchard/patch-steward-testbed-public branch=master existed=yes
+DEPLOY commit=61ff7a3d556cf3678bfc5dad5842031661e935af message=scenario: deploy steward wrappers and policy
+DEPLOY push=ok attempt=1 head=61ff7a3d556cf3678bfc5dad5842031661e935af
+DEPLOY identical dest=.github/workflows/steward-pr.yml blob=6a2ded1721a593ece56863a31502232c02ce3e06
+DEPLOY identical dest=.github/workflows/steward-issues.yml blob=ecd5347c96097dce26f96a611a9bbf048b1d1fac
+DEPLOY identical dest=.github/patch-steward/policy.yml blob=6a8f59316af0631a3d6772f88f55e71f621c53b8
+SCENARIO-DEPLOY repo=steady-orchard/patch-steward-testbed-public pin=7161cd20df662314d14cc7f2f4130102baee1e98 policy=scenarios/fixtures/policies/caps-author.yml result=ok
+$ gh api "repos/steady-orchard/patch-steward-testbed-public/contents/.github?ref=master" --jq '.[] | select(.name=="patch-steward") | .sha'
+5fd52dc2a12ee40b72c01c02cf69aa990bf91fa7
+```
+
+```text
+$ R=steady-orchard/patch-steward-testbed-public; A=$(gh api "repos/$R/actions/runs?per_page=1" --jq '.workflow_runs[0].id // 0'); echo "A=$A"; gh issue create -R $R --title "[scenario S11] per-author cap, first issue" --body-file fixtures/submissions/defect-complete.txt; gh issue create -R $R --title "[scenario S11] per-author cap, second issue" --body-file fixtures/submissions/defect-complete.txt
+A=36422572569
+https://github.com/steady-orchard/patch-steward-testbed-public/issues/40
+https://github.com/steady-orchard/patch-steward-testbed-public/issues/41
+```
+
+```text
+$ PROBE_WAIT_SECONDS=540 bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-issues.yml "steward issue " 36422572569 2
+RUN id=36423270119 attempt=1 event=issues status=completed conclusion=success created_at=2026-09-28T12:39:48Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36423270119 title=steward issue 40 author 2095171 event issues opened sender 2095171 User
+RUN id=36423271890 attempt=1 event=issues status=completed conclusion=success created_at=2026-09-28T12:39:49Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36423271890 title=steward issue 41 author 2095171 event issues opened sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-issues.yml after=36422572569 count=2 completed=2 result=complete
+```
+
+```text
+$ gh run view 36423270119 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36423270119 1 gate | grep -E 'text=(event |listing |dedup |caps |disposition |- Status|- Caps)'
+LOG job=gate ts=2026-09-28T12:40:27.7127565Z text=event issues opened issue 40 sender User
+LOG job=gate ts=2026-09-28T12:40:27.7130086Z text=listing none
+LOG job=gate ts=2026-09-28T12:40:27.7130820Z text=dedup commit no-owner
+LOG job=gate ts=2026-09-28T12:40:27.7131858Z text=caps per-author-concurrent-runs daily 31 of 1000 author 2 of 1
+LOG job=gate ts=2026-09-28T12:40:27.7133111Z text=disposition queued
+LOG job=gate ts=2026-09-28T12:40:27.7289227Z text=- Status: `queued`
+LOG job=gate ts=2026-09-28T12:40:27.7292759Z text=- Caps: daily `31` of `1000`, author `2` of `1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36423270119 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence)'
+LOG job=publish ts=2026-09-28T12:40:52.9023484Z text=evidence commit f063c98cff2d407841b6b1042cf61447c0db92c5 rebuilds 1
+LOG job=publish ts=2026-09-28T12:40:52.9024067Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:40:52.9024494Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:40:52.9024891Z text=freshness current
+LOG job=publish ts=2026-09-28T12:40:52.9201155Z text=- Status: `queued`
+LOG job=publish ts=2026-09-28T12:40:52.9204741Z text=- Evidence: commit `f063c98cff2d407841b6b1042cf61447c0db92c5` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/issue-40/36423270119-1`
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public issue 40
+RECORD run=36423270119-1 kind=waiting state=queued reason=per-author-concurrent-runs daily=31/1000 author=2/1 arrival_at=2026-09-28T12:40:29Z policy_revision=5fd52dc2a12ee40b72c01c02cf69aa990bf91fa7 snapshot=sha256:b46f0e9548370e070b5113bf7ee6c457457676cfa594fd2cdaa0f3fc5538be86
+RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public subject=issue-40 runs=1 supersessions=0
+$ bash scenarios/tools/evidence.sh steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public issue 40
+EVIDENCE run=36423270119-1 kind=waiting manifest=verified
+EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=issue-40 runs=1 verified=1 result=ok
+```
+
+```text
+$ gh run view 36423271890 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36423271890 1 gate | grep -E 'text=(event |listing |dedup |caps |disposition |- Status|- Caps)'
+LOG job=gate ts=2026-09-28T12:40:19.6990934Z text=event issues opened issue 41 sender User
+LOG job=gate ts=2026-09-28T12:40:19.6992443Z text=listing none
+LOG job=gate ts=2026-09-28T12:40:19.6992820Z text=dedup commit no-owner
+LOG job=gate ts=2026-09-28T12:40:19.6993426Z text=caps within daily 31 of 1000 author 1 of 1
+LOG job=gate ts=2026-09-28T12:40:19.6994060Z text=disposition runnable
+LOG job=gate ts=2026-09-28T12:40:19.7135606Z text=- Status: `runnable`
+LOG job=gate ts=2026-09-28T12:40:19.7138746Z text=- Caps: daily `31` of `1000`, author `1` of `1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36423271890 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence)'
+LOG job=publish ts=2026-09-28T12:40:47.8098617Z text=evidence commit 64cdc3d232af4180f2cb38412ea8119a20e4ba82 rebuilds 0
+LOG job=publish ts=2026-09-28T12:40:47.8099511Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:40:47.8100202Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:40:47.8100795Z text=freshness current
+LOG job=publish ts=2026-09-28T12:40:47.8254759Z text=- Status: `inconclusive`
+LOG job=publish ts=2026-09-28T12:40:47.8258888Z text=- Evidence: commit `64cdc3d232af4180f2cb38412ea8119a20e4ba82` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/issue-41/36423271890-1`
+```
+
+```text
+$ bash scenarios/tools/deploy-steward.sh org-public
+SCENARIO-DEPLOY repo=steady-orchard/patch-steward-testbed-public pin=7161cd20df662314d14cc7f2f4130102baee1e98 policy=scenarios/fixtures/policies/orphan-branch.yml result=ok
+$ gh api "repos/steady-orchard/patch-steward-testbed-public/contents/.github?ref=master" --jq '.[] | select(.name=="patch-steward") | .sha'
+d997b1e362c75af03942da0e7a1e8902ca5dbe51
+```
+
+Result: pass
