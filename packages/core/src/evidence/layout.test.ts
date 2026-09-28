@@ -10,14 +10,18 @@ import {
   executionFilePath,
   findingFilePath,
   findingId,
+  latestRunDirectoryName,
   localEvidenceLocation,
   localRunId,
   maintainerActionFilePath,
   metricsStorePath,
   recordTypeForPath,
+  repositoryStorePath,
   repositoryStoreRoot,
   runStorePath,
   stagingStorePath,
+  supersessionMetricsStorePath,
+  supersessionStorePath,
 } from './layout.js';
 
 describe('evidence layout', () => {
@@ -90,5 +94,57 @@ describe('evidence layout', () => {
     const location = localEvidenceLocation('runs/pr-12/x');
     expect(location('')).toBe('runs/pr-12/x');
     expect(location('findings/finding-0001.json')).toBe('runs/pr-12/x/findings/finding-0001.json');
+  });
+
+  it('supersession paths follow the approved layout', () => {
+    expect(supersessionStorePath('pull_request', 12, 36081628326, 1)).toBe('runs/pr-12/supersessions/36081628326-1.json');
+    expect(supersessionStorePath('issue', 29, 36081628326, 1)).toBe('runs/issue-29/supersessions/36081628326-1.json');
+    expect(supersessionMetricsStorePath('2026-09-27T10:15:00.000Z', 36081628326, 1)).toBe(
+      'metrics/2026-09/36081628326-1-supersession.json',
+    );
+  });
+
+  it('repository store paths prefix the target repository', () => {
+    const result = repositoryStorePath('steady-orchard/patch-steward-testbed-public', 'runs/pr-12/36081628326-1');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe('steady-orchard/patch-steward-testbed-public/runs/pr-12/36081628326-1');
+    }
+  });
+
+  it('repository store paths reject unsafe input', () => {
+    for (const repository of ['bad', 'o/..']) {
+      const result = repositoryStorePath(repository, 'runs/pr-12/1-1');
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('evidence.layout-invalid');
+      }
+    }
+
+    for (const storePath of ['', '/abs', 'a/../b', 'a//b', './a', 'a\\b']) {
+      const result = repositoryStorePath('octo/demo', storePath);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.failure.code).toBe('evidence.layout-invalid');
+      }
+    }
+  });
+
+  it('waiting.json maps to the waiting record type', () => {
+    expect(recordTypeForPath('waiting.json')).toBe('waiting');
+  });
+
+  it('the latest run directory is the greatest run id and attempt', () => {
+    expect(latestRunDirectoryName(['9-1', '10-1'])).toEqual({ name: '10-1', runId: 10, runAttempt: 1 });
+    expect(latestRunDirectoryName(['36081628326-1', '36081628326-2'])).toEqual({
+      name: '36081628326-2',
+      runId: 36081628326,
+      runAttempt: 2,
+    });
+  });
+
+  it('run directory selection ignores other names', () => {
+    const names = ['supersessions', '.staging', 'local-20260927T101500Z-3f9a1c2e', '0-1', '01-1', '1-0', '99999999999999999999-1'];
+    expect(latestRunDirectoryName(names)).toBeNull();
   });
 });
