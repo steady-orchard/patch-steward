@@ -16,8 +16,21 @@
 #     the three files is pinned to a 40-hex sha that resolves on GitHub;
 #   - read-only: no writes, no checkout, no clone.
 #
+# Environment gating (check 4, environment-jobs) requires exactly the jobs gate and publish to
+# declare the Environment steward-publication as the job-level mapping form
+#   environment:
+#     name: steward-publication
+#     deployment: false
+# and requires no job (in either wrapper or the reusable workflow) to declare an Environment in any
+# other form (the plain string form `environment: steward-publication` makes GitHub Actions record a
+# Deployment on pull request heads).
+#
+# PINS_SCREENING_FILE=<path>: when set, reads the reusable screening workflow text from that local
+# file (CR-stripped) instead of fetching it at the pin; a missing file is a read failure. All other
+# checks are unchanged, and the final result line carries " screening=local" before " result=".
+#
 # Output: "PINS repo=<r> check=<name> ok|FAIL [<detail>]" lines, then a final
-#   "PINS repo=<r> pin=<PIN> result=pass|fail" line.
+#   "PINS repo=<r> pin=<PIN> [screening=local ]result=pass|fail" line.
 # Exit 0: result=pass. Exit 1: result=fail. Exit 2: usage error. Exit 3: a required read failed.
 set -uo pipefail
 
@@ -65,10 +78,17 @@ local_blob_issues="$(git rev-parse HEAD:scenarios/workflows/steward-issues.yml 2
 pin="$(printf '%s\n' "$raw_pr" | grep -oE 'steward-screening\.yml@[0-9a-f]{40}' | head -n1 | cut -d@ -f2)"
 [ -n "$pin" ] || fail_read "pin"
 
-raw_screening="$(gh api -H 'Accept: application/vnd.github.raw+json' "repos/steady-orchard/patch-steward/contents/.github/workflows/steward-screening.yml?ref=$pin" 2> /dev/null)"
-rc=$?
-[ "$rc" -eq 0 ] && [ -n "$raw_screening" ] || fail_read "screening"
-raw_screening="$(printf '%s' "$raw_screening" | strip_cr)"
+screening_source=pinned
+if [ -n "${PINS_SCREENING_FILE:-}" ]; then
+  [ -f "$PINS_SCREENING_FILE" ] || fail_read "screening-file"
+  raw_screening="$(strip_cr < "$PINS_SCREENING_FILE")"
+  screening_source=local
+else
+  raw_screening="$(gh api -H 'Accept: application/vnd.github.raw+json' "repos/steady-orchard/patch-steward/contents/.github/workflows/steward-screening.yml?ref=$pin" 2> /dev/null)"
+  rc=$?
+  [ "$rc" -eq 0 ] && [ -n "$raw_screening" ] || fail_read "screening"
+  raw_screening="$(printf '%s' "$raw_screening" | strip_cr)"
+fi
 
 compare_status="$(gh api "repos/steady-orchard/patch-steward/compare/$pin...milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish" --jq .status 2> /dev/null)"
 rc=$?
@@ -171,27 +191,42 @@ print_check pin-reachable "$c3" "status=$compare_status"
 
 # 4/5. job structure from the reusable workflow
 job_info="$(printf '%s\n' "$raw_screening" | awk '
-  BEGIN { seen_jobs = 0; job = "" }
+  BEGIN { seen_jobs = 0; job = ""; inenv = 0 }
   /^jobs:$/ { seen_jobs = 1; next }
   seen_jobs && /^  [a-z][a-z0-9_-]*:$/ {
     job = $0
     sub(/^  /, "", job)
     sub(/:$/, "", job)
-    env[job] = 0
+    decl[job] = 0; name[job] = 0; dep[job] = 0; extra[job] = 0; strf[job] = 0
     sec[job] = 0
+    inenv = 0
     next
   }
   seen_jobs && job != "" {
-    if ($0 == "    environment: steward-publication") env[job] = 1
+    if (inenv && $0 ~ /^      /) {
+      if ($0 == "      name: steward-publication") name[job] = 1
+      else if ($0 == "      deployment: false") dep[job] = 1
+      else extra[job] = 1
+      next
+    }
+    inenv = 0
+    if ($0 == "    environment:") { decl[job] = 1; inenv = 1; next }
+    if ($0 ~ /^    environment:/) strf[job] = 1
     if ($0 ~ /secrets\.PATCH_STEWARD_APP_ID/ || $0 ~ /secrets\.PATCH_STEWARD_APP_PRIVATE_KEY/) sec[job] = 1
   }
   END {
-    for (j in env) print "ENV|" j "|" env[j]
+    for (j in decl) {
+      m = (decl[j] && name[j] && dep[j] && !extra[j] && !strf[j]) ? 1 : 0
+      o = ((decl[j] || strf[j]) && !m) ? 1 : 0
+      print "MAP|" j "|" m
+      print "OTHER|" j "|" o
+    }
     for (j in sec) print "SEC|" j "|" sec[j]
   }
 ')"
 
-env_list="$(printf '%s\n' "$job_info" | awk -F'|' '$1 == "ENV" && $3 == 1 { print $2 }' | sort | paste -sd, -)"
+env_list="$(printf '%s\n' "$job_info" | awk -F'|' '$1 == "MAP" && $3 == 1 { print $2 }' | sort | paste -sd, -)"
+other_list="$(printf '%s\n' "$job_info" | awk -F'|' '$1 == "OTHER" && $3 == 1 { print $2 }' | sort | paste -sd, -)"
 sec_list="$(printf '%s\n' "$job_info" | awk -F'|' '$1 == "SEC" && $3 == 1 { print $2 }' | sort | paste -sd, -)"
 before_jobs="$(printf '%s\n' "$raw_screening" | awk '/^jobs:$/ { exit } { print }')"
 before_jobs_has_secrets="$(printf '%s\n' "$before_jobs" | grep -c 'secrets\.' || true)"
@@ -200,12 +235,12 @@ wrappers_have_environment=no
 if printf '%s' "$raw_pr" | grep -q 'environment:'; then wrappers_have_environment=yes; fi
 if printf '%s' "$raw_issues" | grep -q 'environment:'; then wrappers_have_environment=yes; fi
 
-if [ "$env_list" = "gate,publish" ] && [ "$wrappers_have_environment" = no ]; then
+if [ "$env_list" = "gate,publish" ] && [ -z "$other_list" ] && [ "$wrappers_have_environment" = no ]; then
   c4=yes
 else
   c4=no
 fi
-print_check environment-jobs "$c4" "jobs=$env_list"
+print_check environment-jobs "$c4" "jobs=${env_list:-none} other_form=${other_list:-none}"
 [ "$c4" = yes ] || overall=no
 
 if [ "$sec_list" = "gate,publish" ] && [ "$before_jobs_has_secrets" -eq 0 ]; then
@@ -253,10 +288,12 @@ print_check probe-names "$c7"
 print_check uses-pinned "$uses_pinned_ok" "count=$uses_count"
 [ "$uses_pinned_ok" = yes ] || overall=no
 
+suffix=""
+if [ "$screening_source" = local ]; then suffix=" screening=local"; fi
 if [ "$overall" = yes ]; then
-  echo "PINS repo=$repo pin=$pin result=pass"
+  echo "PINS repo=$repo pin=$pin$suffix result=pass"
   exit 0
 else
-  echo "PINS repo=$repo pin=$pin result=fail"
+  echo "PINS repo=$repo pin=$pin$suffix result=fail"
   exit 1
 fi
