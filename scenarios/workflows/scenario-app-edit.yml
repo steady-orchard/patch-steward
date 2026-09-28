@@ -38,7 +38,9 @@ jobs:
     if: ${{ github.event.sender.id == 2095171 }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    environment: steward-publication
+    environment:
+      name: steward-publication
+      deployment: false
     permissions: {}
     steps:
       - name: Edit with an App installation token
