@@ -15,6 +15,7 @@ import { CLI_LOCAL_RUN_NOTICE } from './conventions.js';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const TEMPLATE = path.join(root, 'templates', 'policy', 'policy.yml');
 const REPO = 'steady-orchard/patch-steward-testbed-public';
+const FORK = 'jambolo/patch-steward-testbed-public';
 
 const token = typeof process.env.GH_TOKEN === 'string' && process.env.GH_TOKEN !== '' ? process.env.GH_TOKEN : null;
 
@@ -124,7 +125,7 @@ describe('steward commands live', () => {
     const before = countManifests(ev);
     const { io, stdout, stderr } = makeIo();
     const context: ScreenCommandContext = { cwd: root, io, env: process.env };
-    const exit = await runScreenCommand(['--issue', '29', '--repo', REPO, '--evidence-dir', ev], context);
+    const exit = await runScreenCommand(['--issue', '29', '--repo', FORK, '--evidence-dir', ev], context);
     expect(exit).toBe(2);
     expect(stdout.join('')).toBe('');
     expect(stderr.join('').includes('screen.policy-missing')).toBe(true);

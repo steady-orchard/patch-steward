@@ -17,6 +17,7 @@ import {
 import { loadPolicy } from '../policy/loader.js';
 
 const repo: GitHubRepositoryRef = { owner: 'steady-orchard', name: 'patch-steward-testbed-public' };
+const fork: GitHubRepositoryRef = { owner: 'jambolo', name: 'patch-steward-testbed-public' };
 const testbedPullHeadSha = 'b46eef5018c202bcb2470bf62e3defd7496ec65b';
 
 const token = typeof process.env.GH_TOKEN === 'string' && process.env.GH_TOKEN !== '' ? process.env.GH_TOKEN : null;
@@ -121,7 +122,8 @@ describe('github live reads', () => {
     if (!entriesResult.ok) return;
     const workflows = entriesResult.value.find((entry) => entry.name === 'workflows');
     expect(workflows?.type).toBe('dir');
-    expect(entriesResult.value.some((entry) => entry.name === 'patch-steward')).toBe(false);
+    const patchSteward = entriesResult.value.find((entry) => entry.name === 'patch-steward');
+    expect(patchSteward?.type).toBe('dir');
   });
 
   test('live: test-bed issue comment read validates', async (ctx) => {
@@ -137,17 +139,37 @@ describe('github live reads', () => {
     expect(result.value.body.length).toBeGreaterThan(0);
   });
 
-  test('live: test-bed has no published policy', async (ctx) => {
+  test('live: the unsynced fork has no published policy', async (ctx) => {
+    if (offline) {
+      ctx.skip();
+      return;
+    }
+    const client = createClient();
+    const result = await loadPolicy({ kind: 'github', client, repository: fork, branch: 'master' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('policy-source.not-published');
+      expect(result.failure.outcome).toBe('inconclusive');
+    }
+  });
+
+  test('live: test-bed published policy loads and validates', async (ctx) => {
     if (offline) {
       ctx.skip();
       return;
     }
     const client = createClient();
     const result = await loadPolicy({ kind: 'github', client, repository: repo, branch: 'master' });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.failure.code).toBe('policy-source.not-published');
-      expect(result.failure.outcome).toBe('inconclusive');
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const revision = result.value.revision;
+    expect(revision.kind).toBe('git-tree');
+    if (revision.kind !== 'git-tree') return;
+    expect(revision.id).toMatch(/^[0-9a-f]{40}$/);
+    expect(revision.commit).toMatch(/^[0-9a-f]{40}$/);
+    expect(revision.ref).toBe('master');
+    expect(result.value.authoritative).toBe(true);
+    expect(result.value.policy.evidence.store).toEqual({ type: 'orphan-branch', branch: 'steward-evidence' });
+    expect(result.value.policy.modes.default).toBe('observe');
   });
 });
