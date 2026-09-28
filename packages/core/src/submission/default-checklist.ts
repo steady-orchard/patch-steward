@@ -251,7 +251,7 @@ export const DEFAULT_CHECKLIST_POLICY: ResolvedPolicy = deepFreeze<ResolvedPolic
   evidence: {
     store: {
       type: 'orphan-branch',
-      branch: 'patch-steward-evidence',
+      branch: 'steward-evidence',
     },
     retention_days: 365,
     redaction_patterns: [],
