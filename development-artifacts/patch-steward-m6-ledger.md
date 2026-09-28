@@ -79,7 +79,7 @@ updates Steps and appends Revisions.
 | 1.11 | 1 | done | packages/core/src/evidence/layout.ts, packages/core/src/evidence/layout.test.ts, packages/core/src/evidence/manifest.ts, packages/core/src/evidence/manifest.test.ts, development-artifacts/patch-steward-m6-1.11-report.md | a8f0365106d11825d374013367f975ab780a94e1 |
 | 1.12 | 1 | done | packages/core/src/records/metrics-event.ts, packages/core/src/records/metrics-event.test.ts, packages/core/src/evidence/metrics.ts, packages/core/src/evidence/metrics.test.ts, development-artifacts/patch-steward-m6-1.12-report.md | 68b43a1353caf718beca5cab6fe02fba9dd5c906 |
 | 1.13 | 1 | done | packages/core/src/pipeline/job-summary.ts, packages/core/src/pipeline/job-summary.test.ts, development-artifacts/patch-steward-m6-1.13-report.md | e02c34475f3c42f56f387d257c0f3dc8d715647b |
-| 1.14 | 1 | pending | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/invariant-5.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-1.14-report.md | |
+| 1.14 | 1 | done | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/invariant-5.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-1.14-report.md | facfbf79e4d03b7a8cf341b8b2b1ed54c6c8a9b5 |
 | 1.15 | 1 | pending | development-artifacts/patch-steward-m6-1.15-report.md | |
 
 ### Phase 1 notes
