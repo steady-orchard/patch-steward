@@ -17,7 +17,8 @@
     owner is kept: no upload, no cancel, no cap evaluation, no evidence). The caller (a later step) lists the ownership artifacts,
     picks the newest by created_at (none, unique, ambiguous tie, or incomplete listing), downloads and validates the unique newest
     owner's record, and, when there is no unexpired owner, reads the latest published evidence run (fallback). This step decides
-    from those already-read inputs.
+    from those already-read inputs. The caller lists ownership artifacts for EVERY event kind (reruns, reopens, closures included);
+    nothing in this module decides whether to list.
 
     Required API of packages/core/src/ownership/dedup.ts (exact names; export nothing else):
       export const DEDUP_COMMIT_REASONS = ['rerun', 'reopened', 'no-owner', 'snapshot-changed', 'owner-ambiguous', 'listing-incomplete'] as const;
@@ -53,7 +54,7 @@
         | { readonly kind: 'duplicate'; readonly reason: DedupDuplicateReason; readonly keptOwner: DedupRunRef | null }
         | { readonly kind: 'commit'; readonly reason: DedupCommitReason };
       export function decideDeduplication(input: DedupInput): Result<DedupDecision, DedupFailureCode>;
-      export function needsOwnershipListing(runAttempt: number, action: string): boolean;
+      export function appliesListingDeduplication(runAttempt: number, action: string): boolean;
       export interface EchoInput {
         readonly senderId: number; readonly botUserId: number | null;
         readonly triggeringResourceId: number; readonly receipts: readonly number[];
@@ -75,7 +76,8 @@
          { runId, runAttempt } of the published run; otherwise -> ok commit 'snapshot-changed'.
     Errors: err(code, 'github-unavailable', message) with messages 'The ownership listing could not be read.' (listing-unavailable)
     and 'The newest ownership record is invalid.' (record-invalid). Never throw.
-    needsOwnershipListing: true exactly when runAttempt === 1 and action !== 'reopened'.
+    appliesListingDeduplication: true exactly when runAttempt === 1 and action !== 'reopened' (neither rule 2 nor rule 3 fires, so
+    the listing-based rules 4 to 7, including the fallback read of rule 7, decide). It never gates the listing itself.
     isVerifiedEcho: true exactly when botUserId !== null and senderId === botUserId and receipts includes triggeringResourceId.
 
     Result helpers (packages/core/src/result.ts): ok(value); err(code, cause, message, details = []) returns
@@ -108,12 +110,13 @@
        - 'a verified echo is a duplicate' (echo true beats an otherwise changed snapshot)
        - 'a bot sender without a recorded receipt is not an echo' (isVerifiedEcho with empty receipts -> false)
        - 'a recorded receipt from another sender is not an echo' (senderId differs from botUserId -> false; botUserId null -> false)
-       - 'the listing is needed only for first attempts of non-reopen events' (needsOwnershipListing truth table)
+       - 'listing-based deduplication applies only to first attempts of non-reopen events' (appliesListingDeduplication truth
+         table: (1, 'edited') true; (1, 'opened') true; (2, 'edited') false; (1, 'reopened') false; (3, 'reopened') false)
     3. Run: pnpm exec prettier --write packages/core/src/ownership/dedup.ts packages/core/src/ownership/dedup.test.ts
 - acceptance: |
     Run each from the worktree root in Git Bash; each must give exactly the stated result.
     1. pnpm vitest run packages/core/src/ownership/dedup.test.ts --reporter=json --outputFile=node_modules/.m6-p1-1.5.json -> exit 0
-    2. node -e "const r=require('./node_modules/.m6-p1-1.5.json');const got=new Set();for(const f of r.testResults)for(const a of f.assertionResults)if(a.status==='passed')got.add(a.title);const need=['an explicit rerun commits a new owner whatever the snapshot','a reopened event commits a new owner whatever the snapshot','an unchanged snapshot and policy revision keep the newest owner','a changed snapshot hash commits a new owner','a changed policy revision commits a new owner','an unchanged published snapshot without an owner is a duplicate','a changed published snapshot without an owner commits','no owner and no published run commits a new owner','an ambiguous newest owner commits a new owner','an incomplete listing commits a new owner','an unavailable listing fails before commitment','an unavailable owner record fails before commitment','an invalid owner record fails before commitment','an unavailable fallback read fails before commitment','a missing listing read fails closed','a verified echo is a duplicate','a bot sender without a recorded receipt is not an echo','a recorded receipt from another sender is not an echo','the listing is needed only for first attempts of non-reopen events'];const miss=need.filter(t=>!got.has(t));console.log(miss.length?'MISSING '+JSON.stringify(miss):'titles ok')"
+    2. node -e "const r=require('./node_modules/.m6-p1-1.5.json');const got=new Set();for(const f of r.testResults)for(const a of f.assertionResults)if(a.status==='passed')got.add(a.title);const need=['an explicit rerun commits a new owner whatever the snapshot','a reopened event commits a new owner whatever the snapshot','an unchanged snapshot and policy revision keep the newest owner','a changed snapshot hash commits a new owner','a changed policy revision commits a new owner','an unchanged published snapshot without an owner is a duplicate','a changed published snapshot without an owner commits','no owner and no published run commits a new owner','an ambiguous newest owner commits a new owner','an incomplete listing commits a new owner','an unavailable listing fails before commitment','an unavailable owner record fails before commitment','an invalid owner record fails before commitment','an unavailable fallback read fails before commitment','a missing listing read fails closed','a verified echo is a duplicate','a bot sender without a recorded receipt is not an echo','a recorded receipt from another sender is not an echo','listing-based deduplication applies only to first attempts of non-reopen events'];const miss=need.filter(t=>!got.has(t));console.log(miss.length?'MISSING '+JSON.stringify(miss):'titles ok')"
        -> prints exactly: titles ok
     3. pnpm vitest run -> exit 0
     4. pnpm typecheck -> exit 0
