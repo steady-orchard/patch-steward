@@ -215,6 +215,37 @@ describe('package root exports', () => {
     'screenPreRunExitStatus',
     'screenPublishFailure',
     'screenSubmission',
+    'readSingleZipEntry',
+    'gitBlobId',
+    'verifyAppendOnlyCompare',
+    'readBackTipAccepted',
+    'verifyReadBackTree',
+    'ownershipArtifactName',
+    'encodeOwnershipRecord',
+    'decodeOwnershipRecord',
+    'newestOwnershipArtifact',
+    'artifactRetentionDays',
+    'ownershipRetentionShort',
+    'decideDeduplication',
+    'appliesListingDeduplication',
+    'isVerifiedEcho',
+    'authenticateEvent',
+    'eventIdentity',
+    'stewardConcurrencyGroup',
+    'closureResolution',
+    'buildRunName',
+    'parseRunName',
+    'runListQueryDate',
+    'evaluateCaps',
+    'supersessionStorePath',
+    'supersessionMetricsStorePath',
+    'repositoryStorePath',
+    'latestRunDirectoryName',
+    'buildWaitingMetricsEvents',
+    'buildSupersessionMetricsEvents',
+    'buildClosureMetricsEvent',
+    'renderJobSummary',
+    'fitJobSummary',
   ] as const;
 
   it.each(functionExports)('exports %s as a function', (name) => {
@@ -291,6 +322,10 @@ describe('package root exports', () => {
     'PIPELINE_FAILURE_CODES',
     'SCREEN_POLICY_FAILURE_CODES',
     'SCREEN_FAILURE_CODES',
+    'ZIP_ENTRY_VIOLATION_REASONS',
+    'DEDUP_COMMIT_REASONS',
+    'DEDUP_DUPLICATE_REASONS',
+    'STEWARD_WRAPPER_PATHS',
   ] as const;
 
   it.each(tupleExports)('exports %s as a tuple', (name) => {
@@ -372,6 +407,12 @@ describe('package root exports', () => {
     'handoffRecordSchema',
     'evidenceManifestSchema',
     'metricsFileSchema',
+    'evidenceCompareSchema',
+    'waitingRecordSchema',
+    'supersessionRecordSchema',
+    'ownershipRecordSchema',
+    'ownershipEventSchema',
+    'ownershipCapSchema',
   ] as const;
 
   it.each(schemaExports)('exports %s as an object', (name) => {
@@ -415,6 +456,7 @@ describe('package root exports', () => {
     'PIPELINE_FAILURE_CAUSES',
     'PIPELINE_FAILURE_MESSAGES',
     'SCREEN_EXIT_BY_OUTCOME',
+    'WAITING_RUN_FILES',
   ] as const;
 
   it.each(recordExports)('exports %s as an object', (name) => {
@@ -503,5 +545,15 @@ describe('package root exports', () => {
     expect(core.PIPELINE_FAILURE_CODES).toHaveLength(6);
     expect(core.SCREEN_EXIT_BY_OUTCOME.inconclusive).toBe(3);
     expect(core.SEQUENCE_PHASES).toEqual(['intake', 'execute', 'assess']);
+  });
+
+  it('exports the hosted contract constants', () => {
+    expect(core.OWNERSHIP_ARTIFACT_FILE).toBe('ownership.json');
+    expect(core.OWNERSHIP_ARTIFACT_PREFIX).toBe('steward-ownership-');
+    expect(core.SUPERSESSIONS_DIRECTORY).toBe('supersessions');
+    expect(core.OWNERSHIP_SETTLE_DELAY_MS).toBe(10000);
+    expect(core.JOB_SUMMARY_MAX_LENGTH).toBe(65536);
+    expect(core.RECORD_TYPES).toHaveLength(12);
+    expect(core.STEWARD_WRAPPER_PATHS).toEqual(['.github/workflows/steward-pr.yml', '.github/workflows/steward-issues.yml']);
   });
 });

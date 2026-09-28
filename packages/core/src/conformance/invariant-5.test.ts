@@ -151,12 +151,16 @@ describe('invariant 5 conformance', () => {
 
     const bytesResult = await (async () => {
       const dir = os.tmpdir();
-      const { writeFileSync, mkdtempSync } = await import('node:fs');
+      const { writeFileSync, mkdtempSync, rmSync } = await import('node:fs');
       const { join } = await import('node:path');
       const tmp = mkdtempSync(join(dir, 'invariant5-'));
-      const path = join(tmp, 'policy.yml');
-      writeFileSync(path, 'version: 1\nextra: 1\n');
-      return core.loadPolicy({ kind: 'file', path });
+      try {
+        const path = join(tmp, 'policy.yml');
+        writeFileSync(path, 'version: 1\nextra: 1\n');
+        return await core.loadPolicy({ kind: 'file', path });
+      } finally {
+        rmSync(tmp, { recursive: true, force: true });
+      }
     })();
     results.push(bytesResult);
 
@@ -218,6 +222,7 @@ describe('invariant 5 conformance', () => {
       'parseIssueBody',
       'parseLinkedIssueValue',
       'parsePullRequestBody',
+      'parseRunName',
       'parseStewardVersion',
       'parseStrictYaml',
       'parseStrictYamlDocument',
@@ -252,6 +257,7 @@ describe('invariant 5 conformance', () => {
     // parseCategoryValue / parseLinkedIssueValue: invalid status, not a Result.
     expect(core.parseCategoryValue('bugfix feature')).toEqual({ status: 'invalid' });
     expect(core.parseLinkedIssueValue('#1, #2', 'o/r').status).toBe('invalid');
+    expect(core.parseRunName('steward pr 01 author 1 event issues opened sender 1 User')).toBeNull();
 
     // parseIssueBody / parsePullRequestBody: Result rejections.
     expectResultRejection(core.parseIssueBody('x'.repeat(65537)), 'submission.body-too-large');
