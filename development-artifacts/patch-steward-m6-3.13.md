@@ -109,6 +109,12 @@
     - Listing failures (used by closures always and by the dedup decision): 'unavailable', or 'unique' with record 'unavailable'
       -> err('ownership.listing-unavailable', 'github-unavailable', 'The ownership listing could not be read.'); 'unique' with
       record 'invalid' -> err('ownership.record-invalid', 'github-unavailable', 'The newest ownership record is invalid.').
+    - Early listing failure (non-closure events): when appliesListingDeduplication(event.runAttempt, event.action) is true and a
+      listing failure exists, return it right after the listing read, before the echo check and capture (the dedup decision would
+      return the same failure; the receipt set is empty then, so no echo can be verified). When appliesListingDeduplication is
+      false (explicit rerun: run attempt > 1; action 'reopened'), a listing failure is NOT returned: the event continues with an
+      empty receipt set to capture, and decideDeduplication commits (reason 'rerun' or 'reopened'). Never fail a rerun or a
+      reopened event because of the listing.
     - Closure (event.closure): a listing failure as above -> return it. paired = unique valid record ? { runId, runAttempt,
       snapshotHash } : null (none, ambiguous, and incomplete pair null). event record = buildClosureMetricsEvent({ repository,
       type, number, resolution: closureResolution(event), pairedRun, pairedSnapshotHash, recordedAt: clock.now().toISOString() }).
@@ -229,6 +235,9 @@
          'gate.repository-gate-unsupported'; no '/actions/artifacts' request.
        - 'an unavailable listing fails before capture': override answering 500 for '/actions/artifacts' -> failure.code
          'ownership.listing-unavailable'; no '/issues/29' request.
+       - 'a rerun or reopen commits despite an unavailable listing': override answering 500 for '/actions/artifacts'; (1)
+         GITHUB_RUN_ATTEMPT '2' with action 'opened' -> ok, disposition 'runnable', a '/issues/29' request happens; (2) run attempt
+         1 with action 'reopened' -> ok, disposition 'runnable'.
        - 'minted tokens are masked and revoked': after a runnable run, masks equals world.tokens and the number of DELETE
          '/installation/token' requests equals world.tokens.length; no minted token appears in any output value or file bytes.
        - 'the gate summary is written once': exactly one summary per run, starting with '## Patch Steward gate'.
@@ -237,7 +246,7 @@
     Run each from the worktree root in Git Bash; each must give exactly the stated result.
     1. pnpm vitest run packages/core/src/pipeline/hosted-gate.test.ts --reporter=json --outputFile=node_modules/.m6-p3-3.13.json
        -> exit 0
-    2. node -e "const r=require('./node_modules/.m6-p3-3.13.json');const got=new Set();for(const f of r.testResults)for(const a of f.assertionResults)if(a.status==='passed')got.add(a.title);const need=['the gate lists ownership before capture','a runnable issue commits handoff, context, and ownership files','an unstructured issue exits early without caps','an over-cap run is queued','an unchanged snapshot keeps the current owner','a changed body commits a new owner','an explicit rerun commits whatever the snapshot','a verified echo stops before capture','a bot event without receipts is captured','a closure records a paired resolution','an invalid event mints no token','a missing trusted policy fails before the listing','an active repository gate is refused','an unavailable listing fails before capture','minted tokens are masked and revoked','the gate summary is written once'];const miss=need.filter(t=>!got.has(t));console.log(miss.length?'MISSING '+JSON.stringify(miss):'titles ok')"
+    2. node -e "const r=require('./node_modules/.m6-p3-3.13.json');const got=new Set();for(const f of r.testResults)for(const a of f.assertionResults)if(a.status==='passed')got.add(a.title);const need=['the gate lists ownership before capture','a runnable issue commits handoff, context, and ownership files','an unstructured issue exits early without caps','an over-cap run is queued','an unchanged snapshot keeps the current owner','a changed body commits a new owner','an explicit rerun commits whatever the snapshot','a verified echo stops before capture','a bot event without receipts is captured','a closure records a paired resolution','an invalid event mints no token','a missing trusted policy fails before the listing','an active repository gate is refused','an unavailable listing fails before capture','a rerun or reopen commits despite an unavailable listing','minted tokens are masked and revoked','the gate summary is written once'];const miss=need.filter(t=>!got.has(t));console.log(miss.length?'MISSING '+JSON.stringify(miss):'titles ok')"
        -> prints exactly: titles ok
     3. grep -cE "method: '(POST|PATCH|DELETE|PUT)'|fetch\(" packages/core/src/pipeline/hosted-gate.ts -> prints 0 (grep exit status 1 is expected)
     4. git grep --untracked -n -P '(?<!PATCH_)STEWARD_APP_(ID|PRIVATE_KEY|CLIENT_ID)' -- packages/core/src/pipeline/hosted-gate.ts packages/core/src/pipeline/hosted-gate.test.ts; echo "grep $?"
