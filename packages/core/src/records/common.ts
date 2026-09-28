@@ -17,6 +17,9 @@ export const RECORD_TYPES = [
   'maintainer-action',
   'metrics-event',
   'policy-revision',
+  'ownership',
+  'waiting',
+  'supersession',
 ] as const;
 
 export const recordTypeSchema = z.enum(RECORD_TYPES);
@@ -49,6 +52,8 @@ export const recordRepositorySchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]
 export const recordLoginSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]{0,38}(?:\[bot\])?$/);
 
 export const policyRevisionIdSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64}|local:[0-9a-f]{64})$/);
+
+export const recordTreeIdSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
 
 export const recordPositiveIntSchema = z.int().min(1);
 
