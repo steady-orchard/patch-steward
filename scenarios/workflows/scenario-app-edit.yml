@@ -1,0 +1,148 @@
+# Scenario helper: performs one edit on a scenario issue or pull request with an installation token of the test App, so
+# the event it causes has the App's bot user as its sender. Dispatched on the default branch, it runs only for the
+# allowlisted user; the App credentials come from the publication Environment. Prints HTTP status codes only, never a
+# credential, and revokes the token before it exits.
+name: scenario-app-edit
+run-name: scenario-app-edit ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: Unique marker that lets the dispatching script find this run
+        required: true
+        type: string
+      kind:
+        description: issue or pr
+        required: true
+        type: string
+      number:
+        description: Issue or pull request number
+        required: true
+        type: string
+      operation:
+        description: title (set the title) or close (close the issue or pull request)
+        required: true
+        type: string
+      title:
+        description: New title for the title operation
+        required: false
+        type: string
+        default: ''
+
+permissions: {}
+
+jobs:
+  edit:
+    name: edit
+    if: ${{ github.event.sender.id == 2095171 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: steward-publication
+    permissions: {}
+    steps:
+      - name: Edit with an App installation token
+        env:
+          PATCH_STEWARD_APP_ID: ${{ secrets.PATCH_STEWARD_APP_ID }}
+          PATCH_STEWARD_APP_PRIVATE_KEY: ${{ secrets.PATCH_STEWARD_APP_PRIVATE_KEY }}
+          EDIT_REPOSITORY: ${{ github.repository }}
+          EDIT_KIND: ${{ inputs.kind }}
+          EDIT_NUMBER: ${{ inputs.number }}
+          EDIT_OPERATION: ${{ inputs.operation }}
+          EDIT_TITLE: ${{ inputs.title }}
+        run: |
+          cat > "$RUNNER_TEMP/app-edit.mjs" << 'SCRIPT'
+          import { createSign } from 'node:crypto';
+
+          const env = process.env;
+          const say = (line) => console.log('app-edit ' + line);
+          const appId = env.PATCH_STEWARD_APP_ID ?? '';
+          const key = env.PATCH_STEWARD_APP_PRIVATE_KEY ?? '';
+          const repository = env.EDIT_REPOSITORY ?? '';
+          const kind = env.EDIT_KIND ?? '';
+          const number = env.EDIT_NUMBER ?? '';
+          const operation = env.EDIT_OPERATION ?? '';
+          const title = env.EDIT_TITLE ?? '';
+
+          if (!/^[1-9][0-9]{0,19}$/.test(appId) || key.length === 0) {
+            say('error=credentials-missing');
+            process.exit(1);
+          }
+          const printable = [...title].every((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127);
+          const titleOk = title.startsWith('[scenario S') && title.length <= 200 && printable;
+          if (
+            !/^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/.test(repository) ||
+            !['issue', 'pr'].includes(kind) ||
+            !/^[1-9][0-9]{0,9}$/.test(number) ||
+            !['title', 'close'].includes(operation) ||
+            (operation === 'title' && !titleOk)
+          ) {
+            say('error=invalid-input');
+            process.exit(1);
+          }
+
+          let jwt;
+          try {
+            const b64url = (text) => Buffer.from(text).toString('base64url');
+            const now = Math.floor(Date.now() / 1000);
+            const claims = { iat: now - 60, exp: now + 480, iss: Number(appId) };
+            const unsigned = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' })) + '.' + b64url(JSON.stringify(claims));
+            const signer = createSign('RSA-SHA256');
+            signer.update(unsigned);
+            jwt = unsigned + '.' + signer.sign(key).toString('base64url');
+          } catch {
+            say('error=jwt');
+            process.exit(1);
+          }
+
+          async function call(method, path, token, body) {
+            const headers = {
+              accept: 'application/vnd.github+json',
+              authorization: 'Bearer ' + token,
+              'user-agent': 'patch-steward-scenario-app-edit',
+              'x-github-api-version': '2022-11-28',
+            };
+            if (body !== undefined) headers['content-type'] = 'application/json';
+            const response = await fetch('https://api.github.com' + path, {
+              method,
+              headers,
+              body: body === undefined ? undefined : JSON.stringify(body),
+              redirect: 'error',
+            });
+            const text = await response.text();
+            let json = null;
+            try {
+              json = text.length > 0 ? JSON.parse(text) : null;
+            } catch {
+              json = null;
+            }
+            return { status: response.status, json };
+          }
+
+          const installation = await call('GET', '/repos/' + repository + '/installation', jwt);
+          say('installation status=' + installation.status);
+          if (installation.status !== 200 || typeof installation.json?.id !== 'number') process.exit(1);
+
+          const permissions = kind === 'pr' ? { pull_requests: 'write' } : { issues: 'write' };
+          const minted = await call('POST', '/app/installations/' + installation.json.id + '/access_tokens', jwt, {
+            repositories: [repository.split('/')[1]],
+            permissions,
+          });
+          say('token status=' + minted.status);
+          if (minted.status !== 201 || typeof minted.json?.token !== 'string') process.exit(1);
+          const token = minted.json.token;
+          console.log('::add-mask::' + token);
+
+          let ok = false;
+          try {
+            const path = '/repos/' + repository + (kind === 'pr' ? '/pulls/' : '/issues/') + number;
+            const edited = await call('PATCH', path, token, operation === 'title' ? { title } : { state: 'closed' });
+            say(operation + ' status=' + edited.status);
+            ok = edited.status === 200;
+          } finally {
+            const revoked = await call('DELETE', '/installation/token', token);
+            say('revoke status=' + revoked.status);
+          }
+          process.exit(ok ? 0 : 1);
+          SCRIPT
+          node "$RUNNER_TEMP/app-edit.mjs"
