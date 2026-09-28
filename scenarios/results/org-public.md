@@ -1277,3 +1277,64 @@ d997b1e362c75af03942da0e7a1e8902ca5dbe51
 ```
 
 Result: pass
+
+## S12 explicit rerun commits a new owner
+
+Date (UTC): 2026-09-28. Re-ran the completed hosted-screening smoke run for issue 31
+(https://github.com/steady-orchard/patch-steward-testbed-public/issues/31), whose gate treated the rerun as an
+explicit rerun, committed a new owner, and whose publish wrote a second run directory keyed by attempt 2. Run:
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36397673122.
+
+```text
+$ R=steady-orchard/patch-steward-testbed-public; gh run view 36397673122 -R $R --json attempt,status,conclusion --jq '(.attempt|tostring) + " " + .status + " " + .conclusion'
+1 completed success
+$ bash scenarios/tools/artifacts.sh $R steward-ownership-issue-31
+ARTIFACT id=10959510156 name=steward-ownership-issue-31 created_at=2026-09-28T08:30:09Z expires_at=2026-12-27T08:29:34Z expired=false run_id=36397673122 size=529
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-issue-31 count=1 unexpired=1
+```
+
+```text
+$ gh run rerun 36397673122 -R steady-orchard/patch-steward-testbed-public
+$ gh run view 36397673122 -R $R --json attempt,status --jq '(.attempt|tostring) + " " + .status'
+2 queued
+$ PROBE_WAIT_SECONDS=540 bash probes/smoke/tools/wait-run.sh steady-orchard/patch-steward-testbed-public 36397673122
+WAIT completed run_id=36397673122 conclusion=success utc=2026-09-28T12:50:00Z
+```
+
+```text
+$ gh run view 36397673122 -R $R --attempt 2 --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh $R 36397673122 2 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:49:31.8658268Z text=event issues opened issue 31 sender User
+LOG job=gate ts=2026-09-28T12:49:31.8660583Z text=listing none
+LOG job=gate ts=2026-09-28T12:49:31.8661194Z text=dedup commit rerun
+LOG job=gate ts=2026-09-28T12:49:31.8661920Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T12:49:31.8793395Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T12:49:31.8796589Z text=- Owner: committed `36397673122-2`
+$ bash scenarios/tools/run-log.sh $R 36397673122 2 publish | grep -E 'text=(ownership |evidence commit |freshness |- Status|- Evidence|- Freshness)'
+LOG job=publish ts=2026-09-28T12:49:53.6000865Z text=ownership retention 90 days
+LOG job=publish ts=2026-09-28T12:49:53.6001890Z text=evidence commit d9ca20b91448abd382fd8009cac5ee72c3eda724 rebuilds 0
+LOG job=publish ts=2026-09-28T12:49:53.6002681Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:49:53.6003585Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:49:53.6004249Z text=freshness current
+LOG job=publish ts=2026-09-28T12:49:53.6147903Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T12:49:53.6152344Z text=- Evidence: commit `d9ca20b91448abd382fd8009cac5ee72c3eda724` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/issue-31/36397673122-2`
+LOG job=publish ts=2026-09-28T12:49:53.6154073Z text=- Freshness: `current`
+```
+
+```text
+$ bash scenarios/tools/artifacts.sh $R steward-ownership-issue-31
+ARTIFACT id=10971196087 name=steward-ownership-issue-31 created_at=2026-09-28T12:49:34Z expires_at=2026-12-27T12:48:23Z expired=false run_id=36397673122 size=530
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-issue-31 count=1 unexpired=1
+$ bash scenarios/tools/run-records.sh runs $R steward-evidence $R issue 31
+RECORD run=36397673122-1 kind=outcome outcome=needs-changes run_id=36397673122 run_attempt=1 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:b76304d018392689a4b010d378277f364e15cf9b4681e7a9935c8e6cebb958dc findings=submission.unstructured
+RECORD run=36397673122-2 kind=outcome outcome=needs-changes run_id=36397673122 run_attempt=2 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:b76304d018392689a4b010d378277f364e15cf9b4681e7a9935c8e6cebb958dc findings=submission.unstructured
+RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public subject=issue-31 runs=2 supersessions=0
+$ bash scenarios/tools/evidence.sh $R steward-evidence $R issue 31
+EVIDENCE store=steady-orchard/patch-steward-testbed-public branch=steward-evidence tip=d9ca20b91448abd382fd8009cac5ee72c3eda724 commits=30
+EVIDENCE run=36397673122-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36397673122-2 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=issue-31 runs=2 verified=2 result=ok
+```
+
+Result: pass
