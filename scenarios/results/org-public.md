@@ -521,3 +521,118 @@ S08 run=36416239795 commit=b5d11cdbe2bf5c4176e1b543a83d133537b4450e committed_at
 ```
 
 Result: pass
+
+## S05 concurrent body edits: only the newest owner publishes
+
+Date (UTC): 2026-09-28. Try 1 of 3 passed on the first attempt: three quick body edits of pull request
+https://github.com/steady-orchard/patch-steward-testbed-public/pull/34 started three runs; the newest ownership
+artifact's run published `freshness current` and the older committed run was superseded, while the third run deduplicated.
+Runs: https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36417410111,
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36417413257,
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36417416630.
+
+```text
+$ R=steady-orchard/patch-steward-testbed-public; P=34; T=1; BASE="$(tr -d '\r' < scenarios/fixtures/submissions/unstructured.txt)"; A=$(gh api "repos/$R/actions/runs?per_page=1" --jq '.workflow_runs[0].id // 0'); echo "A=$A"; for E in 1 2 3; do gh pr edit "$P" -R "$R" --body "..." > /dev/null && echo "edit$E utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; done
+A=36416239795
+edit1 utc=2026-09-28T11:43:58Z
+edit2 utc=2026-09-28T11:44:00Z
+edit3 utc=2026-09-28T11:44:01Z
+```
+
+```text
+$ bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-pr.yml "steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User" 36416239795 3
+RUN id=36417410111 attempt=1 event=pull_request_target status=completed conclusion=success created_at=2026-09-28T11:44:01Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36417410111 title=steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User
+RUN id=36417413257 attempt=1 event=pull_request_target status=completed conclusion=success created_at=2026-09-28T11:44:03Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36417413257 title=steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User
+RUN id=36417416630 attempt=1 event=pull_request_target status=completed conclusion=success created_at=2026-09-28T11:44:05Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36417416630 title=steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-pr.yml after=36416239795 count=3 completed=3 result=complete
+```
+
+```text
+$ node -e '...' (S05 check script) => S05 check runs=36417410111,36417413257,36417416630 committed=36417410111,36417413257 duplicates=36417416630 newest_owner=36417413257 tie=false current=36417413257 superseded=36417410111 cancelled=
+S05 pass
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36417410111 1 gate | grep -E 'text=(listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T11:44:33.7563591Z text=listing unique owner 36416239795-1
+LOG job=gate ts=2026-09-28T11:44:33.7563999Z text=dedup commit snapshot-changed
+LOG job=gate ts=2026-09-28T11:44:33.7564553Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T11:44:33.7699622Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T11:44:33.7701397Z text=- Owner: committed `36417410111-1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36417410111 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Freshness|- Failure)'
+LOG job=publish ts=2026-09-28T11:45:02.4863263Z text=evidence commit 046f5905ff2fae4b85cabd623e7c65358f66b4ae rebuilds 0
+LOG job=publish ts=2026-09-28T11:45:02.4863624Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T11:45:02.4863864Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T11:45:02.4864140Z text=freshness superseded newer-owner 36417413257-1
+LOG job=publish ts=2026-09-28T11:45:02.4996289Z text=- Status: `superseded`
+LOG job=publish ts=2026-09-28T11:45:02.5003179Z text=- Freshness: `superseded` (`newer-owner`)
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36417413257 1 gate | grep -E 'text=(listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T11:44:34.6230074Z text=listing unique owner 36416239795-1
+LOG job=gate ts=2026-09-28T11:44:34.6230654Z text=dedup commit snapshot-changed
+LOG job=gate ts=2026-09-28T11:44:34.6231158Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T11:44:34.6387623Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T11:44:34.6390781Z text=- Owner: committed `36417413257-1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36417413257 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Freshness|- Failure)'
+LOG job=publish ts=2026-09-28T11:45:19.7421343Z text=evidence commit da5cf11f9562449557b0b458c0ecb15537bc5e94 rebuilds 0
+LOG job=publish ts=2026-09-28T11:45:19.7422297Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T11:45:19.7423216Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T11:45:19.7423832Z text=freshness current
+LOG job=publish ts=2026-09-28T11:45:19.7562370Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T11:45:19.7567532Z text=- Freshness: `current`
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36417416630 1 gate | grep -E 'text=(listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T11:44:39.2025530Z text=listing unique owner 36417413257-1
+LOG job=gate ts=2026-09-28T11:44:39.2026624Z text=dedup duplicate owner-unchanged owner 36417413257-1
+LOG job=gate ts=2026-09-28T11:44:39.2152236Z text=- Status: `duplicate`
+LOG job=gate ts=2026-09-28T11:44:39.2155040Z text=- Owner: kept `36417413257-1`
+```
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-pr-34
+ARTIFACT id=10967320747 name=steward-ownership-pr-34 created_at=2026-09-28T11:33:57Z expires_at=2026-12-27T11:32:24Z expired=false run_id=36416239795 size=537
+ARTIFACT id=10967968117 name=steward-ownership-pr-34 created_at=2026-09-28T11:44:35Z expires_at=2026-12-27T11:44:02Z expired=false run_id=36417410111 size=535
+ARTIFACT id=10967883208 name=steward-ownership-pr-34 created_at=2026-09-28T11:44:36Z expires_at=2026-12-27T11:44:03Z expired=false run_id=36417413257 size=537
+```
+
+```text
+$ bash scenarios/tools/evidence.sh steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public pr 34
+EVIDENCE store=steady-orchard/patch-steward-testbed-public branch=steward-evidence tip=da5cf11f9562449557b0b458c0ecb15537bc5e94 commits=16
+EVIDENCE commit=6f1c3c890f7106aa762a591faff452a2cac35c1d parents=0 added=10 other=0
+EVIDENCE commit=9e54a5140f1440cf901cbb7cceb1fd8f4d546390 parents=1 added=11 other=0
+EVIDENCE commit=2a6121dbdd6b2e074bb9637f0a275c3c9f5e602d parents=1 added=11 other=0
+EVIDENCE commit=214529eff25d9a5c82c307add55c281cbe05ae61 parents=1 added=10 other=0
+EVIDENCE commit=7acff9681741e174bc7ebc5799a60815a8d5a704 parents=1 added=10 other=0
+EVIDENCE commit=bc8ebb448ff6a90d5576706aea4f16d7d87526b9 parents=1 added=10 other=0
+EVIDENCE commit=767fd74ede7d2526f23e18d03f6ea9f64be1b3af parents=1 added=10 other=0
+EVIDENCE commit=b721a29825a9958eb19b4ebe66954bb84d20da54 parents=1 added=10 other=0
+EVIDENCE commit=d0f7b356b3a8bcc03dcbfc3410e61d328ecd3a7d parents=1 added=10 other=0
+EVIDENCE commit=072dc1740b6812752fbf0486ef318af991e3e5c9 parents=1 added=10 other=0
+EVIDENCE commit=ac2b86e55c980ad1433c0b4c15b5aa2a8ef73e8d parents=1 added=10 other=0
+EVIDENCE commit=2f9a5315634c4b06052569e3f4155ce8c6ba549d parents=1 added=2 other=0
+EVIDENCE commit=b5d11cdbe2bf5c4176e1b543a83d133537b4450e parents=1 added=10 other=0
+EVIDENCE commit=046f5905ff2fae4b85cabd623e7c65358f66b4ae parents=1 added=10 other=0
+EVIDENCE commit=946c4ba918321150008093aa423f1cc1f9839c5e parents=1 added=2 other=0
+EVIDENCE commit=da5cf11f9562449557b0b458c0ecb15537bc5e94 parents=1 added=10 other=0
+EVIDENCE append_only=yes
+EVIDENCE run=36412442107-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36414063591-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36414211101-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36414463707-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36414579082-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36414810059-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36414986082-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36416155582-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36416239795-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36417410111-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36417413257-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE supersession=36416155582-1.json
+EVIDENCE supersession=36417410111-1.json
+EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=pr-34 runs=11 verified=11 result=ok
+```
+
+Result: pass
