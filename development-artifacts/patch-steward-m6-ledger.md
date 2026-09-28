@@ -133,7 +133,7 @@ updates Steps and appends Revisions.
 | 4.12 | 4 | done | scenarios/README.md, development-artifacts/patch-steward-m6-4.12-report.md | 8c31b0f822210dad8bfd461f7f2365d7b0ecbbf7 |
 | 4.13 | 4 | done | development-artifacts/patch-steward-m6-4.13-report.md | 62786b0c6890199b7ac3f150becc1e75201b7fbb |
 | 4.14 | 4 | done | scenarios/workflows/steward-pr.yml, scenarios/workflows/steward-issues.yml, development-artifacts/patch-steward-m6-4.14-report.md | 57508fc1dafa4ae24637e7d34e741d5a0fc03385 |
-| 4.15 | 4 | pending | development-artifacts/patch-steward-m6-4.15-report.md | |
+| 4.15 | 4 | done | development-artifacts/patch-steward-m6-4.15-report.md | aebfeb3d5459d8d7990be2d258ff1d84393a0b60 |
 | 4.16 | 4 | pending | packages/core/src/github/github.live.test.ts, packages/cli/src/steward-commands.live.test.ts, development-artifacts/patch-steward-m6-4.16-report.md | |
 | 4.17 | 4 | pending | development-artifacts/patch-steward-m6-4.17-report.md | |
 | 4.18 | 4 | pending | development-artifacts/patch-steward-m6-4.18-report.md | |
