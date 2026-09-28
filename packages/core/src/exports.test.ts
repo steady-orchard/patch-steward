@@ -606,4 +606,57 @@ describe('package root exports', () => {
     });
     expect(core.GITHUB_FAILURE_CODES).toHaveLength(17);
   });
+
+  it('exports the hosted pipeline entry points', () => {
+    const functions = [
+      'runHostedGate',
+      'runHostedPublish',
+      'readGateEnvironment',
+      'readPublishEnvironment',
+      'hostedEventEnvironment',
+      'prepareHostedRunEvidence',
+      'verifyPublishFreshness',
+      'publishFreshnessFailure',
+      'decidePublishFreshness',
+      'freshnessTop',
+      'findOwnOwnershipArtifact',
+      'encodeGateContext',
+      'decodeGateContext',
+      'encodeClosureContext',
+      'decodeClosureContext',
+      'decodeHandoffBytes',
+      'classificationRecord',
+      'gateContextClassification',
+      'prepareWaitingEvidence',
+      'prepareSupersessionEvidence',
+      'prepareClosureEvidence',
+      'runEvidenceGroups',
+      'loadPolicyRevision',
+      'gateCaptureSubmission',
+      'buildGateHandoff',
+      'gateContractLogLines',
+      'mapHostedPolicyFailure',
+      'repositoryGateRefusal',
+      'hostedRepositoryGateActive',
+    ] as const;
+    for (const name of functions) {
+      expect(typeof core[name]).toBe('function');
+    }
+    expect(core.HANDOFF_ARTIFACT).toBe('steward-handoff');
+    expect(core.CLOSURE_ARTIFACT).toBe('steward-closure');
+    expect(core.HANDOFF_FILE).toBe('handoff.json');
+    expect(core.GATE_CONTEXT_FILE).toBe('gate-context.json');
+    expect(core.CLOSURE_CONTEXT_FILE).toBe('closure.json');
+    expect(core.GATE_CONTEXT_LOG_LINES_MAX).toBe(200);
+    expect(core.HOSTED_GATE_FAILURE_CODES).toEqual([
+      'gate.policy-missing',
+      'gate.policy-invalid',
+      'gate.repository-gate-unsupported',
+    ]);
+    expect(core.PUBLISH_FRESHNESS_FAILURE_CODES).toEqual(['publish.freshness-unknown']);
+    expect(core.HOSTED_ENVIRONMENT_FAILURE_CODES).toEqual(['action.environment-invalid']);
+    expect(core.FRESHNESS_UNKNOWN_REASONS).toHaveLength(7);
+    expect(core.HOSTED_APP_ID_VARIABLE).toBe('PATCH_STEWARD_APP_ID');
+    expect(core.HOSTED_APP_KEY_VARIABLE).toBe('PATCH_STEWARD_APP_PRIVATE_KEY');
+  });
 });

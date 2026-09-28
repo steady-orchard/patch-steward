@@ -4,6 +4,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   FAILURE_CAUSES,
+  DEFAULT_CHECKLIST_POLICY,
   authenticateEvent,
   decodeOwnershipRecord,
   decideDeduplication,
@@ -19,6 +20,11 @@ import {
   gitBlobId,
   githubGitObjectResponseSchema,
   githubRefResponseSchema,
+  err,
+  mapHostedPolicyFailure,
+  repositoryGateRefusal,
+  publishFreshnessFailure,
+  readGateEnvironment,
 } from '../index.js';
 import type {
   Result,
@@ -31,6 +37,9 @@ import type {
   GitHubWriteOnlyFailureCode,
   AppAuthFailureCode,
   EvidenceStoreConflictFailureCode,
+  HostedGateFailureCode,
+  PublishFreshnessFailureCode,
+  HostedEnvironmentFailureCode,
 } from '../index.js';
 
 type HostedFailureCode =
@@ -42,7 +51,10 @@ type HostedFailureCode =
   | ReadBackFailureCode
   | GitHubWriteOnlyFailureCode
   | AppAuthFailureCode
-  | EvidenceStoreConflictFailureCode;
+  | EvidenceStoreConflictFailureCode
+  | HostedGateFailureCode
+  | PublishFreshnessFailureCode
+  | HostedEnvironmentFailureCode;
 
 const validEnvironment = {
   eventName: 'issues',
@@ -188,6 +200,18 @@ const TRIGGERS: { readonly [K in HostedFailureCode]: () => Result<unknown, strin
       { client, writer, sleep: async () => undefined },
     );
   },
+  'gate.policy-missing': () => ({
+    ok: false as const,
+    failure: mapHostedPolicyFailure(err('policy-source.not-published', 'policy-unavailable', 'x').failure),
+  }),
+  'gate.policy-invalid': () => ({
+    ok: false as const,
+    failure: mapHostedPolicyFailure(err('policy.unknown-key', 'policy-invalid', 'x').failure),
+  }),
+  'gate.repository-gate-unsupported': () =>
+    repositoryGateRefusal({ ...DEFAULT_CHECKLIST_POLICY, modes: { default: 'advise', per_category: {} } }),
+  'publish.freshness-unknown': () => publishFreshnessFailure('tie'),
+  'action.environment-invalid': () => readGateEnvironment({}),
 };
 
 describe('never-pass conformance: hosted contracts', () => {
