@@ -1,0 +1,37 @@
+{
+  "action": "edited",
+  "issue": {
+    "id": 5578290556,
+    "number": 29,
+    "title": "[scenario] defect report",
+    "body": "Event body text is never used; the gate reads the issue through the API.",
+    "state": "open",
+    "updated_at": "2026-09-28T09:59:00Z",
+    "user": {
+      "login": "jambolo",
+      "id": 2095171,
+      "type": "User"
+    }
+  },
+  "repository": {
+    "id": 1376317064,
+    "name": "patch-steward-testbed-public",
+    "full_name": "steady-orchard/patch-steward-testbed-public",
+    "private": false,
+    "default_branch": "master",
+    "owner": {
+      "login": "steady-orchard",
+      "type": "Organization"
+    }
+  },
+  "sender": {
+    "login": "patch-steward-testbed[bot]",
+    "id": 331019482,
+    "type": "Bot"
+  },
+  "changes": {
+    "title": {
+      "from": "Earlier title"
+    }
+  }
+}
