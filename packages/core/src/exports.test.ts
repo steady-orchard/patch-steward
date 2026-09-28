@@ -246,6 +246,30 @@ describe('package root exports', () => {
     'buildClosureMetricsEvent',
     'renderJobSummary',
     'fitJobSummary',
+    'githubWriteFailure',
+    'githubRepositoryPath',
+    'githubBranchRefPath',
+    'isAllowedGitHubWrite',
+    'createGitHubWriter',
+    'createAppJwt',
+    'lookupInstallationId',
+    'mintInstallationToken',
+    'revokeInstallationToken',
+    'lookupAppBotUserId',
+    'listOwnershipArtifacts',
+    'downloadOwnershipRecord',
+    'readOwnershipListing',
+    'dedupListingRead',
+    'readRunList',
+    'readCapRunLists',
+    'readPublishedSnapshot',
+    'evidenceStoreLocation',
+    'evidenceCommitMessage',
+    'hostedEvidenceLocation',
+    'commitEvidence',
+    'readBackEvidence',
+    'writeEvidenceCommit',
+    'prepareRunEvidence',
   ] as const;
 
   it.each(functionExports)('exports %s as a function', (name) => {
@@ -326,6 +350,8 @@ describe('package root exports', () => {
     'DEDUP_COMMIT_REASONS',
     'DEDUP_DUPLICATE_REASONS',
     'STEWARD_WRAPPER_PATHS',
+    'GITHUB_WRITE_FAILURE_CODES',
+    'APP_AUTH_FAILURE_CODES',
   ] as const;
 
   it.each(tupleExports)('exports %s as a tuple', (name) => {
@@ -413,6 +439,15 @@ describe('package root exports', () => {
     'ownershipRecordSchema',
     'ownershipEventSchema',
     'ownershipCapSchema',
+    'githubInstallationResponseSchema',
+    'githubInstallationTokenResponseSchema',
+    'githubAppResponseSchema',
+    'githubBotUserSchema',
+    'githubArtifactSchema',
+    'githubWorkflowRunSchema',
+    'githubContentsFileSchema',
+    'githubGitObjectResponseSchema',
+    'githubGitCommitResponseSchema',
   ] as const;
 
   it.each(schemaExports)('exports %s as an object', (name) => {
@@ -457,6 +492,8 @@ describe('package root exports', () => {
     'PIPELINE_FAILURE_MESSAGES',
     'SCREEN_EXIT_BY_OUTCOME',
     'WAITING_RUN_FILES',
+    'APP_TOKEN_PERMISSION_SETS',
+    'GITHUB_WRITE_FAILURE_CAUSES',
   ] as const;
 
   it.each(recordExports)('exports %s as an object', (name) => {
@@ -555,5 +592,18 @@ describe('package root exports', () => {
     expect(core.JOB_SUMMARY_MAX_LENGTH).toBe(65536);
     expect(core.RECORD_TYPES).toHaveLength(12);
     expect(core.STEWARD_WRAPPER_PATHS).toEqual(['.github/workflows/steward-pr.yml', '.github/workflows/steward-issues.yml']);
+  });
+
+  it('exports the hosted adapter constants', () => {
+    expect(core.GITHUB_WRITE_FAILURE_CODES).toEqual(['github.write-not-allowed', 'github.write-conflict']);
+    expect(core.APP_AUTH_FAILURE_CODES).toEqual(['app-auth.credentials-invalid', 'app-auth.token-scope-mismatch']);
+    expect(core.APP_TOKEN_PERMISSION_SETS['publish-store']).toEqual({ contents: 'write' });
+    expect(core.APP_TOKEN_PERMISSION_SETS['gate-target']).toEqual({
+      actions: 'read',
+      contents: 'read',
+      issues: 'read',
+      pull_requests: 'read',
+    });
+    expect(core.GITHUB_FAILURE_CODES).toHaveLength(17);
   });
 });
