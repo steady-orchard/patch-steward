@@ -130,8 +130,8 @@ updates Steps and appends Revisions.
 | 4.9 | 4 | done | scenarios/workflows/scenario-secret-scope.yml, scenarios/workflows/scenario-secret-scope-called.yml, scenarios/tools/secret-scope.sh, development-artifacts/patch-steward-m6-4.9-report.md | fef718036b64332041a2af31cdb63ee47ceb3ff8 |
 | 4.10 | 4 | done | packages/core/src/conformance/workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.10-report.md | 7b81cc01629381131a729ff5f24f8a6956ddde30 |
 | 4.11 | 4 | done | packages/core/src/conformance/invariant-1-workflows.fixture.test.ts, development-artifacts/patch-steward-m6-4.11-report.md | fae847ef43661e6c95d32411db478829d12b912d |
-| 4.12 | 4 | pending | scenarios/README.md, development-artifacts/patch-steward-m6-4.12-report.md | |
-| 4.13 | 4 | pending | development-artifacts/patch-steward-m6-4.13-report.md | |
+| 4.12 | 4 | done | scenarios/README.md, development-artifacts/patch-steward-m6-4.12-report.md | 8c31b0f822210dad8bfd461f7f2365d7b0ecbbf7 |
+| 4.13 | 4 | done | development-artifacts/patch-steward-m6-4.13-report.md | 62786b0c6890199b7ac3f150becc1e75201b7fbb |
 | 4.14 | 4 | pending | scenarios/workflows/steward-pr.yml, scenarios/workflows/steward-issues.yml, development-artifacts/patch-steward-m6-4.14-report.md | |
 | 4.15 | 4 | pending | development-artifacts/patch-steward-m6-4.15-report.md | |
 | 4.16 | 4 | pending | packages/core/src/github/github.live.test.ts, packages/cli/src/steward-commands.live.test.ts, development-artifacts/patch-steward-m6-4.16-report.md | |
@@ -581,6 +581,15 @@ updates Steps and appends Revisions.
   repository with an empty-permission job token; corepack under setup-node Node 24; setup-node's version-manifest read with an
   empty-permission token; the artifact download redirect host (OW5); `gh run view --log` job-name column for called workflows
   (4.17 acceptance 5 matches job names ending in `publish`).
+- Execution record (supervisor):
+  - W1 (4.1-4.8) and W2 (4.9-4.11) verified in their worktrees (acceptance re-run, scope clean, one commit each), merged; full
+    typecheck and vitest re-run in the main tree after each wave (189 files, 3474 tests after W2).
+  - Pre-push checks P1-P9 of 4.13 re-run by the supervisor in the main tree at 7161cd2 before launching 4.13: all passed.
+  - Pushed commit (PIN for test-bed wrappers): 7161cd20df662314d14cc7f2f4130102baee1e98 = origin
+    refs/heads/milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish (first push; branch was absent on origin).
+  - Minor wording defect noted, not blocking: scenarios/tools/find-runs.sh header and scenarios/README.md say it lists
+    "completed" runs; the tool lists runs of any status (4.17 relies on that to find an in-progress run). Fix in a later
+    wording pass (phase 6 scenarios/README.md review).
 
 ## Revisions
 
