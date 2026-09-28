@@ -135,8 +135,9 @@ test-bed repositories only, with the test App; never this repository, never real
   hash plus policy revision equal to the newest committed owner's keeps that owner: no commit, no cancel, no cap debit. Verified App
   echoes (sender is the installation bot and the resource id is recorded) are dropped before capture; the ownership listing, which
   supplies the recorded resource ids, therefore precedes the echo check (gate order DD8, owner decision 2026-09-27).
-- D5 Build and pinning (ADR-0011): BUILD AT RUNTIME (owner's choice over the lead's recommended committed bundle). Jobs check out this
-  repository at the pinned SHA and run `pnpm install --frozen-lockfile` and the build; no committed bundles; wrappers pin the reusable
+- D5 Build and pinning (ADR-0011): BUILD AT RUNTIME (owner's choice over the lead's recommended committed bundle). Only the
+  credential-free `build` job checks out this repository at the pinned SHA and runs `pnpm install --frozen-lockfile` and the build
+  (G8 M1, WF8); `gate` and `publish` run the verified runtime artifact; no committed bundles; wrappers pin the reusable
   workflow (in this repository's `.github/workflows/`, `workflow_call` only) by full commit SHA; during development the pins point at
   pushed milestone-branch commits. Consequences stated and mitigations proposed in gate G8 — do NOT silently switch approach.
 - D6 Test-beds and outward actions: all exit scenarios on org-public (`steady-orchard/patch-steward-testbed-public`, including a fork PR
@@ -543,10 +544,17 @@ test-bed repositories only, with the test App; never this repository, never real
   `STEWARD_APP_CLIENT_ID` (the probe names).
 - WF5 Publish condition: `if: ${{ always() && needs.gate.result == 'success' && (needs.gate.outputs.committed == 'true' ||
   needs.gate.outputs.record_only == 'true') }}` (the architecture §6.4 condition extended for closures; Q8 A).
-- WF6 Concurrency: only `publish` has job-level `concurrency: { group: ${{ needs.gate.outputs.concurrency_group }}, cancel-in-progress:
-  false }`; the group string is built by the core as `steward-<repository id>-<pr|issue>-<n>` (digits and fixed words only). No
-  workflow-level concurrency. A pending publish replaced by a newer committed run's publish (PA05.3) leaves that run without evidence;
-  the newer owner supersedes it anyway (I11).
+- WF6 Concurrency: only `publish` has job-level concurrency, exactly `concurrency: { group: ${{ needs.gate.outputs.concurrency_group
+  || format('steward-{0}-run-{1}', github.repository_id, github.run_id) }}, cancel-in-progress: false }`. Committed runs: the gate
+  output `concurrency_group` is non-empty, built by the core as `steward-<repository id>-<pr|issue>-<n>` (digits and fixed words only),
+  so publishes of one submission share one group. Record-only (closure) publishes: the gate outputs `concurrency_group: ''`
+  (`packages/core/src/pipeline/hosted-gate.ts`, delivered in phase 3; unchanged), so the fallback gives a per-run group
+  `steward-<repository id>-run-<run id>` (digits and fixed words only): a closure publish is never serialized with, never replaces, and
+  is never replaced by any other publish (a closure never supersedes, I9; its metrics-only commit is append-only with ES5
+  non-fast-forward retries, RS1). The fallback also keeps the expression non-empty when `publish` is skipped (duplicate, failed gate).
+  An empty group is never evaluated. No workflow-level concurrency. A pending publish replaced by a newer committed run's publish
+  (PA05.3) leaves that run without evidence; the newer owner supersedes it anyway (I11). The static workflow test asserts the exact
+  group expression and `cancel-in-progress: false`.
 - WF7 Handoffs (same-run transport; M05 kept `GateOutput` and the loaded policy in memory, the hosted split cannot): `gate` uploads
   same-run artifacts, each `retention-days: 1` (K51), BEFORE the ownership upload; `publish` downloads them by name from this run
   (`actions/download-artifact`, runtime token) and the core validates them. Publish never recaptures the submission for evidence (a
@@ -573,9 +581,12 @@ test-bed repositories only, with the test App; never this repository, never real
     (OW9); run id and attempt equal between `handoff.json` and `gate-context.json`; the store location equals `evidence.store` of the
     policy loaded by tree id (I22). Any mismatch → `pipeline.handoff-binding`. Closures apply the same checks that exist for them
     (`closure.json` against the gate outputs `record_only`/`disposition=closure`, the environment, and the I22 policy).
-- WF8 Steward code: every job checks out `steady-orchard/patch-steward` at `inputs.steward_ref` (full 40-hex SHA; the core rejects any
-  other form) into `steward/`, with `persist-credentials: false`. The wrapper's `uses:` pin and its `steward_ref` input are equal (static
-  test on templates; deploy check on test-beds). (Q11 A approved; the runner-context alternative is rejected.)
+- WF8 Steward code: only the `build` job checks out `steady-orchard/patch-steward`, at `inputs.steward_ref`, into `steward/`, with
+  `persist-credentials: false`. A `build` step preceding the checkout rejects (non-zero exit) any `steward_ref` that is not exactly 40
+  lowercase hex characters (`^[0-9a-f]{40}$`); it receives the value through `env:`, never through `${{ }}` inside `run:`. The core
+  never receives `steward_ref`. `gate` and `publish` never check out; they run only the verified runtime artifact (G8 M1). The wrapper's
+  `uses:` pin and its `steward_ref` input are equal (static test on templates; deploy check on test-beds). (Q11 A approved; the
+  runner-context alternative is rejected.)
 - WF9 Pins: every `uses:` in the reusable workflow and wrappers is `owner/repo[/path]@<40 hex>` with a trailing comment naming the
   tag; only `actions/*` actions (`checkout`, `setup-node`, `upload-artifact`, `download-artifact`). No `pnpm/action-setup` (pnpm through
   corepack, M4). No `actions/cache`.
@@ -762,7 +773,8 @@ Documentation change inventory (governing document first; persistence and deferr
   evidence commits only; artifacts listing/download; run list; App token minting), Evidence store row (branch and repository stores
   implemented), Clock and ids row (Actions run ids); §6.4 (reusable workflow name and jobs, publication Environment
   `steward-publication` and its Environment-only secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`,
-  publish condition with record-only runs, concurrency group key, ownership record, dedup and event identity, settle delay, runtime
+  publish condition with record-only runs, concurrency group key (per submission for committed runs, per run for record-only
+  publishes; WF6), ownership record, dedup and event identity, settle delay, runtime
   build, test-bed guard not part of templates); §6.7 (wrapper template paths); §7 rows (Artifacts, Actions runs API run-name tagging,
   Actions artifacts API, Job summaries, Environments, JavaScript action → action package); §9 (record types `ownership`, `waiting`,
   `supersession`; resolution payload keys; manifest `run_kind`); §11 (store commit protocol, layout additions, template branch name);
