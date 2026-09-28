@@ -26,16 +26,28 @@
     scenarios/fixtures/submissions/unstructured.txt (contract not met: every committed run is early-exit, outcome
     needs-changes, no caps).
 
-    Why the timing matters: the gate captures the body LIVE when its gate job runs (about 30 s after the event). Two edits
-    seconds apart are usually captured identically by both runs, and the second run then ends duplicate. The procedure
-    therefore makes the second edit right AFTER the first run's gate job completed (its ownership artifact then records the
-    first body) and well BEFORE that run's publish re-checks freshness (publish runs about 25 s after the gate: it commits
-    evidence, waits 10 s, re-lists ownership, and recaptures the live body). The older run's publish then sees either the
-    newer run's ownership artifact (`freshness superseded newer-owner <new>-1`) or the changed live body
-    (`freshness superseded snapshot-changed`) and commits a supersession record; the newer run commits
-    (`dedup commit snapshot-changed`) and, being the newest owner with the live body, publishes `freshness current`.
-    Scenario S04 pass: exactly as the check command in actions prints `S04 pass`. Retry (a fresh pair of edits) up to 3
-    tries in total when a try prints `S04 not met`; record every try.
+    Why the timing matters: the gate captures the body LIVE when its gate job runs, and the older run's publish recaptures
+    it after a 10 s settle. The supersession needs the second edit's effect to reach the older run's publish recapture:
+    either the newer run's ownership artifact (`freshness superseded newer-owner <new>-1`) or a changed live body
+    (`freshness superseded snapshot-changed`). Measured on this test-bed (three earlier tries, runs 36414063591,
+    36414463707, 36414810059), relative to the first edit: the older run's gate captured the body at about +32 to +39 s
+    and completed at +37 to +46 s; its publish recaptured at about +54 to +95 s. Detecting the gate's completion by
+    polling the run list failed all three earlier tries: the run list showed a new run up to 100 s late, so the second
+    edit always landed after the older run had already published `freshness current` (no overlap). This procedure
+    therefore uses NO polling between the edits; the second edit follows the first after a fixed delay D per try:
+      - D = 45 s: the second edit lands after the older run's gate captured the first body and before its publish
+        recaptures; the newer run commits `dedup commit snapshot-changed` and the older run's publish sees the changed
+        body (or the newer owner).
+      - D = 5 s ("within about 5 s"): both gates capture the second body; the two gate jobs overlap, so the newer run's
+        listing usually does not yet see the older run's artifact and also commits; the older run's publish re-lists and
+        sees `freshness superseded newer-owner <new>-1`.
+    Tries: T = 4 (D 45), T = 5 (D 5), T = 6 (D 45); the try number T only labels the body text (tries 1 to 3 were the
+    earlier attempt). Scenario S04 pass: exactly as the check command in actions prints `S04 pass`. Retry (a fresh pair
+    of edits) until the first `S04 pass`, at most tries 4, 5, 6; record every try.
+    Results section: start it (after the Date line) with exactly one sentence stating that tries 1 to 3 (older and newer
+    runs 36414063591 and 36414211101, 36414463707 and 36414579082, 36414810059 and 36414986082) waited for the older
+    run's gate by polling the run list, made the second edit after the older run had already published, and produced no
+    overlap; then record tries 4 onward.
 
     HOSTED RUN SHAPE (observe mode, contract level). Every submission event on a test-bed starts one wrapper run with jobs
     `screen / build`, `screen / gate`, `screen / publish`; check with
@@ -115,13 +127,13 @@
        It must print exactly `checked`; otherwise STOP and report status missing-base with the output (do not fetch, merge, or improvise).
     2. pnpm install --frozen-lockfile && pnpm build; rate limit >= 500.
        P=$(grep -m1 -o '^s01_pr: [0-9]*' development-artifacts/patch-steward-m6-5.11-report.md | cut -d' ' -f2); echo "P=$P"
-    3. For try T = 1, 2, 3 (stop after the first `S04 pass`):
-       a. Edits (ONE Bash call; substitute P and T; it takes at most about 8 minutes):
-          R=steady-orchard/patch-steward-testbed-public; P=<P>; T=<T>; BASE="$(tr -d '\r' < scenarios/fixtures/submissions/unstructured.txt)"; PFX="steward pr $P author 2095171 event pull_request_target edited sender 2095171 User"; A=$(gh api "repos/$R/actions/runs?per_page=1" --jq '.workflow_runs[0].id // 0'); echo "A=$A"; gh pr edit "$P" -R "$R" --body "$(printf '%s\n\nScenario body edit: S04 try %s, first edit.\n' "$BASE" "$T")" > /dev/null && echo "edit1 utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; OLD=""; G=""; for i in $(seq 1 24); do sleep 20; if [ -z "$OLD" ]; then OLD=$(bash scenarios/tools/find-runs.sh "$R" steward-pr.yml "$PFX" | awk -v a="$A" '/^RUN /{split($2,x,"="); if (x[2]+0 > a+0) {print x[2]; exit}}'); fi; if [ -n "$OLD" ]; then G=$(gh run view "$OLD" -R "$R" --json jobs --jq '[.jobs[] | select(.name == "screen / gate") | .status + "/" + (.conclusion // "")] | join(",")'); echo "poll $i old=$OLD gate=$G utc=$(date -u +%H:%M:%S)"; case "$G" in completed/*) break ;; esac; fi; done; gh pr edit "$P" -R "$R" --body "$(printf '%s\n\nScenario body edit: S04 try %s, second edit.\n' "$BASE" "$T")" > /dev/null && echo "edit2 utc=$(date -u +%Y-%m-%dT%H:%M:%SZ) old=$OLD gate=$G after=$A"
-          Record the output. OLD = the old run id it printed; A = the printed after id.
+    3. For try T = 4, 5, 6 with D = 45, 5, 45 respectively (stop after the first `S04 pass`):
+       a. Edits (ONE Bash call; substitute P, T, D; it takes under 2 minutes; no polling between the edits):
+          R=steady-orchard/patch-steward-testbed-public; P=<P>; T=<T>; D=<D>; BASE="$(tr -d '\r' < scenarios/fixtures/submissions/unstructured.txt)"; A=$(gh api "repos/$R/actions/runs?per_page=1" --jq '.workflow_runs[0].id // 0'); echo "A=$A"; gh pr edit "$P" -R "$R" --body "$(printf '%s\n\nScenario body edit: S04 try %s, first edit.\n' "$BASE" "$T")" > /dev/null && echo "edit1 utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; sleep "$D"; gh pr edit "$P" -R "$R" --body "$(printf '%s\n\nScenario body edit: S04 try %s, second edit.\n' "$BASE" "$T")" > /dev/null && echo "edit2 utc=$(date -u +%Y-%m-%dT%H:%M:%SZ) delay=$D after=$A"
+          Record the output. A = the printed after id.
        b. PROBE_WAIT_SECONDS=540 bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-pr.yml "steward pr P author 2095171 event pull_request_target edited sender 2095171 User" A 2
-          (repeat once on exit 3). NEW = the id of the other RUN line (the one that is not OLD; if more than two lines
-          appear, NEW = the newest). Record the output.
+          (repeat once on exit 3). OLD = the id of the first RUN line (the older run, smallest id), NEW = the id of the
+          last RUN line (the newest). Record the output.
        c. Check (substitute OLD, NEW, P):
           R=steady-orchard/patch-steward-testbed-public; OLD=<OLD>; NEW=<NEW>; P=<P>; g1=$(bash scenarios/tools/run-log.sh $R $OLD 1 gate | grep -c -E '^LOG job=gate ts=[^ ]+ text=dedup commit '); g2=$(bash scenarios/tools/run-log.sh $R $NEW 1 gate | grep -c -E '^LOG job=gate ts=[^ ]+ text=dedup commit '); p1=$(bash scenarios/tools/run-log.sh $R $OLD 1 publish | grep -c -E '^LOG job=publish ts=[^ ]+ text=(freshness superseded (newer-owner [0-9]+-[0-9]+|snapshot-changed)|- Status: `superseded`)$'); p2=$(bash scenarios/tools/run-log.sh $R $NEW 1 publish | grep -c -E '^LOG job=publish ts=[^ ]+ text=(freshness current|- Status: `needs-changes`)$'); s=$(bash scenarios/tools/run-records.sh runs $R steward-evidence $R pr $P | grep -c "^SUPERSESSION file=$OLD-1.json run=$OLD-1 reason="); echo "S04 check old=$OLD new=$NEW gate_commits=$g1$g2 old_superseded=$p1 new_current=$p2 supersession_records=$s"; [ "$g1$g2$p1$p2$s" = "11221" ] && echo "S04 pass" || echo "S04 not met"
        d. Record for the try: the gate lines (`bash scenarios/tools/run-log.sh R <id> 1 gate | grep -E 'text=(listing |dedup |disposition |- Status|- Owner)'`)
@@ -132,14 +144,14 @@
        bash scenarios/tools/run-records.sh metrics steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public OLD-1 ;
        bash scenarios/tools/evidence.sh steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public pr P
        (record the append_only, run, supersession, and final lines; per-commit lines may be omitted).
-       No pass after 3 tries -> write the section with `Result: fail`, status fail, STOP.
+       No pass after try 6 -> write the section with `Result: fail`, status fail, STOP.
     5. Append `## S04 body edit commits a new owner and supersedes the older run` (every try: commands and outputs of a-d,
        then the step 4 outputs); prettier; `bash scenarios/tools/results-check.sh scenarios/results/org-public.md S01 S02 S03 S04 S09 S17`.
     6. Report: at column 0 the lines `s04_try: <T>`, `s04_old_run: <OLD>`, `s04_new_run: <NEW>` (of the passing try) and
        `s04_new_commit: <sha of NEW's evidence commit line>`.
 - acceptance: |
     Run each from the tree root in Git Bash (read-only); each must give exactly the stated result.
-    1. node -e 'const s=require("fs").readFileSync("development-artifacts/patch-steward-m6-5.13-report.md","utf8");const ok=[/^s04_try: [1-3]\s*$/m,/^s04_old_run: [0-9]+\s*$/m,/^s04_new_run: [0-9]+\s*$/m,/^s04_new_commit: [0-9a-f]{40}\s*$/m].every(r=>r.test(s));console.log(ok?"report ok":"report incomplete")'
+    1. node -e 'const s=require("fs").readFileSync("development-artifacts/patch-steward-m6-5.13-report.md","utf8");const ok=[/^s04_try: [4-6]\s*$/m,/^s04_old_run: [0-9]+\s*$/m,/^s04_new_run: [0-9]+\s*$/m,/^s04_new_commit: [0-9a-f]{40}\s*$/m].every(r=>r.test(s));console.log(ok?"report ok":"report incomplete")'
        -> prints exactly: report ok
     2. R=steady-orchard/patch-steward-testbed-public; f=development-artifacts/patch-steward-m6-5.13-report.md; P=$(grep -m1 -o '^s01_pr: [0-9]*' development-artifacts/patch-steward-m6-5.11-report.md | cut -d' ' -f2); OLD=$(grep -m1 -o '^s04_old_run: [0-9]*' $f | cut -d' ' -f2); NEW=$(grep -m1 -o '^s04_new_run: [0-9]*' $f | cut -d' ' -f2); g1=$(bash scenarios/tools/run-log.sh $R $OLD 1 gate | grep -c -E '^LOG job=gate ts=[^ ]+ text=dedup commit '); g2=$(bash scenarios/tools/run-log.sh $R $NEW 1 gate | grep -c -E '^LOG job=gate ts=[^ ]+ text=dedup commit '); p1=$(bash scenarios/tools/run-log.sh $R $OLD 1 publish | grep -c -E '^LOG job=publish ts=[^ ]+ text=(freshness superseded (newer-owner [0-9]+-[0-9]+|snapshot-changed)|- Status: `superseded`)$'); p2=$(bash scenarios/tools/run-log.sh $R $NEW 1 publish | grep -c -E '^LOG job=publish ts=[^ ]+ text=(freshness current|- Status: `needs-changes`)$'); s=$(bash scenarios/tools/run-records.sh runs $R steward-evidence $R pr $P | grep -c "^SUPERSESSION file=$OLD-1.json run=$OLD-1 reason="); [ "$g1$g2$p1$p2$s" = "11221" ] && echo "S04 pass" || echo "S04 not met $g1$g2$p1$p2$s"
        -> prints exactly: S04 pass
