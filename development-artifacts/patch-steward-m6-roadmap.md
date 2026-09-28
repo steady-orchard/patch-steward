@@ -57,8 +57,12 @@ Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the
 - **Objective:** `node packages/action/dist/main.js gate` and `... publish` run the complete M06 gate and publish logic from runner
   environment variables and files, producing validated outputs, artifacts files, summaries, and evidence commits, and every invariant
   extension passes.
-- **Scope:** `packages/core/src/pipeline/` (hosted gate DD8 order incl. closure EV4 and repository-gate refusal I5; hosted publish I2–I4,
-  I10, I12, OW7 settle and verification, SS1 supersession commit, RS1 closure commit, EL2 waiting run directory), `packages/action/`
+- **Scope:** `packages/core/src/pipeline/` (hosted gate DD8 order incl. closure EV4 and repository-gate refusal I5; WF7 same-run
+  records: `handoff.json` unchanged plus the gate context record `gate-context.json` and the closure record `closure.json`, with
+  publish-side validation and binding; hosted publish I2–I4, I10, I12, I13 budgets (fresh bootstrap per AT4, then the handoff's
+  remainder), OW9 own-artifact read with OW6 retention, OW7 settle and ordered freshness evaluation (a)–(d) with
+  `publish.freshness-unknown`, SS1 supersession commit, RS1 closure commit, EL2 waiting run directory), `packages/core/src/policy/loader.ts`
+  (publish policy load by recorded tree id, I22), `packages/action/`
   (package dependency on core, `tsconfig.test.json` paths mapping, entry, environment validation incl. the App credentials read from
   `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY`, outputs, masks, summaries, staging
   files under `RUNNER_TEMP`), `packages/core/src/conformance/` (invariant-2, -4, -7, -8 extensions, write-allowlist test, zero-execution
@@ -71,11 +75,16 @@ Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the
   brief DD8 (ownership listing before capture), a verified echo built with synthetic receipts ends `duplicate` reason `echo` with no
   capture request recorded and nothing uploaded, duplicate keeps owner, body change commits,
   newer owner and changed snapshot supersede, tie or incomplete listing or unavailable read fails publication without supersession,
+  a tie at the greatest `created_at` that includes this run's own artifact fails publication with `publish.freshness-unknown` and no
+  supersession record, a `newer-owner` supersession record carries the successor's run attempt read from its validated record,
   failure before commitment commits nothing, publish failure leaves no evidence, evidence commit precedes the summary write (recorded
-  call order), waiting run directory for over-cap, closure metrics-only commit; lockfile diff since the phase base is only the action →
-  core workspace link.
+  call order), publish loads the policy by the gate context's tree id and issues no live default-branch policy read before the evidence
+  commit (recorded requests), a gate context, handoff, or own ownership record mismatch fails publish with `pipeline.handoff-binding`
+  before any evidence request, waiting run directory for over-cap, closure metrics-only commit; lockfile diff since the phase base is
+  only the action → core workspace link.
 - **Risks:** re-use of M05 `publishRunEvidence` across a new store without changing M05 bytes (golden reports must stay unchanged);
-  handoff binding for re-run attempts (I12); summary escaping; action tests needing the core alias.
+  handoff binding for re-run attempts (I12); gate context record size near K37 for large PR submission records; summary escaping;
+  action tests needing the core alias.
 
 ## Phase 4 — Workflows, templates, and test-bed deployment
 

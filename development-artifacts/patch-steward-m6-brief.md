@@ -283,8 +283,8 @@ test-bed repositories only, with the test App; never this repository, never real
 | §0.3 item | How it applies here |
 | --- | --- |
 | Build, type-check, tests, lint, format (Ubuntu and Windows) | Local Windows in the main tree; Ubuntu via `act` on an LF clone and by the `build` job running `pnpm build` on `ubuntu-latest` in every test-bed run. |
-| Runtime validation; handled as data | New inputs: event payload file, runner environment variables, run-list items and `display_title`, artifact listings and downloaded `ownership.json`, same-run artifacts (handoff, closure), Git Data API responses, evidence snapshot reads, App token responses. None reaches a shell, a workflow expression, or an authorization decision; workflows pass no event text through `${{ }}` into `run:` (conformance WF-scan). |
-| Injected failures never `pass` | invariant-4 gains gate and publish injections (event, token, policy, capture, listing, download, caps, upload, handoff, store commit, read-back, settle re-list, recapture); new failure-code unions join the never-pass tables. |
+| Runtime validation; handled as data | New inputs: event payload file, runner environment variables, run-list items and `display_title`, artifact listings and downloaded `ownership.json`, same-run artifacts (`handoff.json`, `gate-context.json`, `closure.json`; WF7), policy trees and blobs read by tree id (I22), Git Data API responses, evidence snapshot reads, App token responses. None reaches a shell, a workflow expression, or an authorization decision; workflows pass no event text through `${{ }}` into `run:` (conformance WF-scan). |
+| Injected failures never `pass` | invariant-4 gains gate and publish injections (event, token, policy, capture, listing, download, caps, upload, handoff, gate context, closure record, publish policy load by tree id, publish own-artifact read, store commit, read-back, settle re-list, recapture, freshness unknown); new failure-code unions join the never-pass tables. |
 | Limits under hard bounds; redaction before persistence | K38–K51 (gate G9); `limits.github.*`, `limits.evidence.*`, `limits.caps.*` from policy; App private key and every minted installation token are exact-value redacted and masked (`::add-mask::`). |
 | No decision input from authorship | Author id is used ONLY for the per-author concurrency cap count (a cost control, D3) and closure attribution (closed by author vs maintainer); never for an outcome, finding, or report text. Test proves outcome/report bytes invariant under author id changes. |
 | Evidence and metrics per delivered step | Committed runs write a run directory (outcome or waiting) + metrics; supersession appends a record + metrics; closures append a metrics file; duplicates write nothing (no commitment) and appear only in the job summary (I8). |
@@ -339,16 +339,39 @@ test-bed repositories only, with the test App; never this repository, never real
 - OW5 Download: `GET /repos/{o}/{r}/actions/artifacts/{id}/zip` answers a redirect; follow exactly one redirect to an HTTPS URL whose
   host resolves to public addresses (reuse `net/address-policy.ts`), sending NO Authorization header; zip ≤ K40 bytes; exactly one entry
   named `ownership.json`, method stored or deflate, decompressed ≤ K39 (new bounded single-entry reader built on `node:zlib`).
-- OW6 Effective retention: after upload, `gate` lists its own artifact and logs `retention_days = round((expires_at - created_at) / 1
-  day)` in the job summary and the run log; publish copies it into `logs/steward.txt`. A value below 90 is a warning
-  (`ownership.retention-short`), never a failure.
-- OW7 Publish verification (SP13 step 4): after the evidence commit and read-back, wait K38, then re-list (OW3) and recapture the live
-  snapshot: a newer artifact (greater `created_at` than this run's own artifact, or the same `created_at` from a different run or
-  attempt) → `superseded` (reason `newer-owner`); live snapshot hash or policy revision differs from the ownership record →
-  `superseded` (reason `snapshot-changed`); this run's own artifact missing, the listing incomplete, ambiguous at the top, or any read
-  unavailable → publication FAILS (job fails, no supersession record, summary says freshness unknown). Never mistake unknown for a
-  confirmed mismatch.
+- OW6 Effective retention: measured by `publish`, never by `gate` (the gate's only key-holding step runs BEFORE the ownership upload,
+  and no later gate step holds a token that can list artifacts: WF3, WF4, G8 M6). Publish's own-artifact read (OW9) computes
+  `retention_days = round((expires_at - created_at) / 1 day)` from that artifact's API `created_at` and `expires_at` and logs it in the
+  run log, in `logs/steward.txt`, and in the publish job summary. A value below 90 is a warning (`ownership.retention-short`), never a
+  failure. The gate job summary reports no retention. Closures and duplicates have no ownership artifact of their own and report none.
+- OW7 Publish verification (SP13 step 4): after the evidence commit and read-back, wait K38, then re-list (OW3) and evaluate in this
+  order, FIRST MATCH WINS:
+  - (a) the listing is unavailable or incomplete (over K41 pages), or this run's own artifact (the unexpired artifact whose
+    `workflow_run.id` equals this run id) is absent, or it differs in artifact id or API `created_at` from the one read by OW9 →
+    UNKNOWN.
+  - (b) two or more unexpired artifacts share the greatest API `created_at` (whether or not this run's artifact is among them) →
+    UNKNOWN (a tie never supersedes and never publishes; owner decision D1 "a tie or incomplete listing blocks publication").
+  - (c) the unique newest artifact is not this run's → download (OW5) and validate (OW2, including record `run_id` equal to that
+    artifact's `workflow_run.id`) its record: valid → `superseded`, reason `newer-owner`, successor {`run_id` and `run_attempt` from
+    that validated record, `artifact_created_at` from the listing} (SS1); download failure or invalid record → UNKNOWN (OW2: an invalid
+    record is treated like an unavailable read).
+  - (d) this run's artifact is the unique newest → recapture: load the LIVE default-branch trusted policy exactly as the gate does (DD8
+    step 1 policy load) and capture the submission with it (DD8 step 5); any failure (policy missing, invalid, or unreadable; capture
+    failure) → UNKNOWN; the live snapshot hash (which embeds the live policy revision) or the live policy revision differs from the
+    ownership record's → `superseded`, reason `snapshot-changed`, `live_snapshot_hash` = the recaptured hash, successor `null` (SS1);
+    else CONFIRMED (no further publication step in M06; the publish summary states freshness `current`).
+  - UNKNOWN → publication FAILS with `publish.freshness-unknown` (cause `github-unavailable`): the job fails, no supersession record,
+    the publish summary states freshness `unknown` and the failure code. The evidence commit already made stays (append-only). Never
+    mistake unknown for a confirmed mismatch.
 - OW8 Expired owner: when no unexpired artifact exists, deduplication falls back to the latest published evidence snapshot (ES10).
+- OW9 Publish own-artifact read (committed runs only; before the evidence commit; not for closures): publish lists the submission's
+  ownership artifacts (OW3) and selects the unexpired artifact of that name whose `workflow_run.id` equals this run id (`GITHUB_RUN_ID`).
+  None, more than one, or an unavailable or incomplete listing → publish fails before any evidence request with
+  `ownership.listing-unavailable`. It downloads (OW5) and validates (OW2) that record; a download or validation failure →
+  `ownership.record-invalid` (before evidence). The record must equal the gate context and the handoff (WF7) in run id, run attempt,
+  snapshot hash, policy revision, and disposition, else `pipeline.handoff-binding` (before evidence). That artifact's API `created_at`
+  is the WS1 `arrival_at` and the reference artifact for OW7 (a); its `expires_at` gives OW6's retention. Freshness (newest owner) is
+  NOT judged here; only OW7 judges it, after the commit (I4).
 
 ### Gate G2 — events, event identity, deduplication, echoes (APPROVED; EV- and DD-rules)
 
@@ -404,10 +427,12 @@ test-bed repositories only, with the test App; never this repository, never real
      ES10 fallback read (DD4) happens only in this step, and only when the listing kind is `none` and the event is neither an explicit
      rerun (DD1) nor `reopened` (DD2). `duplicate` → stop.
   7. Contract check → caps (G3, only for otherwise runnable work, I6) → disposition `runnable`, `early-exit`, or `queued`.
-  8. Commit: write the gate handoff and `ownership.json`; upload `steward-handoff`, then the ownership artifact (WF7, OW1) → outputs.
+  8. Commit: write `handoff.json` (M05 handoff record), `gate-context.json` (WF7), and `ownership.json`; upload `steward-handoff`
+     (`handoff.json` + `gate-context.json`), then the ownership artifact (WF7, OW1) → outputs.
 - EV4 Closure (`closed`; issue `deleted`): no capture of a new snapshot and no ownership commitment. Gate assembles one
   `maintainer-resolution` metrics event (gate G5 RS-rules) paired with the newest committed owner from the DD8 step 2 listing (run id,
-  attempt, snapshot hash) or `null` when none, uploads it as same-run artifact `steward-closure`, outputs `disposition=closure`,
+  attempt, snapshot hash) or `null` when none, embeds it in the closure record `closure.json` (WF7), uploads that as same-run artifact
+  `steward-closure`, outputs `disposition=closure`,
   `record_only=true`. An unavailable listing, download, or record read fails the gate before any upload (DD6). A closure never
   supersedes an owner and never cancels work.
 
@@ -482,12 +507,14 @@ test-bed repositories only, with the test App; never this repository, never real
   state-transition `null` → `queued`, latency events, cost event.
 - WS1 `waiting.json` record (`record_type: "waiting"`, `schema_version: 1`): `run_id`, `run_attempt`, `subject` {repository, type,
   number}, `state` (`queued`), `reason` (`daily-runs` or `per-author-concurrent-runs`), `counts` {daily_count, daily_limit,
-  author_count, author_limit}, `snapshot_hash`, `policy_revision`, `arrival_at` (this run's ownership artifact API `created_at`),
+  author_count, author_limit}, `snapshot_hash`, `policy_revision`, `arrival_at` (this run's ownership artifact API `created_at`, read by publish per OW9),
   `recorded_at`. It is the restart record: maintenance (M13) restarts in `arrival_at` order.
 - SS1 Supersession (SP18 step 6): a SECOND commit after a confirmed mismatch (OW7) adds `runs/<pr|issue>-<n>/supersessions/<run-dir>.json`
   (`record_type: "supersession"`, `schema_version: 1`: `run_id`, `run_attempt`, `subject`, `reason` (`newer-owner` or
   `snapshot-changed`), `successor` {run_id, run_attempt, artifact_created_at} or null, `recorded_snapshot_hash`, `live_snapshot_hash`
-  or null, `recorded_at`) and `metrics/<YYYY-MM>/<run-dir>-supersession.json` (one state-transition `<outcome or waiting state>` →
+  or null, `recorded_at`; for `newer-owner`: `successor` = the newer artifact's validated record `run_id` and `run_attempt` plus its
+  listing `created_at` (OW7 c), `live_snapshot_hash` null; for `snapshot-changed`: `successor` null, `live_snapshot_hash` = the
+  recaptured hash (OW7 d)) and `metrics/<YYYY-MM>/<run-dir>-supersession.json` (one state-transition `<outcome or waiting state>` →
   `superseded`). The original run directory is never modified.
 - RS1 Closure: record-only publish commits ONE file `metrics/<YYYY-MM>/<run_id>-<run_attempt>.json` holding one `maintainer-resolution`
   event (subject kind `submission`) and no run directory, no manifest; ES6 read-back verifies its blob id.
@@ -520,9 +547,32 @@ test-bed repositories only, with the test App; never this repository, never real
   false }`; the group string is built by the core as `steward-<repository id>-<pr|issue>-<n>` (digits and fixed words only). No
   workflow-level concurrency. A pending publish replaced by a newer committed run's publish (PA05.3) leaves that run without evidence;
   the newer owner supersedes it anyway (I11).
-- WF7 Handoffs: `gate` uploads same-run artifacts `steward-handoff` (M05 handoff record, ≤ K37) and, for closures, `steward-closure`,
-  each `retention-days: 1`, BEFORE the ownership upload; `publish` downloads them by name from this run and verifies schema, run id,
-  attempt (I12), snapshot hash, and policy revision against its own ownership record and the gate outputs.
+- WF7 Handoffs (same-run transport; M05 kept `GateOutput` and the loaded policy in memory, the hosted split cannot): `gate` uploads
+  same-run artifacts, each `retention-days: 1` (K51), BEFORE the ownership upload; `publish` downloads them by name from this run
+  (`actions/download-artifact`, runtime token) and the core validates them. Publish never recaptures the submission for evidence (a
+  recapture records a different snapshot); everything EL1, EL2, I4, I17, I18, and WS1 need from the gate comes from these records.
+  - `steward-handoff` (committed runs: `runnable`, `early-exit`, `queued`) holds exactly two files:
+    - `handoff.json`: the M05 handoff record (`packages/core/src/pipeline/handoff.ts`, schema UNCHANGED), ≤ K37.
+    - `gate-context.json`: the gate context record, strict zod, versioned (`record_type` `gate-context`, `schema_version` 1; exact key
+      names are the decomposer's, the field set is binding), canonical JSON ≤ K37, fields: gate run id and run attempt; target
+      repository full name, id, default branch; subject type (`pull_request` or `issue`) and number; disposition (`runnable`,
+      `early-exit`, `queued`); snapshot hash (equal to the captured submission record's); policy revision (tree id), the trusted-branch
+      commit and ref recorded at load, and the load time; evidence store location from the trusted policy (type, repository, branch);
+      the captured submission record (M04/M05 submission record schema); base commit (PR; `null` for issues); contract effective mode;
+      classification; required stages; cap evaluation (the OW2 `cap` value) or `null`; gate GitHub request count; gate start and
+      completion times; bounded gate log lines (publish writes them into `logs/steward.txt` ahead of its own lines).
+  - `steward-closure` (closures only) holds exactly one file `closure.json`: the closure record, strict zod, versioned (`record_type`
+    `closure`, `schema_version` 1; key names the decomposer's, field set binding), canonical JSON ≤ K37, fields: gate run id and run
+    attempt; target repository full name, id, default branch; subject type and number; policy revision (tree id), trusted-branch commit,
+    ref, and load time; evidence store location (type, repository, branch); remaining GitHub request budget after the gate; the one
+    `maintainer-resolution` metrics event (EV4, RS1, RS2).
+  - Publish validation, all BEFORE any evidence request: each file parses and validates strictly (else `pipeline.handoff-invalid`);
+    run id equals `GITHUB_RUN_ID`; run attempt ≤ `GITHUB_RUN_ATTEMPT` (I12); target repository full name and id equal
+    `GITHUB_REPOSITORY` and `GITHUB_REPOSITORY_ID`; disposition equals gate output `disposition`; snapshot hash and policy revision are
+    equal across the gate outputs (WF10), `handoff.json`, `gate-context.json`, and (committed runs) this run's own ownership record
+    (OW9); run id and attempt equal between `handoff.json` and `gate-context.json`; the store location equals `evidence.store` of the
+    policy loaded by tree id (I22). Any mismatch → `pipeline.handoff-binding`. Closures apply the same checks that exist for them
+    (`closure.json` against the gate outputs `record_only`/`disposition=closure`, the environment, and the I22 policy).
 - WF8 Steward code: every job checks out `steady-orchard/patch-steward` at `inputs.steward_ref` (full 40-hex SHA; the core rejects any
   other form) into `steward/`, with `persist-credentials: false`. The wrapper's `uses:` pin and its `steward_ref` input are equal (static
   test on templates; deploy check on test-beds). (Q11 A approved; the runner-context alternative is rejected.)
@@ -534,7 +584,9 @@ test-bed repositories only, with the test App; never this repository, never real
 - WF11 Job summaries: `gate` and `publish` append bounded Markdown (≤ K47) to `GITHUB_STEP_SUMMARY`: submission, disposition or outcome,
   snapshot hash, policy revision, owner kept or committed, cap counts, evidence commit and store location, failure code on failure; all
   derived values as code spans via the M05 escaper; no title, body, login, or report text. The publish summary is written only AFTER
-  the evidence commit and read-back (exit criterion "evidence first").
+  the evidence commit and read-back (exit criterion "evidence first"); for committed runs it also states the effective ownership
+  artifact retention (OW6) and freshness (`current`, `superseded` with its reason, or `unknown`; OW7). The gate summary states no
+  retention.
 - WF12 Wrapper templates: `templates/workflows/steward-pr.yml` and `templates/workflows/steward-issues.yml` (Prettier-clean YAML):
   `name`, `run-name` (RN1), `on` (EV1), `permissions: {}`, one job `screen` with `uses:
   steady-orchard/patch-steward/.github/workflows/steward-screening.yml@<40 hex>`, `with: { steward_ref: <same 40 hex> }`, `secrets:`
@@ -570,7 +622,10 @@ test-bed repositories only, with the test App; never this repository, never real
 - AT3 The private key and every minted token are registered as exact-value secrets for redaction (M05 EX-rules) and masked with
   `::add-mask::<value>` before any other output; tokens are never written to files, outputs, artifacts, or logs, and never passed
   between jobs.
-- AT4 Tokens and the JWT count against the bootstrap budget (K19) before the policy is loaded.
+- AT4 Tokens and the JWT count against the bootstrap budget (K19) before the policy is loaded. This holds per job: `gate` spends one
+  bootstrap budget on its JWT, installation lookup, token mints, bot id lookup, and trusted policy load; `publish` spends a FRESH
+  bootstrap budget on its JWT, installation lookups (target and, when separate, store repository), token mints, token revocations,
+  and the policy load by tree id (I22). Every other request follows I13.
 
 ### Gate G8 — runtime build: consequences and mitigations (APPROVED; D5 stays: build at runtime)
 
@@ -750,10 +805,13 @@ Documentation change inventory (governing document first; persistence and deferr
 - I11 A committed run whose pending publish is replaced (WF6) has no evidence; the replacing newer owner makes it moot. Documented, not
   compensated.
 - I12 Re-run of failed jobs: when only `publish` re-runs, its attempt number exceeds the gate's; publish binds to the gate attempt from
-  the handoff and ownership record (same run id, handoff attempt ≤ current attempt, the ownership record is this run's), and evidence is
-  keyed by the gate's `<run_id>-<attempt>`.
-- I13 Budget: `gate` uses the bootstrap budget (K19) for tokens, bot id, and policy, then `limits.github.*` from the policy; publish uses
-  `budget_remaining.github_requests` from the handoff; exhaustion fails the job (never `pass`).
+  the gate context, the handoff, and its own ownership record (OW9) (same run id, gate attempt ≤ current attempt, the ownership record
+  is this run's and carries the gate attempt), and evidence is keyed by the gate's `<run_id>-<attempt>`.
+- I13 Budget: `gate` uses the bootstrap budget (K19) for tokens, bot id, and policy, then `limits.github.*` from the policy. `publish`
+  uses a fresh bootstrap budget (K19) for its JWT, installation lookups, token mints and revocations, and the policy load by tree id
+  (AT4, I22); every later publish request (OW9 own-artifact read, evidence commit and read-back, OW7 re-list, successor download, live
+  policy load and recapture) uses `budget_remaining.github_requests` from the handoff (closures: the closure record's remaining count)
+  with the loaded policy's `limits.github.retries_per_request`. Exhaustion fails the job (never `pass`).
 - I14 The local CLI (`steward screen`, `steward report`, `steward preflight`, `steward policy`) is unchanged and stays GET-only; the new
   write endpoints are reachable only through a separate writer interface used by the hosted phases.
 - I15 Write allowlist: the only non-GET GitHub requests the core can make are `POST /app/installations/{id}/access_tokens`, `DELETE
@@ -775,6 +833,14 @@ Documentation change inventory (governing document first; persistence and deferr
   property of each test-bed's configuration: no repository or organization secret named `PATCH_STEWARD_APP_*` exists, so the values
   reach only Environment-declaring jobs. Placing the check inside `steward-screening.yml` itself would contradict M6/M8 and needs a new
   owner decision.
+- I22 Publish policy source: publish loads the GATE's policy from git objects of the target repository by the tree id recorded in the
+  gate context (closures: the closure record): `GET /repos/{o}/{r}/git/trees/<tree id>?recursive=1`; the returned tree `sha` must equal
+  the tree id; then the `policy.yml` blob; validated and resolved exactly as the gate's load (same size, truncation, and regular-file
+  checks and failure codes as the existing GitHub policy source). The policy-revision record's commit and ref come from the gate
+  context (or closure record). Publish never uses the head's policy and never uses the current default-branch policy for evidence
+  (the live default-branch policy is read only for the OW7 (d) recapture). Any load failure fails publish before evidence (failure code
+  from the GitHub policy load union; never `pass`). The loaded policy supplies the policy-revision record, redaction patterns,
+  `evidence.store`, `limits.evidence.run_bytes`, `limits.evidence.write_retries`, and `limits.github.retries_per_request` for publish.
 
 ### Module layout (recommended; the decomposer may refine names, not responsibilities)
 
@@ -787,7 +853,13 @@ Documentation change inventory (governing document first; persistence and deferr
 - `packages/core/src/net/zip-entry.ts` (single-entry bounded reader).
 - `packages/core/src/evidence/`: `git-store.ts` (ES-rules), `blob-id.ts`, `fallback-read.ts` (ES10), layout and manifest additions
   (`run_kind`), waiting and supersession assembly, closure file.
-- `packages/core/src/pipeline/`: `hosted-gate.ts`, `hosted-publish.ts`, `job-summary.ts`.
+- `packages/core/src/pipeline/`: `hosted-gate.ts`, `hosted-publish.ts`, `job-summary.ts`, plus the WF7 same-run records (gate context
+  record and closure record schemas, builders, and publish-side validation and binding; e.g. `gate-context.ts`), and the OW7 ordered
+  freshness evaluation (pure part may live in `packages/core/src/ownership/`). New failure code `publish.freshness-unknown` (cause
+  `github-unavailable`) joins the never-pass tables.
+- `packages/core/src/policy/loader.ts`: a GitHub load by recorded tree id (I22), e.g. `loadPolicyRevision`, sharing the existing GitHub
+  policy source's tree, truncation, regular-file, and blob-size checks; a new root export with the `load` prefix extends the
+  invariant-5 name lists in the same step (Context).
 - `packages/action/src/`: `main.ts` (entry: `gate`, `publish`), `environment.ts` (runner variables and `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`, zod), `outputs.ts`
   (`GITHUB_OUTPUT`, `GITHUB_STEP_SUMMARY`, masks), `files.ts` (artifact staging paths under `RUNNER_TEMP`). Module names avoid the
   zero-execution forbidden words (`runner`, `container`, ...). `packages/action/package.json` gains dependency `@patch-steward/core:
@@ -801,14 +873,19 @@ Documentation change inventory (governing document first; persistence and deferr
   titles `no event text reaches a run step` and `run-name uses only numeric and enumerated values`.
 - `invariant-2`: a `pull_request_target` gate over recorded responses where the PR changes `.github/patch-steward/policy.yml` loads the
   default-branch policy (revision = default-branch tree id), records `submission.policy-change`, and never loads the head's policy;
-  title `pull request policy changes never govern the hosted run`.
+  the matching publish loads that same tree id (I22), never the head's or the live default branch's policy, for its evidence; title
+  `pull request policy changes never govern the hosted run`.
 - `invariant-4`: new injections (event invalid, token mint failure, policy failure, capture failure, listing unavailable, download
-  invalid, run list unavailable, upload failure, handoff invalid/binding, store commit failure at each ES step, non-fast-forward
-  exhaustion, read-back mismatch, settle re-list unavailable, recapture failure): never `pass`; gate failures commit nothing; publish
-  failures leave no evidence or no summary outcome; titles `invariant 4: hosted <step> failure never yields pass`.
+  invalid, run list unavailable, upload failure, handoff invalid/binding (handoff, gate context, closure record, own ownership record
+  mismatch), publish policy load by tree id failure, publish own-artifact read unavailable (OW9), store commit failure at each ES step,
+  non-fast-forward exhaustion, read-back mismatch, settle re-list unavailable, successor record invalid, recapture failure, freshness
+  unknown): never `pass`; gate failures commit nothing; publish failures leave no evidence or no summary outcome; titles
+  `invariant 4: hosted <step> failure never yields pass`.
 - `invariant-7`: App private key and minted tokens absent from every stored file, output, summary, and artifact (sentinel values built by
   concatenation); bounds K38–K51 enforced.
-- `invariant-8`: newest owner by `created_at` never id; tie and incomplete listing block publication; newer artifact → `superseded`;
+- `invariant-8`: newest owner by `created_at` never id; tie (including a tie at the top that contains this run's own artifact) and
+  incomplete listing block publication (OW7 a, b); newer artifact with a valid record → `superseded` (successor attempt from that
+  record), invalid newer record → unknown;
   changed snapshot or policy revision → `superseded`; unknown freshness never supersedes and never publishes; duplicate keeps owner;
   rerun replaces; titles `ownership ties block publication`, `newer owner supersedes`, `unknown freshness fails publication`.
 - `never-pass*`: every new failure-code union in compile-time exhaustive tables.
