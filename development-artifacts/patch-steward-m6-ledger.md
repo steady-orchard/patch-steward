@@ -148,7 +148,7 @@ updates Steps and appends Revisions.
 | 5.9 | 5 | done | scenarios/results/org-private.md, development-artifacts/patch-steward-m6-5.9-report.md | 85631ebb3c6f1c0d730dcd000e2b1dc7207d0a80 |
 | 5.10 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.10-report.md | 81474ae6a1877db59afed89868f3dc473a887c97 |
 | 5.11 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.11-report.md | 378299895c44003702984460c437df3fea0de5f3 |
-| 5.12 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.12-report.md | |
+| 5.12 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.12-report.md | 3e0ca5f96223b869c943a72d53a5cfe55670cd2f |
 | 5.13 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.13-report.md | |
 | 5.14 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.14-report.md | |
 | 5.15 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.15-report.md | |
