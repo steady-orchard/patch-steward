@@ -43,8 +43,12 @@
     and the outcome is `inconclusive` (no screening stage exists yet). Caps: the daily cap counts every non-bot steward
     wrapper run created today (UTC) on R and the per-author cap counts queued or in-progress runs by author 2095171 including
     this one: run the two pull requests strictly one after the other and trigger nothing else on R meanwhile.
-    Pass condition, for EACH of the two runs: run name `steward-pr`, path `.github/workflows/steward-pr.yml`, event
-    `pull_request_target`, display title `steward pr <n> author 2095171 event pull_request_target opened sender 2095171 User`;
+    Pass condition, for EACH of the two runs: workflow name `steward-pr` (`gh run view <id> -R <repo> --json workflowName
+    --jq .workflowName`); the REST run field `name` is the EVALUATED run-name (verified live: for a workflow with `run-name`
+    GitHub reports that text as the run's `name`, equal to `display_title`), so `name` and `display_title` must both equal
+    master's run-name `steward pr <n> author 2095171 event pull_request_target opened sender 2095171 User` (a run defined
+    by the proposed wrapper would be named `modified steward pr <n>`); path `.github/workflows/steward-pr.yml`, event
+    `pull_request_target`;
     jobs build, gate, publish success; gate lines `policy trusted-branch revision <M>`, `caps within ...`,
     `disposition runnable`; publish `freshness current` and summary `- Status: `inconclusive``; the run's evidence record
     `RECORD run=<run>-1 kind=outcome outcome=inconclusive ... policy_revision=<M> ... findings=` listing both codes; and the
@@ -129,6 +133,10 @@
     2. pnpm install --frozen-lockfile && pnpm build
     3. Rate limit >= 500. M=$(gh api "repos/steady-orchard/patch-steward-testbed-public/contents/.github?ref=master" --jq '.[] | select(.name=="patch-steward") | .sha'); echo "M=$M"
     4. Same-repository pull request:
+       RESUME (attempt 2): attempt 1 already performed 4a, 4c, 4d, 4e: branch scenario-s09-same exists on R, N1 = 32
+       (https://github.com/steady-orchard/patch-steward-testbed-public/pull/32), RUN1 = 36410834391 (completed, all jobs
+       success). Do NOT run 4a, 4c, 4d, 4e again (no second branch push, no second pull request). Run 4b (read-only) and 4f
+       for N1 = 32 and RUN1 = 36410834391, then continue with 5.
        a. bash probes/smoke/tools/deploy.sh steady-orchard/patch-steward-testbed-public scenario-s09-same "scenario: S09 change the wrapper and the policy" scenarios/fixtures/pull-requests/steward-pr-modified.yml:.github/workflows/steward-pr.yml scenarios/fixtures/policies/caps-daily.yml:.github/patch-steward/policy.yml
        b. gh api "repos/steady-orchard/patch-steward-testbed-public/contents/.github?ref=scenario-s09-same" --jq '.[] | select(.name=="patch-steward") | .sha'   (head policy tree; must differ from M)
        c. A=$(gh api "repos/steady-orchard/patch-steward-testbed-public/actions/runs?per_page=1" --jq '.workflow_runs[0].id // 0'); echo "A=$A"
@@ -137,6 +145,7 @@
        e. PROBE_WAIT_SECONDS=540 bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-pr.yml "steward pr N1 author 2095171 event pull_request_target opened sender 2095171 User" "$A" 1
           (repeat once on exit 3). RUN1 = the id in the RUN line.
        f. Checks (record each command and output): gh api repos/steady-orchard/patch-steward-testbed-public/actions/runs/RUN1 --jq '[.name, .path, .event, .display_title] | join(" | ")';
+          gh run view RUN1 -R steady-orchard/patch-steward-testbed-public --json workflowName --jq .workflowName;
           gh run view RUN1 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")';
           bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public RUN1 1 gate | grep -E 'text=(event |policy |listing |dedup |caps |disposition |- )';
           bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public RUN1 1 publish | grep -E 'text=(policy |evidence commit |freshness |- )';
@@ -158,7 +167,7 @@
     Run each from the tree root in Git Bash (read-only); each must give exactly the stated result.
     1. node -e 'const s=require("fs").readFileSync("development-artifacts/patch-steward-m6-5.10-report.md","utf8");const ok=[/^s09_master_tree: [0-9a-f]{40}\s*$/m,/^s09_same_pr: [0-9]+\s*$/m,/^s09_same_run: [0-9]+\s*$/m,/^s09_fork_pr: [0-9]+\s*$/m,/^s09_fork_run: [0-9]+\s*$/m].every(r=>r.test(s));console.log(ok?"report ok":"report incomplete")'
        -> prints exactly: report ok
-    2. f=development-artifacts/patch-steward-m6-5.10-report.md; R=steady-orchard/patch-steward-testbed-public; for k in same fork; do n=$(grep -m1 -o "^s09_${k}_pr: [0-9]*" $f | cut -d' ' -f2); run=$(grep -m1 -o "^s09_${k}_run: [0-9]*" $f | cut -d' ' -f2); t=$(gh api repos/$R/actions/runs/$run --jq '[.name, .path, .event, .display_title] | join(" | ")'); [ "$t" = "steward-pr | .github/workflows/steward-pr.yml | pull_request_target | steward pr $n author 2095171 event pull_request_target opened sender 2095171 User" ] && echo "$k definition ok" || echo "$k definition WRONG $t"; gh run view $run -R $R --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'; done
+    2. f=development-artifacts/patch-steward-m6-5.10-report.md; R=steady-orchard/patch-steward-testbed-public; for k in same fork; do n=$(grep -m1 -o "^s09_${k}_pr: [0-9]*" $f | cut -d' ' -f2); run=$(grep -m1 -o "^s09_${k}_run: [0-9]*" $f | cut -d' ' -f2); t=$(gh api repos/$R/actions/runs/$run --jq '[.name, .path, .event, .display_title] | join(" | ")')" | "$(gh run view $run -R $R --json workflowName --jq .workflowName); d="steward pr $n author 2095171 event pull_request_target opened sender 2095171 User"; [ "$t" = "$d | .github/workflows/steward-pr.yml | pull_request_target | $d | steward-pr" ] && echo "$k definition ok" || echo "$k definition WRONG $t"; gh run view $run -R $R --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'; done
        -> prints exactly four lines: same definition ok, screen / build=success,screen / gate=success,screen / publish=success, fork definition ok, screen / build=success,screen / gate=success,screen / publish=success
     3. f=development-artifacts/patch-steward-m6-5.10-report.md; R=steady-orchard/patch-steward-testbed-public; M=$(grep -m1 -o '^s09_master_tree: [0-9a-f]*' $f | cut -d' ' -f2); for k in same fork; do run=$(grep -m1 -o "^s09_${k}_run: [0-9]*" $f | cut -d' ' -f2); g=$(bash scenarios/tools/run-log.sh $R $run 1 gate | grep -c -E "^LOG job=gate ts=[^ ]+ text=(policy trusted-branch revision $M|disposition runnable|caps within daily [0-9]+ of 50 author [0-9]+ of 2)\$"); p=$(bash scenarios/tools/run-log.sh $R $run 1 publish | grep -c -E "^LOG job=publish ts=[^ ]+ text=(freshness current|- Status: \`inconclusive\`)\$"); echo "$k gate=$g publish=$p"; done
        -> prints exactly two lines: same gate=3 publish=2, fork gate=3 publish=2
