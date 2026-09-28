@@ -986,3 +986,125 @@ CLOSED
 ```
 
 Result: pass
+
+## S10 pull requests: close by the author, merge into a scenario base
+
+Date (UTC): 2026-09-28. Opened and closed pull request 36 by its author, then opened pull request 37 against
+scenario-s10-base and merged it: https://github.com/steady-orchard/patch-steward-testbed-public/pull/36
+https://github.com/steady-orchard/patch-steward-testbed-public/pull/37
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36421209248
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36421341796
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36421552482
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36421707693.
+Runs of the pull request into scenario-s10-base: opened pass, closed pass.
+
+```text
+$ bash probes/smoke/tools/deploy.sh steady-orchard/patch-steward-testbed-public scenario-s10-close "scenario: S10 pull request change" scenarios/fixtures/submissions/unstructured.txt:scenario-s10-close.txt
+DEPLOY repo=steady-orchard/patch-steward-testbed-public branch=scenario-s10-close existed=no
+DEPLOY commit=822d2be929692accce1ff3e22e7ca10f8ecfebef message=scenario: S10 pull request change
+DEPLOY push=ok attempt=1 head=822d2be929692accce1ff3e22e7ca10f8ecfebef
+DEPLOY identical dest=scenario-s10-close.txt blob=416033bb79d1631d231a6d86791ea321223f1a5c
+$ gh pr create -R steady-orchard/patch-steward-testbed-public --base master --head scenario-s10-close --title "[scenario S10] pull request closed by its author" --body-file scenarios/fixtures/submissions/unstructured.txt
+https://github.com/steady-orchard/patch-steward-testbed-public/pull/36
+```
+
+```text
+$ gh run view 36421209248 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36421209248 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:21:08.7771831Z text=event pull_request_target opened pr 36 sender User
+LOG job=gate ts=2026-09-28T12:21:08.7773765Z text=listing none
+LOG job=gate ts=2026-09-28T12:21:08.7774192Z text=dedup commit no-owner
+LOG job=gate ts=2026-09-28T12:21:08.7775369Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T12:21:08.7917059Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T12:21:08.7919501Z text=- Owner: committed `36421209248-1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36421209248 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence)'
+LOG job=publish ts=2026-09-28T12:21:33.0208611Z text=evidence commit b28b138ba3651a30589ea6e86af7a0c5e33cf4fd rebuilds 0
+LOG job=publish ts=2026-09-28T12:21:33.0209255Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:21:33.0209718Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:21:33.0210144Z text=freshness current
+LOG job=publish ts=2026-09-28T12:21:33.0381441Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T12:21:33.0384336Z text=- Evidence: commit `b28b138ba3651a30589ea6e86af7a0c5e33cf4fd` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/pr-36/36421209248-1`
+```
+
+```text
+$ gh pr close 36 -R steady-orchard/patch-steward-testbed-public
+Closed pull request steady-orchard/patch-steward-testbed-public#36 ([scenario S10] pull request closed by its author)
+$ gh run view 36421341796 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36421341796 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:22:20.5889467Z text=event pull_request_target closed pr 36 sender User
+LOG job=gate ts=2026-09-28T12:22:20.5892213Z text=listing unique owner 36421209248-1
+LOG job=gate ts=2026-09-28T12:22:20.5893009Z text=disposition closure resolution closed-by-author
+LOG job=gate ts=2026-09-28T12:22:20.5975365Z text=- Status: `closure`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36421341796 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence)'
+LOG job=publish ts=2026-09-28T12:22:35.1837231Z text=evidence commit a47bfdf872fefe33ecaa7c9a906034f99c2f9db1 rebuilds 0
+LOG job=publish ts=2026-09-28T12:22:35.1970288Z text=- Status: `closure`
+LOG job=publish ts=2026-09-28T12:22:35.1973672Z text=- Evidence: commit `a47bfdf872fefe33ecaa7c9a906034f99c2f9db1` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/metrics/2026-09/36421341796-1.json`
+$ bash scenarios/tools/run-records.sh metrics steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public 36421341796-1
+METRIC file=steady-orchard/patch-steward-testbed-public/metrics/2026-09/36421341796-1.json kind=maintainer-resolution subject=submission action_kind=resolution resolution=closed-by-author paired_run=36421209248-1 paired_snapshot=sha256:5fbdeca07dd136a135f2faeead462f6993460aca16409987f3a8401a036dce23
+METRICS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public run=36421341796-1 files=1 events=1
+```
+
+```text
+$ bash probes/smoke/tools/deploy.sh steady-orchard/patch-steward-testbed-public scenario-s10-base "scenario: S10 base branch" scenarios/workflows/steward-pr.yml
+DEPLOY repo=steady-orchard/patch-steward-testbed-public branch=scenario-s10-base existed=no
+DEPLOY commit=none reason=already-identical
+DEPLOY push=ok attempt=1 head=98ed7cdfcc010a6fd30975fc008636796116a3ed
+DEPLOY identical dest=.github/workflows/steward-pr.yml blob=6a2ded1721a593ece56863a31502232c02ce3e06
+$ bash probes/smoke/tools/deploy.sh steady-orchard/patch-steward-testbed-public scenario-s10-merge "scenario: S10 merge change" scenarios/fixtures/submissions/unstructured.txt:scenario-s10-merge.txt
+DEPLOY repo=steady-orchard/patch-steward-testbed-public branch=scenario-s10-merge existed=no
+DEPLOY commit=881381836f34af84ff8f2838c1eac0128c797827 message=scenario: S10 merge change
+DEPLOY push=ok attempt=1 head=881381836f34af84ff8f2838c1eac0128c797827
+DEPLOY identical dest=scenario-s10-merge.txt blob=416033bb79d1631d231a6d86791ea321223f1a5c
+$ gh pr create -R steady-orchard/patch-steward-testbed-public --base scenario-s10-base --head scenario-s10-merge --title "[scenario S10] pull request merged into a scenario base" --body-file scenarios/fixtures/submissions/unstructured.txt
+https://github.com/steady-orchard/patch-steward-testbed-public/pull/37
+```
+
+```text
+$ gh run view 36421552482 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36421552482 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:24:22.8613727Z text=event pull_request_target opened pr 37 sender User
+LOG job=gate ts=2026-09-28T12:24:22.8615899Z text=listing none
+LOG job=gate ts=2026-09-28T12:24:22.8616271Z text=dedup commit no-owner
+LOG job=gate ts=2026-09-28T12:24:22.8616690Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T12:24:22.8733061Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T12:24:22.8735281Z text=- Owner: committed `36421552482-1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36421552482 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence)'
+LOG job=publish ts=2026-09-28T12:24:44.5629598Z text=evidence commit 06113cf688033223c047dd32fa8a529ca840e69f rebuilds 0
+LOG job=publish ts=2026-09-28T12:24:44.5630558Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:24:44.5631198Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:24:44.5631790Z text=freshness current
+LOG job=publish ts=2026-09-28T12:24:44.5766360Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T12:24:44.5771597Z text=- Evidence: commit `06113cf688033223c047dd32fa8a529ca840e69f` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/pr-37/36421552482-1`
+```
+
+```text
+$ gh pr merge 37 -R steady-orchard/patch-steward-testbed-public --merge
+$ gh run view 36421707693 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36421707693 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:25:48.4363146Z text=event pull_request_target closed pr 37 sender User
+LOG job=gate ts=2026-09-28T12:25:48.4369342Z text=listing unique owner 36421552482-1
+LOG job=gate ts=2026-09-28T12:25:48.4369615Z text=disposition closure resolution merged
+LOG job=gate ts=2026-09-28T12:25:48.4493145Z text=- Status: `closure`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36421707693 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence)'
+LOG job=publish ts=2026-09-28T12:26:11.8963847Z text=evidence commit 35a1509a910a4f1757e8ffea81ed303a5c5e6680 rebuilds 0
+LOG job=publish ts=2026-09-28T12:26:11.9091065Z text=- Status: `closure`
+LOG job=publish ts=2026-09-28T12:26:11.9094035Z text=- Evidence: commit `35a1509a910a4f1757e8ffea81ed303a5c5e6680` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/metrics/2026-09/36421707693-1.json`
+$ bash scenarios/tools/run-records.sh metrics steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public 36421707693-1
+METRIC file=steady-orchard/patch-steward-testbed-public/metrics/2026-09/36421707693-1.json kind=maintainer-resolution subject=submission action_kind=resolution resolution=merged paired_run=36421552482-1 paired_snapshot=sha256:beabe36dc74ec31ad710d9d2519ba94f04ade12a08c60f24b2785456045c72f1
+METRICS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public run=36421707693-1 files=1 events=1
+$ gh pr view 37 -R steady-orchard/patch-steward-testbed-public --json state,baseRefName --jq '.state + " " + .baseRefName'
+MERGED scenario-s10-base
+```
+
+```text
+$ bash scenarios/tools/evidence.sh steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public pr 37
+EVIDENCE append_only=yes
+EVIDENCE run=36421552482-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=pr-37 runs=1 verified=1 result=ok
+```
+
+Result: pass
