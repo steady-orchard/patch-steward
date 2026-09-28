@@ -94,6 +94,31 @@ updates Steps and appends Revisions.
 | 2.11 | 2 | done | packages/core/src/github/hosted-responses.fixture.test.ts, development-artifacts/patch-steward-m6-2.11-report.md | c5bfad5ff9302766b80cdeb4e2dc8f2feafe57e0 |
 | 2.12 | 2 | done | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-2.12-report.md | 194d1270f9f327292764350e720d0fd788c23472 |
 | 2.13 | 2 | done | development-artifacts/patch-steward-m6-2.13-report.md | 74d9cf15c186f98dde5c54048466bd28ea63ef94 |
+| 3.1 | 3 | pending | packages/core/src/policy/loader.ts, packages/core/src/policy/loader-revision.test.ts, packages/core/src/conformance/invariant-5.test.ts, development-artifacts/patch-steward-m6-3.1-report.md | |
+| 3.2 | 3 | pending | packages/core/src/pipeline/gate.ts, packages/core/src/pipeline/gate-capture.test.ts, development-artifacts/patch-steward-m6-3.2-report.md | |
+| 3.3 | 3 | pending | packages/core/src/pipeline/gate-context.ts, packages/core/src/pipeline/gate-context.test.ts, development-artifacts/patch-steward-m6-3.3-report.md | |
+| 3.4 | 3 | pending | packages/core/src/ownership/freshness.ts, packages/core/src/ownership/freshness.test.ts, development-artifacts/patch-steward-m6-3.4-report.md | |
+| 3.5 | 3 | pending | packages/core/src/evidence/prepare-waiting.ts, packages/core/src/evidence/prepare-waiting.test.ts, development-artifacts/patch-steward-m6-3.5-report.md | |
+| 3.6 | 3 | pending | packages/core/src/evidence/prepare-records.ts, packages/core/src/evidence/prepare-records.test.ts, development-artifacts/patch-steward-m6-3.6-report.md | |
+| 3.7 | 3 | pending | packages/core/src/pipeline/hosted-environment.ts, packages/core/src/pipeline/hosted-environment.test.ts, development-artifacts/patch-steward-m6-3.7-report.md | |
+| 3.8 | 3 | pending | fixtures/events/issues-opened.json, fixtures/events/issues-edited.json, fixtures/events/issues-edited-by-bot.json, fixtures/events/issues-edited-hostile.json, fixtures/events/issues-reopened.json, fixtures/events/issues-closed.json, fixtures/events/issues-closed-by-maintainer.json, fixtures/events/issues-deleted.json, fixtures/events/issues-opened-pull-request.json, fixtures/events/pull-request-target-opened.json, fixtures/events/pull-request-target-edited.json, fixtures/events/pull-request-target-synchronize.json, fixtures/events/pull-request-target-closed-merged.json, fixtures/events/pull-request-target-opened-fork.json, fixtures/README.md, development-artifacts/patch-steward-m6-3.8-report.md | |
+| 3.9 | 3 | pending | packages/action/package.json, packages/action/tsconfig.test.json, pnpm-lock.yaml, packages/action/src/outputs.ts, packages/action/src/outputs.test.ts, packages/action/src/files.ts, packages/action/src/files.test.ts, development-artifacts/patch-steward-m6-3.9-report.md | |
+| 3.10 | 3 | pending | packages/core/src/evidence/store-world.test.ts, development-artifacts/patch-steward-m6-3.10-report.md | |
+| 3.11 | 3 | pending | packages/core/src/pipeline/hosted-world.test.ts, development-artifacts/patch-steward-m6-3.11-report.md | |
+| 3.12 | 3 | pending | packages/core/src/pipeline/job-summary.ts, packages/core/src/pipeline/job-summary.test.ts, development-artifacts/patch-steward-m6-3.12-report.md | |
+| 3.13 | 3 | pending | packages/core/src/pipeline/hosted-gate.ts, packages/core/src/pipeline/hosted-gate.test.ts, development-artifacts/patch-steward-m6-3.13-report.md | |
+| 3.14 | 3 | pending | packages/core/src/pipeline/hosted-evidence.ts, packages/core/src/pipeline/hosted-evidence.test.ts, development-artifacts/patch-steward-m6-3.14-report.md | |
+| 3.15 | 3 | pending | packages/core/src/pipeline/hosted-freshness.ts, packages/core/src/pipeline/hosted-freshness.test.ts, development-artifacts/patch-steward-m6-3.15-report.md | |
+| 3.16 | 3 | pending | packages/core/src/pipeline/hosted-publish.ts, packages/core/src/pipeline/hosted-publish.test.ts, development-artifacts/patch-steward-m6-3.16-report.md | |
+| 3.17 | 3 | pending | packages/core/src/pipeline/hosted-gate-scenarios.fixture.test.ts, development-artifacts/patch-steward-m6-3.17-report.md | |
+| 3.18 | 3 | pending | packages/core/src/index.ts, packages/core/src/exports.test.ts, packages/core/src/conformance/never-pass-hosted.test.ts, development-artifacts/patch-steward-m6-3.18-report.md | |
+| 3.19 | 3 | pending | packages/core/src/pipeline/hosted-publish-scenarios.fixture.test.ts, development-artifacts/patch-steward-m6-3.19-report.md | |
+| 3.20 | 3 | pending | packages/core/src/conformance/invariant-2-hosted.test.ts, packages/core/src/conformance/invariant-8-hosted.test.ts, development-artifacts/patch-steward-m6-3.20-report.md | |
+| 3.21 | 3 | pending | packages/core/src/conformance/invariant-4-hosted.test.ts, development-artifacts/patch-steward-m6-3.21-report.md | |
+| 3.22 | 3 | pending | packages/core/src/conformance/invariant-7-hosted.test.ts, development-artifacts/patch-steward-m6-3.22-report.md | |
+| 3.23 | 3 | pending | packages/core/src/conformance/write-allowlist.test.ts, packages/core/src/conformance/zero-execution.fixture.test.ts, development-artifacts/patch-steward-m6-3.23-report.md | |
+| 3.24 | 3 | pending | packages/action/src/dispatch.ts, packages/action/src/dispatch.test.ts, packages/action/src/main.ts, development-artifacts/patch-steward-m6-3.24-report.md | |
+| 3.25 | 3 | pending | development-artifacts/patch-steward-m6-3.25-report.md | |
 
 ### Phase 1 notes
 
@@ -322,6 +347,101 @@ updates Steps and appends Revisions.
     tests. Phase DoD D1-D10 re-run by the supervisor in the main tree: all PASS (D2 91 titles, D3 7 titles, D5 fetch-blocked
     test run 3062 pass, D8 leak check clean).
   - All C:/w/m6-* worktrees and wt/patch-steward-m6-* branches removed. C:/w/m5-3.4 is a pre-existing M05 leftover, untouched.
+
+### Phase 3 notes
+
+- Decomposed at the commit that adds this block (message `decompose(patch-steward-m6): phase 3 steps`), base 13d99dc (the planner
+  amendment this decomposition triggered: WF7 same-run records, I22 publish policy by tree id, AT4 and I13 per-job budgets, OW6 moved
+  to publish, new OW9 own-artifact read, ordered OW7 with `publish.freshness-unknown`; see Revisions). The gate 3.25 and every step
+  acceptance use 13d99dc04943dca10e10ba9976b02ecdc90693fa as the phase base (the decomposition commit touches only
+  development-artifacts/). All steps route mechanical. No file under packages/cli/, .github/, templates/, docs/, scenarios/, probes/
+  is in any scope; the only dependency change is the action -> core workspace link (3.9).
+- Dependency graph (scopes pairwise disjoint within each wave; merge order within a wave is free):
+  - W1 (parallel, no deps): 3.1 loadPolicyRevision plus invariant-5 lists; 3.2 gate.ts split (gateCaptureSubmission,
+    buildGateHandoff, gateContractLogLines; runGate unchanged in behavior); 3.3 gate context and closure records
+    (pipeline/gate-context.ts); 3.4 pure freshness rules (ownership/freshness.ts); 3.5 waiting evidence
+    (evidence/prepare-waiting.ts); 3.6 store groups for runs, supersessions, closures (evidence/prepare-records.ts); 3.7 runner
+    environment reading (pipeline/hosted-environment.ts); 3.8 fixtures/events payloads plus fixtures/README.md; 3.9 action wiring
+    (package.json dependency, tsconfig.test.json paths, pnpm-lock.yaml link) plus action outputs.ts and files.ts; 3.10 shared fake
+    Git Data API store (evidence/store-world.test.ts); 3.11 shared fake GitHub (pipeline/hosted-world.test.ts); 3.12 job summary
+    freshness vocabulary.
+  - W2: 3.13 hosted gate (3.2, 3.3, 3.7, 3.10, 3.11); 3.14 hosted evidence (3.3, 3.5, 3.6); 3.15 hosted freshness (3.4, 3.11).
+  - W3: 3.16 hosted publish (3.1, 3.3, 3.6, 3.7, 3.10-3.15); 3.17 gate fixture scenarios (3.8, 3.10, 3.11, 3.13).
+  - W4: 3.18 root exports plus never-pass-hosted (3.1-3.7, 3.12-3.16); 3.19 publish fixture scenarios; 3.20 invariant-2 and
+    invariant-8 hosted; 3.21 invariant-4 hosted; 3.22 invariant-7 hosted; 3.23 write allowlist plus zero-execution scan roots
+    (3.19-3.23 each need 3.10, 3.11, 3.13, 3.16; 3.19 also 3.8; 3.23 also 3.9).
+  - W5: 3.24 action entry (dispatch.ts, main.ts; needs 3.9 and 3.18 root exports).
+  - W6: 3.25 gate (verification only; MAIN tree; after 3.17 and 3.19-3.24 merged).
+  - Critical path: 3.11 -> 3.13 -> 3.16 -> 3.18 -> 3.24 -> 3.25.
+- Environment / bootstrap:
+  - Worker worktrees on short paths (C:/w/m6-<id>); `pnpm install --frozen-lockfile` per new worktree, sequentially. 3.9 runs a
+    non-frozen `pnpm install` once to record the action link; after 3.9 merges run `pnpm install --frozen-lockfile` in the main tree
+    before creating later worktrees (they base on the new lockfile).
+  - Acceptance runs Vitest with the JSON reporter to node_modules/.m6-p3-<id>.json and checks rendered titles with node (all plain
+    it(...), none over it.each). jq is not installed. Greps never use a `$` anchor on CRLF files. `git grep --untracked` is used for
+    new files so the same command works before and after the step commit.
+  - Tests never reach the network: every hosted call gets the world's fetch, attachment resolver, and transport and a no-op sleep
+    (the publish settle delay is 10 s otherwise). 3.17, 3.19, and the gate D5 run with global fetch replaced by a throwing function.
+  - Temp directories only in the action tests (prefix m6-act-, removed in afterEach; leak check in 3.9, 3.24, and gate D7).
+- Couplings:
+  - Shared test worlds: 3.10 (evidence/store-world.test.ts, createStoreWorld) and 3.11 (pipeline/hosted-world.test.ts,
+    createHostedWorld) are .test.ts files that also EXPORT the fakes; later test files import them (importing re-registers their
+    self-check tests in the importer; expected). They are excluded from the build by the existing **/*.test.ts exclusion. The
+    store world is chained into the hosted world through `createHostedWorld({ handlers: [store.handler] })`.
+  - Root exports: gate.ts (3.2) and loader.ts (3.1) are already root modules, so their new names surface at their merge; every
+    other new module is root-exported only by 3.18 (index.ts 105 -> 114 `export *` lines). All new names were checked unique across
+    packages/core/src and packages/cli/src; the only new root name with a pinned invariant-5 prefix is loadPolicyRevision (3.1 edits
+    invariant-5.test.ts; nothing else touches it).
+  - Single editors: gate.ts 3.2; job-summary.ts 3.12; index.ts, exports.test.ts, never-pass-hosted.test.ts 3.18;
+    zero-execution.fixture.test.ts 3.23; fixtures/README.md 3.8; pnpm-lock.yaml 3.9.
+  - ownership/freshness.ts and its test live in a directory that never-pass-hosted scans (no fs or network import, no `fetch(`
+    text, test files included).
+  - The existing invariant-2, -4, -7, -8 test files stay unchanged; the hosted extensions are new files
+    conformance/invariant-{2,4,7,8}-hosted.test.ts (titles pinned in the brief live there).
+- Emergent contracts for phase 4 (workflow, templates; names exact):
+  - Entry: `node <runtime>/packages/action/dist/main.js gate` or `... publish`; exit 0 on success (gate: any disposition incl.
+    duplicate and closure; publish: current, superseded, closure), 1 on failure, 2 on usage. The first stdout lines are
+    `::add-mask::` commands for every line of PATCH_STEWARD_APP_PRIVATE_KEY; minted tokens are masked the same way.
+  - Environment of the core step: the standard runner variables (GITHUB_EVENT_NAME, GITHUB_EVENT_PATH, GITHUB_REPOSITORY,
+    GITHUB_REPOSITORY_ID, GITHUB_REF, GITHUB_SERVER_URL, GITHUB_API_URL, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, RUNNER_TEMP,
+    GITHUB_OUTPUT, GITHUB_STEP_SUMMARY) plus PATCH_STEWARD_APP_ID and PATCH_STEWARD_APP_PRIVATE_KEY from the Environment secrets;
+    publish also STEWARD_GATE_DISPOSITION, STEWARD_GATE_RECORD_ONLY, STEWARD_GATE_SNAPSHOT_HASH, STEWARD_GATE_POLICY_REVISION mapped
+    from `needs.gate.outputs.*` through `env:` (never inside `run:`).
+  - Gate step outputs (always all seven, single-line): disposition, commit ('true' only for runnable, early-exit, queued),
+    record_only ('true' only for closures), concurrency_group, snapshot_hash, policy_revision, ownership_artifact. The workflow sets
+    the job output `committed=true` only in a step after a successful ownership upload; `record_only` may be mapped directly.
+  - Staging layout under RUNNER_TEMP: steward/handoff/handoff.json and steward/handoff/gate-context.json (upload as
+    `steward-handoff`, path `${{ runner.temp }}/steward/handoff/`), steward/ownership/ownership.json (upload as the step output
+    ownership_artifact), steward/closure/closure.json (upload as `steward-closure`), each retention 1 day except ownership (90);
+    handoff before ownership. Publish downloads `steward-handoff` into `${{ runner.temp }}/steward/handoff/` or `steward-closure`
+    into `${{ runner.temp }}/steward/closure/`.
+  - Publish step outputs: status, freshness, evidence_commit, supersession_commit.
+  - Test-bed policies keep `limits.github.requests_per_run` at the template's 300 (a policy at the minimum 10 cannot afford a
+    hosted run; it fails with `github.budget-exhausted`, never pass).
+- Decisions taken at decomposition (within the brief's latitude after amendment 13d99dc; no gate, DoD, or brief text changed by
+  them):
+  - New failure codes: `gate.policy-missing` (policy-unavailable), `gate.policy-invalid` (policy-invalid),
+    `gate.repository-gate-unsupported` (policy-invalid), `action.environment-invalid` (infrastructure); missing or empty App
+    credential variables reuse `app-auth.credentials-invalid`; `publish.freshness-unknown` per the amendment. All join
+    never-pass-hosted (3.18).
+  - The action validates the environment through core (pipeline/hosted-environment.ts, zod) because the action package may depend
+    only on core (no direct zod dependency); the action's own modules are dispatch.ts, outputs.ts, files.ts, main.ts.
+  - The gate redacts the handoff and gate context (and closure record) with the App key and minted tokens as exact values plus
+    the policy patterns before encoding, so same-run artifacts carry no credential even if a submission contains one.
+  - DD7 triggering resource id = the event's issue or pull request id; the hosted gate takes an optional receipts provider
+    (default: none, as M06 records no receipts) so the echo rule is testable with synthetic receipts.
+  - Closure pairing: a unique valid newest record pairs; none, ambiguous, or incomplete listings pair null; unavailable or invalid
+    reads fail the gate (DD6).
+  - Job summary freshness vocabulary is { state: current | superseded (reason) | unknown } (3.12 replaces 'confirmed').
+  - Publish run records count only publish-side retries (0 recorded; the gate's retry waits are not transported); the request
+    count is gate plus publish.
+  - Open items from phases 1 and 2, resolved: (1) a publish re-run of the same gate attempt after a successful evidence commit
+    fails `evidence.store-not-append-only` before any ref update (fail closed; a full workflow re-run is the recovery, it commits a
+    new attempt); (2) compare responses over the 5 MiB cap or beyond the 300-file compare listing fail closed (a contract-level run
+    commits about ten files); (3) a policy at the `limits.github.requests_per_run` minimum cannot afford a hosted run and fails with
+    `github.budget-exhausted`, never pass (test-bed policies keep 300; phase 6 documents it); (4) evidence/verify.ts still verifies
+    outcome run directories only (the CLI is unchanged in M06; waiting directories are checked by manifest schema and read-back);
+    (5) the OW7 successor attempt is read from the newer artifact's validated record (amendment item 5).
 
 ## Revisions
 
