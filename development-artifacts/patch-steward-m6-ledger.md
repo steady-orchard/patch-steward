@@ -142,10 +142,10 @@ updates Steps and appends Revisions.
 | 5.3 | 5 | done | scenarios/workflows/scenario-app-edit.yml, scenarios/tools/app-edit.sh, development-artifacts/patch-steward-m6-5.3-report.md | d7e3407a5c1789e94a82fe13099d98af67c0fef7 |
 | 5.4 | 5 | done | scenarios/tools/pins.sh, scenarios/tools/results-check.sh, development-artifacts/patch-steward-m6-5.4-report.md | 43b378b4ac0419d20b4b7bd4124ac494b312f2bd |
 | 5.5 | 5 | done | scenarios/fixtures/policies/invalid-limit.yml, scenarios/fixtures/policies/unwritable-store.yml, scenarios/fixtures/policies/caps-daily.yml, scenarios/fixtures/policies/caps-author.yml, scenarios/fixtures/pull-requests/steward-pr-modified.yml, development-artifacts/patch-steward-m6-5.5-report.md | 4b42502ff55a68ae49ddc5c94e920225efc18c8a |
-| 5.6 | 5 | pending | scenarios/README.md, development-artifacts/patch-steward-m6-5.6-report.md | |
-| 5.7 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.7-report.md | |
-| 5.8 | 5 | pending | scenarios/results/personal.md, development-artifacts/patch-steward-m6-5.8-report.md | |
-| 5.9 | 5 | pending | scenarios/results/org-private.md, development-artifacts/patch-steward-m6-5.9-report.md | |
+| 5.6 | 5 | done | scenarios/README.md, development-artifacts/patch-steward-m6-5.6-report.md | 8cf796fd39e2932711307356798ae49eefebe4e8 |
+| 5.7 | 5 | done | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.7-report.md | b4d0b11249ef2084b4ce5b52ec0340c978c728ac |
+| 5.8 | 5 | done | scenarios/results/personal.md, development-artifacts/patch-steward-m6-5.8-report.md | b8d5395c03851d1eac02773032b737fda03fba5f |
+| 5.9 | 5 | done | scenarios/results/org-private.md, development-artifacts/patch-steward-m6-5.9-report.md | 85631ebb3c6f1c0d730dcd000e2b1dc7207d0a80 |
 | 5.10 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.10-report.md | |
 | 5.11 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.11-report.md | |
 | 5.12 | 5 | pending | scenarios/results/org-public.md, development-artifacts/patch-steward-m6-5.12-report.md | |
