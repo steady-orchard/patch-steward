@@ -14,8 +14,13 @@ workflows run only on the three test-beds below, never in this repository and ne
   to a pushed steward commit, with `steward_ref` equal to the pin, plus a sender guard `if:` on job `screen` allowing
   only user id 2095171 and the test App's bot user id 331019482, because the public test-beds accept events from
   anyone. The guard is not part of the templates.
-- `workflows/scenario-secret-scope.yml` and `workflows/scenario-secret-scope-called.yml` — the secret-scope pair.
-- `workflows/scenario-app-edit.yml` — the App-edit helper workflow, deployed and dispatched by `app-edit.sh`.
+- `workflows/scenario-secret-scope.yml` and `workflows/scenario-secret-scope-called.yml` — the secret-scope pair; the
+  job inside `scenario-secret-scope-called.yml` declares the publication Environment as the mapping `name:
+steward-publication` plus `deployment: false`, the same declaration rule the reusable screening workflow's jobs
+  gate and publish use (see Safety rules).
+- `workflows/scenario-app-edit.yml` — the App-edit helper workflow, deployed and dispatched by `app-edit.sh`; its job
+  `edit` declares the publication Environment the same way, as the mapping `name: steward-publication` plus
+  `deployment: false`.
 - `fixtures/policies/orphan-branch.yml` and `fixtures/policies/repository-store.yml` — test-bed policies (all
   observe, no `llm` section); `fixtures/policies/invalid-limit.yml`, `unwritable-store.yml`, `caps-daily.yml`, and
   `caps-author.yml` — scenario policy variants (an invalid daily cap, a separate store repository the App cannot
@@ -64,6 +69,11 @@ the probe suite's App secrets, and they stay untouched.
   publication Environment, prints only HTTP status codes, and revokes its token.
 - A policy variant stays deployed for one scenario only and is restored with `deploy-steward.sh` after every run of
   that scenario completed, because publish reads the default-branch policy again for its freshness check.
+- The reusable screening workflow's jobs gate and publish, and every scenario workflow job that declares the
+  publication Environment, declare it as the mapping `name: steward-publication` plus `deployment: false`. In the
+  plain form `environment: steward-publication`, GitHub Actions records a Deployment for each Environment job of a
+  run, which for a `pull_request_target` run sits on the pull request head; with `deployment: false` the Environment
+  secrets and the Environment's branch restriction still apply and no Deployment is created.
 
 ## Budgets
 
@@ -91,7 +101,14 @@ Read each script's header comment for full detail.
   submission, including waiting run directories against their manifest. Needs `pnpm build` first (it verifies run
   directories with `steward report --json`).
 - `bash scenarios/tools/audit.sh <owner/repo> [<title prefix>]` — observe-mode audit that checks scenario issues and
-  pull requests carry no writes from the steward App.
+  pull requests carry no writes from the steward App; for each scenario pull request it also lists every deployment
+  on the head commit as an `AUDIT-DEPLOYMENT` line (id, environment, ref, creator, created_at, class) and classifies
+  each as `before-fix` when GitHub Actions created it for `steward-publication` for the allowlisted user or the test
+  App's bot user before the current wrappers were deployed, otherwise `counted`. The wrappers' deployment time is the
+  committer date of the newest `master` commit that changed `.github/workflows/steward-pr.yml` (first output line
+  `wrappers_deployed_at=`), or the value of `AUDIT_WRAPPERS_DEPLOYED_AT` (UTC `YYYY-MM-DDTHH:MM:SSZ`) when set. The
+  summary line carries `head_deployments` (counted only) and `before_fix_deployments`; only counted deployments, App
+  comments, labels, App check runs, and review requests make the result `writes-found`.
 - `bash scenarios/tools/secret-scope.sh check|run <owner/repo>` — verifies that the steward's two App secrets reach
   only jobs declaring the Environment `steward-publication`, by reproducing the product's secret path in a
   disposable caller/called workflow pair; `run` also deploys and dispatches it and inspects the log for the
@@ -111,7 +128,10 @@ count>` — waits, polling every 20 s up to a bounded deadline, until at least t
   token of the test App so the event sender is the App's bot user.
 - `bash scenarios/tools/pins.sh <owner/repo>` — read-only static check of the deployed wrapper workflows and the
   pinned reusable workflow (blob identity, pin equality and reachability, environment and secret usage, no probe
-  secret names, every `uses` pinned by a resolvable 40-hex SHA).
+  secret names, every `uses` pinned by a resolvable 40-hex SHA); the environment check passes only when gate and
+  publish declare `steward-publication` in the mapping form with `deployment: false` and no job declares an
+  Environment in any other form (detail `jobs=... other_form=...`). `PINS_SCREENING_FILE=<path>` checks a local copy
+  of the reusable workflow instead of the pinned one; the final line then carries `screening=local`.
 - `bash scenarios/tools/results-check.sh <results file> <scenario id>...` — checks that every listed scenario has
   sections that all end `Result: pass`, that the file holds no forbidden text, and that it is Prettier-clean.
 
@@ -124,6 +144,12 @@ count>` — waits, polling every 20 s up to a bounded deadline, until at least t
 4. Deploy with `deploy-steward.sh` per test-bed.
 5. Confirm the deployed blob ids equal `git rev-parse HEAD:<path>` (never compare working-tree bytes: line endings
    differ on Windows) and that the pin is reachable on GitHub.
+
+After a steward fix: push the fix commit to the milestone branch without force; regenerate the wrapper copies with
+that commit as the pin; redeploy the wrappers with `deploy-steward.sh` and every changed helper workflow with
+`probes/smoke/tools/deploy.sh`; deploying a file does not change whether its workflow is enabled, so enable only the
+workflows a scenario needs with `gh workflow enable <file> -R <owner/repo>` and disable them again when it ends (the
+steady state keeps them disabled).
 
 Ownership artifacts are named `steward-ownership-pr-<n>` or `steward-ownership-issue-<n>`. Run display titles read
 `steward <pr|issue> <n> author <id> event <event> <action> sender <id> <type>`. In the run's job list the jobs
@@ -205,9 +231,9 @@ Pass condition: runs used master's workflow; run record `policy_revision` equals
 
 ### S10
 
-org-public: open, title-edit, body-edit, close, and reopen an issue; open and close a pull request by the author;
-close a pull request by the test App (`app-edit.sh` close), which gives closed-by-maintainer; merge a scenario
-pull request targeting base branch `scenario-s10-base`.
+org-public: open, title-edit, and body-edit an issue; close the issue by the author; reopen it; close it by the test
+App (`app-edit.sh` close), which gives closed-by-maintainer. Pull requests: one opened and closed by the author, one
+opened and merged into base branch `scenario-s10-base`.
 
 Pass condition: body edit commits; reopen commits; closures produce metrics-only commits with merged,
 closed-by-author, closed-by-maintainer as applicable.
@@ -226,17 +252,26 @@ Pass condition: the new attempt commits a new owner (newest `created_at`).
 
 ### S13
 
-all test-beds: audit every scenario submission with `audit.sh`.
+all test-beds. On org-public, after the publication jobs declare `deployment: false` and the wrappers pinning that
+version are deployed: enable `steward-pr.yml`, open one pull request `[scenario S13] post-fix deployment check` from
+branch `scenario-s13-head` (created from `master` with `probes/smoke/tools/deploy.sh`) with
+`fixtures/submissions/unstructured.txt` as body, wait for its run, edit the body once, wait for the second run,
+disable `steward-pr.yml`. Then audit every scenario submission on every test-bed with `audit.sh`.
 
-Pass condition: App-authored comments, labels, App check runs on head SHAs, and requested reviewers all 0; no
-deployment on a pull request head.
+Pass condition: App-authored comments, labels, App check runs on head SHAs, requested reviewers, and counted
+deployments all 0; the new pull request had exactly two wrapper runs, both calling the fixed reusable workflow
+commit, with gate and publish successful, and its head has no deployment; the deployments GitHub Actions created on
+the heads of org-public pull requests 32, 33, 34, 36, and 37 while the publication jobs used the plain form (2, 2,
+28, 4, and 4) are listed as `before-fix`, all for `steward-publication` by the allowlisted user or the test App's bot
+user, created before the fixed wrappers were deployed; none is deleted.
 
 ### S14
 
 all test-beds: fetch the deployed wrappers and the pinned reusable workflow with `pins.sh`.
 
-Pass condition: only gate and publish declare `steward-publication` and reference the two secrets; no probe suite
-secret name appears; every `uses` is pinned by 40-hex SHA reachable on GitHub; `steward_ref` equals the pin.
+Pass condition: only gate and publish declare `steward-publication`, both in the mapping form with `deployment:
+false` (no job in another form), and only they reference the two secrets; no probe suite secret name appears; every
+`uses` is pinned by 40-hex SHA reachable on GitHub; `steward_ref` equals the pin.
 
 ### S15
 
@@ -259,6 +294,13 @@ all test-beds: check the Environment (`environment-check.sh`), then `bash scenar
 Pass condition: job outside logs both `length-zero=true`; job inside both `length-zero=false`; no secret value,
 length number, or `-----BEGIN` in either log; record the two log lines verbatim.
 
+Repeated on every test-bed after the change: enable `scenario-secret-scope.yml` and `scenario-secret-scope-called.yml`
+for the run, disable them after.
+
+Pass condition: the job inside the deployed called workflow declares the mapping form with `deployment: false`; the
+same four length-zero lines; and the test-bed shows no `steward-publication` deployment created at or after the
+repeated run's creation time. The first S17 sections stay as recorded; the repeated run gets its own S17 section.
+
 Ambiguous or unavailable ownership and snapshot reads cannot be forced live without platform manipulation; they are
 proved by fixture-tier tests with recorded responses.
 
@@ -275,4 +317,9 @@ After the scenarios: `steward-pr.yml`, `steward-issues.yml`, and `scenario-*.yml
 its own and may stay active); no open `[scenario` issue or pull request.
 
 What stays: the evidence branches, the evidence repository, the policy, the Environment, the wrapper files
-(disabled), and closed scenario issues and pull requests (never deleted).
+(disabled), closed scenario issues and pull requests (never deleted), every Deployment and deployment status on the
+test-beds, including those GitHub Actions created on the heads of org-public pull requests 32, 33, 34, 36, and 37
+while the publication jobs used the plain form (never deleted), and, on org-public, the one-off check workflow
+`.github/workflows/scenario-deployment-probe.yml` (disabled; it showed that `deployment: false` keeps the Environment
+secrets and the branch restriction and creates no Deployment) and its branch `scenario-deployment-probe`. The
+`scenario-*` disable rule covers that workflow.
