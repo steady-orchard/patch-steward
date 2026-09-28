@@ -80,4 +80,66 @@ describe('record metrics-event', () => {
     const unknownKind = { ...validEvent, kind: 'not-a-kind' };
     expect(metricsEventRecordSchema.safeParse(unknownKind).success).toBe(false);
   });
+
+  it('resolution payload keys are optional', () => {
+    const withoutNewKeys = {
+      ...validEvent,
+      kind: 'maintainer-resolution',
+      payload: { action_kind: 'resolution', dismissal_code: 'duplicate' },
+    };
+    expect(metricsEventRecordSchema.safeParse(withoutNewKeys).success).toBe(true);
+  });
+
+  it('resolution payload accepts every resolution kind', () => {
+    const resolutions = ['merged', 'closed-by-author', 'closed-by-maintainer', 'deleted'] as const;
+    for (const resolution of resolutions) {
+      const withPairedRun = {
+        ...validEvent,
+        kind: 'maintainer-resolution',
+        payload: {
+          action_kind: 'resolution',
+          dismissal_code: null,
+          resolution,
+          paired_run: { run_id: 1, run_attempt: 1 },
+          paired_snapshot_hash: `sha256:${'a'.repeat(64)}`,
+        },
+      };
+      expect(metricsEventRecordSchema.safeParse(withPairedRun).success).toBe(true);
+
+      const withoutPairedRun = {
+        ...validEvent,
+        kind: 'maintainer-resolution',
+        payload: {
+          action_kind: 'resolution',
+          dismissal_code: null,
+          resolution,
+          paired_run: null,
+          paired_snapshot_hash: null,
+        },
+      };
+      expect(metricsEventRecordSchema.safeParse(withoutPairedRun).success).toBe(true);
+    }
+  });
+
+  it('resolution payload rejects an unknown resolution', () => {
+    const unknownResolution = {
+      ...validEvent,
+      kind: 'maintainer-resolution',
+      payload: { action_kind: 'resolution', dismissal_code: null, resolution: 'reopened' },
+    };
+    expect(metricsEventRecordSchema.safeParse(unknownResolution).success).toBe(false);
+
+    const extraKeyInPairedRun = {
+      ...validEvent,
+      kind: 'maintainer-resolution',
+      payload: {
+        action_kind: 'resolution',
+        dismissal_code: null,
+        resolution: 'merged',
+        paired_run: { run_id: 1, run_attempt: 1, extra: 'nope' },
+        paired_snapshot_hash: null,
+      },
+    };
+    expect(metricsEventRecordSchema.safeParse(extraKeyInPairedRun).success).toBe(false);
+  });
 });
