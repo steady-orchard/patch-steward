@@ -190,6 +190,16 @@ async function loadFromGitHub(source: GitHubPolicySource): Promise<Result<Loaded
   }
   const treeId = policyDirEntry.sha;
 
+  return loadFromGitHubTree(client, repository, treeId, commit, branch);
+}
+
+async function loadFromGitHubTree(
+  client: GitHubClient,
+  repository: GitHubRepositoryRef,
+  treeId: string,
+  commit: string,
+  ref: string,
+): Promise<Result<LoadedPolicy, GitHubPolicyLoadFailureCode>> {
   const treeResult = await readGitTree(client, repository, treeId, true);
   if (!treeResult.ok) {
     return treeResult;
@@ -242,10 +252,43 @@ async function loadFromGitHub(source: GitHubPolicySource): Promise<Result<Loaded
   }
 
   return ok({
-    revision: { kind: 'git-tree', id: treeId, commit, ref: branch },
+    revision: { kind: 'git-tree', id: treeId, commit, ref },
     policy: resolved,
     authoritative: true,
   });
+}
+
+export interface GitHubPolicyRevisionSource {
+  readonly client: GitHubClient;
+  readonly repository: GitHubRepositoryRef;
+  readonly treeId: string;
+  readonly commit: string;
+  readonly ref: string;
+}
+
+const GIT_OBJECT_ID_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+
+function isValidRef(ref: string): boolean {
+  if (ref.length < 1 || ref.length > 255) {
+    return false;
+  }
+  for (let i = 0; i < ref.length; i += 1) {
+    const code = ref.charCodeAt(i);
+    if (code < 33 || code > 126) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export async function loadPolicyRevision(
+  source: GitHubPolicyRevisionSource,
+): Promise<Result<LoadedPolicy, GitHubPolicyLoadFailureCode>> {
+  const { client, repository, treeId, commit, ref } = source;
+  if (!GIT_OBJECT_ID_PATTERN.test(treeId) || !GIT_OBJECT_ID_PATTERN.test(commit) || !isValidRef(ref)) {
+    return githubFailure('github.invalid-request', 'The policy revision reference is not valid.');
+  }
+  return loadFromGitHubTree(client, repository, treeId, commit, ref);
 }
 
 async function loadFromFile(source: Extract<PolicySource, { kind: 'file' }>): Promise<Result<LoadedPolicy, PolicyLoadFailureCode>> {
