@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# List completed workflow runs whose display title starts with a given prefix, oldest first.
+# List workflow runs (any status) whose display title starts with a given prefix, oldest first.
 #
 # Usage:
 #   bash scenarios/tools/find-runs.sh <owner/repo> <workflow file name> <display title prefix>
 #
-# Reads runs of the named workflow (up to 100, most recent first from the API) and keeps those whose
+# Reads runs of the named workflow of any status (up to 100, most recent first from the API) and keeps those whose
 # displayTitle starts with the given prefix (plain string prefix match, not a pattern). Prints them
 # oldest first, one line per run:
 #   RUN id=<databaseId> attempt=<attempt> event=<event> status=<status> conclusion=<conclusion or none> created_at=<createdAt> url=<url> title=<displayTitle>
