@@ -137,6 +137,7 @@ describe('invariant 5 conformance', () => {
       .sort();
     expect(names).toEqual([
       'loadPolicy',
+      'loadPolicyRevision',
       'resolveCommit',
       'resolvePolicy',
       'validateHandoff',
@@ -191,6 +192,21 @@ describe('invariant 5 conformance', () => {
       throw new Error(`unexpected git invocation: ${args.join(' ')}`);
     };
     results.push(await core.loadPolicy({ kind: 'git', repoDir: os.tmpdir(), ref: 'main' }, { runner: versionRunner }));
+    results.push(
+      await core.loadPolicyRevision({
+        client: core.createGitHubClient({
+          token: null,
+          budget: core.createGitHubBudget({ requests: 1, retriesPerRequest: 0 }),
+          fetch: async () => {
+            throw new Error('no network');
+          },
+        }),
+        repository: { owner: 'o', name: 'r' },
+        treeId: 'x',
+        commit: 'a'.repeat(40),
+        ref: 'main',
+      }),
+    );
 
     for (const result of results) {
       const r = result as { ok: boolean; failure?: { outcome: string; cause: string } };
@@ -218,6 +234,7 @@ describe('invariant 5 conformance', () => {
       'checkPolicyRules',
       'checkRedactionPattern',
       'loadPolicy',
+      'loadPolicyRevision',
       'parseCategoryValue',
       'parseIssueBody',
       'parseLinkedIssueValue',
@@ -246,6 +263,22 @@ describe('invariant 5 conformance', () => {
 
     // loadPolicy, resolveCommit, resolvePolicy, validatePolicy, validatePolicyBytes: reuse the existing test's invalid inputs.
     expectResultRejection(await core.loadPolicy({ kind: 'file', path: '/does-not-exist/policy.yml' }));
+    expectResultRejection(
+      await core.loadPolicyRevision({
+        client: core.createGitHubClient({
+          token: null,
+          budget: core.createGitHubBudget({ requests: 1, retriesPerRequest: 0 }),
+          fetch: async () => {
+            throw new Error('no network');
+          },
+        }),
+        repository: { owner: 'o', name: 'r' },
+        treeId: 'x',
+        commit: 'a'.repeat(40),
+        ref: 'main',
+      }),
+      'github.invalid-request',
+    );
     expectResultRejection(core.validatePolicy({ version: 1 }));
     expectResultRejection(core.validatePolicyBytes(Buffer.from('version: 1\n')));
     expectResultRejection(core.resolvePolicy({ dismissal_codes: [] } as unknown as core.Policy));
