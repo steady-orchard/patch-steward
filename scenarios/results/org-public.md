@@ -636,3 +636,77 @@ EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=pr-34 runs=1
 ```
 
 Result: pass
+
+## S06 invalid policy: the gate fails before commitment
+
+Date (UTC): 2026-09-28. With an invalid policy (daily run cap 1001, above the hard bound 1000) deployed to master, a body edit of pull request
+https://github.com/steady-orchard/patch-steward-testbed-public/pull/34 produced a run whose
+gate job failed before any listing, dedup, or disposition step; the ownership artifact
+listing for the pull request was unchanged and no evidence record was written for that run.
+Run: https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36418122598.
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-pr-34   # before
+ARTIFACT id=10967968117 name=steward-ownership-pr-34 created_at=2026-09-28T11:44:35Z expires_at=2026-12-27T11:44:02Z expired=false run_id=36417410111 size=535
+ARTIFACT id=10967883208 name=steward-ownership-pr-34 created_at=2026-09-28T11:44:36Z expires_at=2026-12-27T11:44:03Z expired=false run_id=36417413257 size=537
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-pr-34 count=11 unexpired=11
+```
+
+```text
+$ bash scenarios/tools/deploy-steward.sh org-public scenarios/fixtures/policies/invalid-limit.yml
+SCENARIO-DEPLOY repo=steady-orchard/patch-steward-testbed-public pin=7161cd20df662314d14cc7f2f4130102baee1e98 policy=scenarios/fixtures/policies/invalid-limit.yml result=ok
+```
+
+```text
+$ gh api "repos/steady-orchard/patch-steward-testbed-public/contents/.github?ref=master" --jq '.[] | select(.name=="patch-steward") | .sha'
+e1ecb71a2a3209a9d2121a4b45c640f4e33f822c
+```
+
+```text
+$ gh pr edit 34 -R steady-orchard/patch-steward-testbed-public --body "..." > /dev/null && echo "edit utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+edit utc=2026-09-28T11:51:01Z
+```
+
+```text
+$ bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-pr.yml "steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User" 36417416630 1
+RUN id=36418122598 attempt=1 event=pull_request_target status=completed conclusion=failure created_at=2026-09-28T11:51:03Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36418122598 title=steward pr 34 author 2095171 event pull_request_target edited sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-pr.yml after=36417416630 count=1 completed=1 result=complete
+```
+
+```text
+$ gh run view 36418122598 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=failure,screen / publish=skipped
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36418122598 1 gate | grep -E 'text=(event |policy |listing |dedup |disposition |steward job summary:|- )'
+LOG job=gate ts=2026-09-28T11:51:36.0015204Z text=event pull_request_target edited pr 34 sender User
+LOG job=gate ts=2026-09-28T11:51:36.0236389Z text=steward job summary:
+LOG job=gate ts=2026-09-28T11:51:36.0237849Z text=- Submission: `steady-orchard/patch-steward-testbed-public` pull request `34`
+LOG job=gate ts=2026-09-28T11:51:36.0238608Z text=- Run: `36418122598-1`
+LOG job=gate ts=2026-09-28T11:51:36.0239123Z text=- Status: `failed`
+LOG job=gate ts=2026-09-28T11:51:36.0239766Z text=- Failure: `gate.policy-invalid`
+```
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-pr-34   # after
+ARTIFACT id=10967968117 name=steward-ownership-pr-34 created_at=2026-09-28T11:44:35Z expires_at=2026-12-27T11:44:02Z expired=false run_id=36417410111 size=535
+ARTIFACT id=10967883208 name=steward-ownership-pr-34 created_at=2026-09-28T11:44:36Z expires_at=2026-12-27T11:44:03Z expired=false run_id=36417413257 size=537
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-pr-34 count=11 unexpired=11
+$ diff before.txt after.txt && echo "listing unchanged"
+listing unchanged
+```
+
+```text
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public pr 34 | grep -c "^RECORD run=36418122598-1 "
+0
+```
+
+```text
+$ bash scenarios/tools/deploy-steward.sh org-public
+SCENARIO-DEPLOY repo=steady-orchard/patch-steward-testbed-public pin=7161cd20df662314d14cc7f2f4130102baee1e98 policy=scenarios/fixtures/policies/orphan-branch.yml result=ok
+$ gh api "repos/steady-orchard/patch-steward-testbed-public/contents/.github?ref=master" --jq '.[] | select(.name=="patch-steward") | .sha'
+d997b1e362c75af03942da0e7a1e8902ca5dbe51
+```
+
+Result: pass
