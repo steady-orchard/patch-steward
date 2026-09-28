@@ -117,7 +117,7 @@ updates Steps and appends Revisions.
 | 3.21 | 3 | done | packages/core/src/conformance/invariant-4-hosted.test.ts, development-artifacts/patch-steward-m6-3.21-report.md | 75b1644b87ed2e4ec626acd4cf17523b8b73b7c8 |
 | 3.22 | 3 | done | packages/core/src/conformance/invariant-7-hosted.test.ts, development-artifacts/patch-steward-m6-3.22-report.md | 9603a9b28059e73f78392b48ac48782256f266f8 |
 | 3.23 | 3 | done | packages/core/src/conformance/write-allowlist.test.ts, packages/core/src/conformance/zero-execution.fixture.test.ts, development-artifacts/patch-steward-m6-3.23-report.md | fffacdb9bf6424f360f8bfdb1db317acc64c203a |
-| 3.24 | 3 | pending | packages/action/src/dispatch.ts, packages/action/src/dispatch.test.ts, packages/action/src/main.ts, development-artifacts/patch-steward-m6-3.24-report.md | |
+| 3.24 | 3 | done | packages/action/src/dispatch.ts, packages/action/src/dispatch.test.ts, packages/action/src/main.ts, development-artifacts/patch-steward-m6-3.24-report.md | d7ee54ab5d19d2f0211bcef0ed6a5bee8271738a |
 | 3.25 | 3 | pending | development-artifacts/patch-steward-m6-3.25-report.md | |
 
 ### Phase 1 notes
