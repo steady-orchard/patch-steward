@@ -461,3 +461,63 @@ EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=pr-34 runs=9
 ```
 
 Result: pass
+
+## S08 evidence is written before the job summary
+
+Date (UTC): 2026-09-28. For the S01 run and the S04 newer run, the publish job log shows the evidence commit written and read back before the job summary that names it; the commit's committer date is not later than the summary timestamp. Run URLs: https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36412442107 and https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36416239795.
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36412442107 1 publish | grep -E 'text=(evidence commit |freshness |steward job summary:|- )'
+LOG job=publish ts=2026-09-28T10:55:16.0897150Z text=evidence commit 214529eff25d9a5c82c307add55c281cbe05ae61 rebuilds 0
+LOG job=publish ts=2026-09-28T10:55:16.0897863Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T10:55:16.0898797Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T10:55:16.0899299Z text=freshness current
+LOG job=publish ts=2026-09-28T10:55:16.1029961Z text=steward job summary:
+LOG job=publish ts=2026-09-28T10:55:16.1036872Z text=- Submission: `steady-orchard/patch-steward-testbed-public` pull request `34`
+LOG job=publish ts=2026-09-28T10:55:16.1037990Z text=- Run: `36412442107-1`
+LOG job=publish ts=2026-09-28T10:55:16.1040941Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T10:55:16.1041756Z text=- Snapshot: `sha256:42947737e5cd63d5d6451df8952195498eab7d2d9f795b90b9cbfe7ad8bba4c1`
+LOG job=publish ts=2026-09-28T10:55:16.1042583Z text=- Policy revision: `d997b1e362c75af03942da0e7a1e8902ca5dbe51`
+LOG job=publish ts=2026-09-28T10:55:16.1044235Z text=- Evidence: commit `214529eff25d9a5c82c307add55c281cbe05ae61` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/pr-34/36412442107-1`
+LOG job=publish ts=2026-09-28T10:55:16.1045469Z text=- Freshness: `current`
+LOG job=publish ts=2026-09-28T10:55:16.1045939Z text=- Ownership artifact retention: `90` days
+```
+
+```text
+$ gh api repos/steady-orchard/patch-steward-testbed-public/git/commits/214529eff25d9a5c82c307add55c281cbe05ae61 --jq '.committer.date'
+2026-09-28T10:55:11Z
+```
+
+```text
+$ R=steady-orchard/patch-steward-testbed-public; run=36412442107; c=214529eff25d9a5c82c307add55c281cbe05ae61; d=$(gh api repos/$R/git/commits/$c --jq .committer.date); bash scenarios/tools/run-log.sh $R $run 1 publish | node -e '...'
+S08 run=36412442107 commit=214529eff25d9a5c82c307add55c281cbe05ae61 committed_at=2026-09-28T10:55:11Z summary_at=2026-09-28T10:55:16.1029961Z order=ok
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36416239795 1 publish | grep -E 'text=(evidence commit |freshness |steward job summary:|- )'
+LOG job=publish ts=2026-09-28T11:34:30.5319420Z text=evidence commit b5d11cdbe2bf5c4176e1b543a83d133537b4450e rebuilds 0
+LOG job=publish ts=2026-09-28T11:34:30.5320116Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T11:34:30.5320639Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T11:34:30.5321504Z text=freshness current
+LOG job=publish ts=2026-09-28T11:34:30.5488481Z text=steward job summary:
+LOG job=publish ts=2026-09-28T11:34:30.5495728Z text=- Submission: `steady-orchard/patch-steward-testbed-public` pull request `34`
+LOG job=publish ts=2026-09-28T11:34:30.5496619Z text=- Run: `36416239795-1`
+LOG job=publish ts=2026-09-28T11:34:30.5497173Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T11:34:30.5497889Z text=- Snapshot: `sha256:7a447cf2faf52026ae336bdf57be1b04f586922dda42517bc50e5add8e2a3230`
+LOG job=publish ts=2026-09-28T11:34:30.5499134Z text=- Policy revision: `d997b1e362c75af03942da0e7a1e8902ca5dbe51`
+LOG job=publish ts=2026-09-28T11:34:30.5501346Z text=- Evidence: commit `b5d11cdbe2bf5c4176e1b543a83d133537b4450e` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/pr-34/36416239795-1`
+LOG job=publish ts=2026-09-28T11:34:30.5502506Z text=- Freshness: `current`
+LOG job=publish ts=2026-09-28T11:34:30.5502938Z text=- Ownership artifact retention: `90` days
+```
+
+```text
+$ gh api repos/steady-orchard/patch-steward-testbed-public/git/commits/b5d11cdbe2bf5c4176e1b543a83d133537b4450e --jq '.committer.date'
+2026-09-28T11:34:24Z
+```
+
+```text
+$ R=steady-orchard/patch-steward-testbed-public; run=36416239795; c=b5d11cdbe2bf5c4176e1b543a83d133537b4450e; d=$(gh api repos/$R/git/commits/$c --jq .committer.date); bash scenarios/tools/run-log.sh $R $run 1 publish | node -e '...'
+S08 run=36416239795 commit=b5d11cdbe2bf5c4176e1b543a83d133537b4450e committed_at=2026-09-28T11:34:24Z summary_at=2026-09-28T11:34:30.5488481Z order=ok
+```
+
+Result: pass
