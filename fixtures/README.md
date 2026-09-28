@@ -53,6 +53,12 @@ Current entries:
   response, the `.github` directory listing on the branch, and the App's bot user. Everything else is as served. Tests read
   them through the hosted adapters and check that no file matches a built-in credential detector; write responses, token
   responses, and artifact downloads are synthetic and built in test code.
+- `events/` — hand-built webhook payloads in the shapes GitHub delivers to the two wrapper workflows (`issues` and
+  `pull_request_target`), carrying the identifiers of the recorded test-bed issue 29 and pull request 26: opened, edited,
+  edited by the App's bot user, edited with hostile title and body text, reopened, closed by the author and by another user,
+  deleted, an issue event for a pull request, synchronize, a merged closure, and a pull request from a fork. The hosted gate
+  and publish tests authenticate them against a matching runner environment; control and format characters are generated in
+  test code, never committed.
 - `reports/` — golden screening reports and check-run summaries as byte-exact `.txt`, one pair per case listed in
   `reports/cases.json`: an unstructured issue, a complete defect issue, a pull request with a missing field and an attachment
   violation, an execution-sensitive change, a shared head commit, a run under a local policy file, more blockers than a
