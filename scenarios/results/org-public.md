@@ -786,3 +786,93 @@ d997b1e362c75af03942da0e7a1e8902ca5dbe51
 ```
 
 Result: pass
+
+## S10 issue: open, title edit, body edit
+
+Date (UTC): 2026-09-28. Opened an unstructured issue on org-public (contract not met), edited only its title (duplicate, owner unchanged), then edited its body (new owner committed); issue https://github.com/steady-orchard/patch-steward-testbed-public/issues/35, runs https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36419197068, https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36419328690, https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36419421470.
+
+```text
+$ gh issue create -R steady-orchard/patch-steward-testbed-public --title "[scenario S10] issue lifecycle" --body-file scenarios/fixtures/submissions/unstructured.txt
+https://github.com/steady-orchard/patch-steward-testbed-public/issues/35
+$ PROBE_WAIT_SECONDS=540 bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-issues.yml "steward issue 35 author 2095171 event issues opened sender 2095171 User" 36418649681 1
+RUN id=36419197068 attempt=1 event=issues status=completed conclusion=success created_at=2026-09-28T12:01:39Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36419197068 title=steward issue 35 author 2095171 event issues opened sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-issues.yml after=36418649681 count=1 completed=1 result=complete
+```
+
+```text
+$ gh issue edit 35 -R steady-orchard/patch-steward-testbed-public --title "[scenario S10] issue lifecycle (title edited)"
+https://github.com/steady-orchard/patch-steward-testbed-public/issues/35
+$ PROBE_WAIT_SECONDS=540 bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-issues.yml "steward issue 35 author 2095171 event issues edited sender 2095171 User" 36419197068 1
+RUN id=36419328690 attempt=1 event=issues status=completed conclusion=success created_at=2026-09-28T12:02:55Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36419328690 title=steward issue 35 author 2095171 event issues edited sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-issues.yml after=36419197068 count=1 completed=1 result=complete
+```
+
+```text
+$ gh issue edit 35 -R steady-orchard/patch-steward-testbed-public --body "$(printf '%s\n\nScenario body edit: S10.\n' "$BASE")"
+https://github.com/steady-orchard/patch-steward-testbed-public/issues/35
+$ PROBE_WAIT_SECONDS=540 bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-issues.yml "steward issue 35 author 2095171 event issues edited sender 2095171 User" 36419328690 1
+RUN id=36419421470 attempt=1 event=issues status=completed conclusion=success created_at=2026-09-28T12:03:49Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36419421470 title=steward issue 35 author 2095171 event issues edited sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-issues.yml after=36419328690 count=1 completed=1 result=complete
+```
+
+```text
+$ gh run view 36419197068 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36419197068 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:02:13.6411188Z text=event issues opened issue 35 sender User
+LOG job=gate ts=2026-09-28T12:02:13.6412533Z text=listing none
+LOG job=gate ts=2026-09-28T12:02:13.6412981Z text=dedup commit no-owner
+LOG job=gate ts=2026-09-28T12:02:13.6413294Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T12:02:13.6527906Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T12:02:13.6532226Z text=- Owner: committed `36419197068-1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36419197068 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Freshness)'
+LOG job=publish ts=2026-09-28T12:02:34.7257162Z text=evidence commit acd9ce3b57277a637f2e979bcf4ad02b1ec1e459 rebuilds 0
+LOG job=publish ts=2026-09-28T12:02:34.7257810Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:02:34.7258264Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:02:34.7259179Z text=freshness current
+LOG job=publish ts=2026-09-28T12:02:34.7433166Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T12:02:34.7439585Z text=- Freshness: `current`
+```
+
+```text
+$ gh run view 36419328690 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=skipped
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36419328690 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:03:28.8757078Z text=event issues edited issue 35 sender User
+LOG job=gate ts=2026-09-28T12:03:28.8760936Z text=listing unique owner 36419197068-1
+LOG job=gate ts=2026-09-28T12:03:28.8761954Z text=dedup duplicate owner-unchanged owner 36419197068-1
+LOG job=gate ts=2026-09-28T12:03:28.8849408Z text=- Status: `duplicate`
+LOG job=gate ts=2026-09-28T12:03:28.8851869Z text=- Owner: kept `36419197068-1`
+```
+
+```text
+$ gh run view 36419421470 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36419421470 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:04:18.4217688Z text=event issues edited issue 35 sender User
+LOG job=gate ts=2026-09-28T12:04:18.4219629Z text=listing unique owner 36419197068-1
+LOG job=gate ts=2026-09-28T12:04:18.4220379Z text=dedup commit snapshot-changed
+LOG job=gate ts=2026-09-28T12:04:18.4220917Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T12:04:18.4354372Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T12:04:18.4357983Z text=- Owner: committed `36419421470-1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36419421470 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Freshness)'
+LOG job=publish ts=2026-09-28T12:04:38.8786048Z text=evidence commit 8ec860b8a43696d2a330a6724905c7aef291aced rebuilds 0
+LOG job=publish ts=2026-09-28T12:04:38.8786637Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:04:38.8787177Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:04:38.8787667Z text=freshness current
+LOG job=publish ts=2026-09-28T12:04:38.8889927Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T12:04:38.8894473Z text=- Freshness: `current`
+```
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-issue-35
+ARTIFACT id=10967369483 name=steward-ownership-issue-35 created_at=2026-09-28T12:02:15Z expires_at=2026-12-27T12:01:39Z expired=false run_id=36419197068 size=526
+ARTIFACT id=10968542140 name=steward-ownership-issue-35 created_at=2026-09-28T12:04:19Z expires_at=2026-12-27T12:03:49Z expired=false run_id=36419421470 size=529
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-issue-35 count=2 unexpired=2
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public issue 35
+RECORD run=36419197068-1 kind=outcome outcome=needs-changes run_id=36419197068 run_attempt=1 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:63159a0ef32616ae2d3df41ea502d0be66f6137f61b3cdcbe29b95d9f2e0edf3 findings=submission.unstructured
+RECORD run=36419421470-1 kind=outcome outcome=needs-changes run_id=36419421470 run_attempt=1 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:2fb97073c26f5050567ed137da8ce458827634d8242852d92ab40cabf87ef411 findings=submission.unstructured
+RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public subject=issue-35 runs=2 supersessions=0
+```
+
+Result: pass
