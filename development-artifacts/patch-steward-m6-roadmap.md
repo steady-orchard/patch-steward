@@ -6,9 +6,11 @@ and `publish` phases and the `action` package entry with conformance extensions,
 test-bed deployment, then the live scenario suite that demonstrates every exit criterion on the test-beds, and finally the ADRs and
 governing-document changes. Phases 1–3 need no network; phase 4 pushes the milestone branch and deploys to test-beds; phase 5 is the
 only phase that creates GitHub events. Owner gate APPROVED 2026-09-27 (brief "Owner gate answers"). All gate references
-(G1–G11, I1–I21, K38–K51, OA1–OA4, S01–S17, SC1–SC5) are in `development-artifacts/patch-steward-m6-brief.md`. Owner actions are not yet
-confirmed: before the earliest phase or step that needs each OA (brief "Owner actions", column "Needed first by"), the pipeline runs
-the OA's verify command and returns `RESULT: needs-human` naming the missing action if it fails. Earliest needs: OA1 on org-public —
+(G1–G11, I1–I21, K38–K51, OA1–OA4, S01–S17, SC1–SC5) are in `development-artifacts/patch-steward-m6-brief.md`. Owner actions: the
+owner reported OA1–OA4 complete on 2026-09-27; OA1 (all three test-beds) and OA2 are verified; OA3 and OA4 are proved only by the S16
+and S15 runs (brief "Owner actions", "Status"). Before the earliest phase or step that needs each OA (brief "Owner actions", column
+"Needed first by"), the pipeline still re-runs the OA's verify command and returns `RESULT: needs-human` naming the missing action if
+it fails. Earliest needs: OA1 on org-public —
 Phase 4, org-public smoke step; OA1 on personal and org-private — Phase 5 (S15, S16, S17); OA2 — Phase 5, S16; OA3 — Phase 5, S16
 (verified by the S16 run); OA4 — Phase 5, S15 (verified by the S15 run). Product secret names: Environment `steward-publication`,
 Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the probe suite's `STEWARD_APP_*` secrets are never read.
@@ -65,7 +67,9 @@ Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the
 - **Depends on:** Phase 2.
 - **Definition of Done (phase):** toolchain command exits 0; `pnpm vitest run packages/core/src/conformance packages/action
   packages/core/src/pipeline` passes with the invariant titles listed in the brief "Conformance checks" (except the workflow scan and
-  static workflow tests, which belong to phase 4); the fixture-tier hosted scenarios assert: duplicate keeps owner, body change commits,
+  static workflow tests, which belong to phase 4); the fixture-tier hosted scenarios assert: the gate's recorded request order follows
+  brief DD8 (ownership listing before capture), a verified echo built with synthetic receipts ends `duplicate` reason `echo` with no
+  capture request recorded and nothing uploaded, duplicate keeps owner, body change commits,
   newer owner and changed snapshot supersede, tie or incomplete listing or unavailable read fails publication without supersession,
   failure before commitment commits nothing, publish failure leaves no evidence, evidence commit precedes the summary write (recorded
   call order), waiting run directory for over-cap, closure metrics-only commit; lockfile diff since the phase base is only the action →
@@ -84,7 +88,7 @@ Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the
   wrappers (pinned to the pushed commit, with the test-bed guard, secrets mapped as `PATCH_STEWARD_APP_ID`/`PATCH_STEWARD_APP_PRIVATE_KEY`)
   and policies to the three test-beds, OA1 verify on org-public, org-public smoke.
 - **Depends on:** Phase 3. Owner action OA1 on org-public (Environment `steward-publication` with secrets `PATCH_STEWARD_APP_ID`,
-  `PATCH_STEWARD_APP_PRIVATE_KEY`, no same-named repository or organization secret) verified with the brief's OA1 commands immediately
+  `PATCH_STEWARD_APP_PRIVATE_KEY`, no same-named repository or organization secret; reported done and verified 2026-09-27) re-verified with the brief's OA1 commands immediately
   before the org-public smoke step (the first step in the plan that uses the Environment); a failing verify returns `RESULT: needs-human`
   naming OA1. Steps before the smoke (code, static tests, push, deploys) need no owner action. OA2–OA4 and OA1 on personal and
   org-private are NOT needed in this phase.
@@ -106,10 +110,12 @@ Environment secrets `PATCH_STEWARD_APP_ID`, `PATCH_STEWARD_APP_PRIVATE_KEY`; the
 - **Objective:** every M06 exit criterion is demonstrated live on the test-beds and recorded with verbatim evidence.
 - **Scope:** run S01–S17 (brief G10; S17 is the live Environment-only delivery check, SC5 and I21) with `scenarios/tools/`, record `scenarios/results/org-public.md`, `personal.md`, `org-private.md`;
   defects found go back through the supervisor revision loop (re-push, re-deploy); steady state SC3 at the end.
-- **Depends on:** Phase 4. Owner actions, each verified with the brief's command before the first scenario that needs it (a failing
-  verify returns `RESULT: needs-human` naming the action): OA1 on personal before S15 and S17 there; OA1 on org-private before S16 and S17
-  there; OA2 before S16; OA3 by the S16 run (store token minted for the evidence repository); OA4 by the S15 run (publish to the personal
-  `steward-evidence`). Scenarios on org-public (S01–S14, S17) need only OA1 on org-public, re-verified at the start of the phase.
+- **Depends on:** Phase 4. Owner actions (all reported done 2026-09-27; OA1 and OA2 verified; OA3 and OA4 unproved until S16 and S15),
+  each re-verified with the brief's command before the first scenario that needs it (a failing verify returns `RESULT: needs-human`
+  naming the action): OA1 on personal before S15 and S17 there; OA1 on org-private before S16 and S17 there; OA2 before S16; OA3 by the
+  S16 run (store token minted for the evidence repository; a token-mint or installation-lookup failure there returns `needs-human`
+  naming OA3); OA4 by the S15 run (publish to the personal `steward-evidence`; a token-mint failure or HTTP 403 there returns
+  `needs-human` naming OA4). Scenarios on org-public (S01–S14, S17) need only OA1 on org-public, re-verified at the start of the phase.
 - **Definition of Done (phase):** each result file lists S01–S17 as applicable with result `pass` and evidence (run URLs, artifact
   listings with `created_at`, evidence commit SHAs, compare outputs); the observe audit (S13) counts are all `0`; S17 on each of the three test-beds shows job `outside` logging both `length-zero=true`
   and job `inside` logging both `length-zero=false`; SC3 steady state

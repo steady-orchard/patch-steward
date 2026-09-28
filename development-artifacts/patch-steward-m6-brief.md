@@ -13,9 +13,10 @@ ADR, and manual changes.
 
 OWNER GATE: APPROVED 2026-09-27 (answers recorded in "Owner gate answers"). Every gate item G1–G11, interpretation I1–I21,
 constant K38–K51, owner action OA1–OA4, scenario S01–S17, and the ADR inventory is BINDING exactly as written below. Rejected
-alternatives are never implemented. Owner actions OA1–OA4 are NOT yet confirmed done: the pipeline runs each OA's verify command
-before the earliest phase or step that needs it (see "Owner actions") and returns `RESULT: needs-human` naming the missing action if
-a check fails.
+alternatives are never implemented. Owner actions OA1–OA4: the owner reported all four complete on 2026-09-27; OA1 (all three
+test-beds) and OA2 are verified by their verify commands; OA3 and OA4 are reported done and are proved only by the S16 and S15 runs
+(see "Owner actions", "Status"). The pipeline still re-runs each OA's verify command before the earliest phase or step that needs it
+and returns `RESULT: needs-human` naming the missing action if a check fails.
 
 ## Context
 
@@ -132,7 +133,8 @@ test-bed repositories only, with the test App; never this repository, never real
 - D4 Deduplication: snapshot-based. Event identity = (event, action, submission, triggering object id and its updated_at, run id,
   attempt), recorded in the ownership record for audit. A new attempt of a run is an explicit rerun and replaces. Otherwise a snapshot
   hash plus policy revision equal to the newest committed owner's keeps that owner: no commit, no cancel, no cap debit. Verified App
-  echoes (sender is the installation bot and the resource id is recorded) are dropped before capture.
+  echoes (sender is the installation bot and the resource id is recorded) are dropped before capture; the ownership listing, which
+  supplies the recorded resource ids, therefore precedes the echo check (gate order DD8, owner decision 2026-09-27).
 - D5 Build and pinning (ADR-0011): BUILD AT RUNTIME (owner's choice over the lead's recommended committed bundle). Jobs check out this
   repository at the pinned SHA and run `pnpm install --frozen-lockfile` and the build; no committed bundles; wrappers pin the reusable
   workflow (in this repository's `.github/workflows/`, `workflow_call` only) by full commit SHA; during development the pins point at
@@ -374,17 +376,40 @@ test-bed repositories only, with the test App; never this repository, never real
 - DD6 Listing, download, or record read UNAVAILABLE (API failure, invalid record) in `gate` → gate fails before commitment
   (`ownership.listing-unavailable` or `ownership.record-invalid`); nothing is superseded.
 - DD7 Echo rule: an event whose `sender.id` equals this installation's bot user id AND whose triggering resource id is in the newest
-  owner's recorded publication receipts is dropped before capture (`duplicate`, reason `echo`). M06 records no publication receipts
-  (observe mode writes nothing on submissions), so the recorded set is always empty and bot-sent events fall through to DD3; the rule is
-  implemented and unit-tested with synthetic receipts. The bot user id is looked up once per job (`GET /app` with the App JWT, then
+  owner's recorded publication receipts is dropped before capture (`duplicate`, reason `echo`): no capture, no fallback read, no cap
+  evaluation, no upload, no evidence. The receipts come from the ownership listing that precedes the echo check (DD8 step 2): the
+  receipts recorded in the UNIQUE newest owner's valid record; when the listing kind is `none`, `ambiguous`, `incomplete`, or
+  unavailable, or that record is unavailable or invalid, the receipt set is empty. An echo that cannot be verified is not an echo: the
+  event continues to capture, and the listing outcome reaches the deduplication decision unchanged (DD6 then fails closed for every
+  event other than DD1 and DD2). M06 records no publication receipts (observe mode writes nothing on submissions; the M06 ownership
+  record has no receipt field), so the recorded set is always empty and bot-sent events fall through to capture and DD1–DD6; the rule
+  is implemented and unit-tested with synthetic receipts. The bot user id is looked up once per job (`GET /app` with the App JWT, then
   `GET /users/<slug>[bot]`), bounded by the bootstrap budget.
-- DD8 Order in `gate`: EV2 → mint tokens (G7) → load trusted policy (GitHub API, default branch) → repository-gate check (I5) → closure
-  branch (EV4) → capture live (M04 `captureIssue`/`capturePullRequest`) → snapshot hash → echo (DD7) → ownership listing/dedup
-  (DD1–DD6) → contract check → caps (G3, only for otherwise runnable) → write `ownership.json` and the gate handoff → outputs.
+- DD8 Order in `gate` (owner decision 2026-09-27: authenticate → list the submission's ownership artifacts (newest owner and its
+  recorded receipts) → verified-echo check → capture the snapshot → deduplication decision → cap and contract disposition → commit;
+  the prerequisite steps the owner's sequence does not name keep their approved positions relative to it). Numbered steps, first
+  failure or stop wins:
+  1. Authenticate: EV2 → mint tokens (G7) and look up the installation bot user id (DD7) → load the trusted policy (GitHub API, default
+     branch) → repository-gate check (I5). Tokens, bot id, and policy use the bootstrap budget; every later request uses
+     `limits.github.*` from the policy (I13), which is why the policy load precedes the listing.
+  2. List: ownership artifact listing (OW3) → newest owner (OW4) → when unique, download (OW5) and validate (OW2) its record. Performed
+     for EVERY event kind (explicit reruns, `reopened`, and closures included); never skipped. The result (kind `none`, `unique` with
+     the record read, `ambiguous`, `incomplete`, or unavailable) is carried unchanged to steps 3, 4, and 6.
+  3. Closure branch (EV4): action `closed`, or issue action `deleted` → record-only path paired from the step 2 listing; stop.
+     Closures are real submission changes and are never echo-dropped.
+  4. Echo check (DD7) with the step 2 receipts: a verified echo → disposition `duplicate`, reason `echo`; stop (nothing captured).
+  5. Capture live (M04 `captureIssue`/`capturePullRequest`) → snapshot hash.
+  6. Deduplication decision (DD1–DD6) over the step 2 listing and the step 5 snapshot. The pure decision function takes the step 4 echo
+     flag as a precomputed input and applies it first (always `false` here, because a verified echo already stopped at step 4). The
+     ES10 fallback read (DD4) happens only in this step, and only when the listing kind is `none` and the event is neither an explicit
+     rerun (DD1) nor `reopened` (DD2). `duplicate` → stop.
+  7. Contract check → caps (G3, only for otherwise runnable work, I6) → disposition `runnable`, `early-exit`, or `queued`.
+  8. Commit: write the gate handoff and `ownership.json`; upload `steward-handoff`, then the ownership artifact (WF7, OW1) → outputs.
 - EV4 Closure (`closed`; issue `deleted`): no capture of a new snapshot and no ownership commitment. Gate assembles one
-  `maintainer-resolution` metrics event (gate G5 RS-rules) paired with the newest committed owner (run id, attempt, snapshot hash) or
-  `null` when none, uploads it as same-run artifact `steward-closure`, outputs `disposition=closure`, `record_only=true`. A closure
-  never supersedes an owner and never cancels work.
+  `maintainer-resolution` metrics event (gate G5 RS-rules) paired with the newest committed owner from the DD8 step 2 listing (run id,
+  attempt, snapshot hash) or `null` when none, uploads it as same-run artifact `steward-closure`, outputs `disposition=closure`,
+  `record_only=true`. An unavailable listing, download, or record read fails the gate before any upload (DD6). A closure never
+  supersedes an owner and never cancels work.
 
 ### Gate G3 — caps from the tagged run list (APPROVED; RN- and CP-rules)
 
@@ -706,7 +731,7 @@ Documentation change inventory (governing document first; persistence and deferr
 ### I-list — interpretations (APPROVED)
 
 - I1 Run existence (mirrors M05 I1): a T1 run exists once its ownership artifact uploads. Before that, every failure (event, token, policy
-  missing or invalid, repository gate active, capture, listing, caps, handoff upload, ownership upload) fails the `gate` job visibly
+  missing or invalid, repository gate active, listing, capture, caps, handoff upload, ownership upload; DD8 order) fails the `gate` job visibly
   (job summary with the failure code) and publishes nothing; a missing or invalid trusted policy therefore has no stored evidence in T1
   (the store location comes from the policy).
 - I2 After commitment, publish-side failures before the evidence commit fail the publish job: no evidence, no summary outcome.
@@ -793,10 +818,19 @@ Documentation change inventory (governing document first; persistence and deferr
   probe secret name except inside `PATCH_STEWARD_APP_*` in `steward-screening.yml` and both templates; the test builds the probe
   names by concatenation, see Constraints "Secret names").
 
-### Owner actions (APPROVED; owner performs them and reports completion to the lead; NOT yet confirmed; the pipeline performs none of these)
+### Owner actions (APPROVED; owner reported OA1–OA4 complete on 2026-09-27; the pipeline performs none of these)
 
-Rule (binding): before the earliest phase or step listed in "Needed first by", the pipeline runs the OA's verify command (and re-runs
-it at the start of every later step that depends on it). If a check fails, it stops and returns `RESULT: needs-human` naming the
+Status (recorded 2026-09-27; owner report plus verification):
+
+| Id | Owner report | Verification | Remaining proof |
+| --- | --- | --- | --- |
+| OA1 | done 2026-09-27 | VERIFIED by the lead on all three test-beds with block OA1: Environment `steward-publication` lists secrets `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY`; deployment branch policy `master`; no repository secret named `PATCH_STEWARD_*`. The planner re-ran every block OA1 line on all three test-beds at the amendment (including the organization-secrets line on both `steady-orchard/*` test-beds): each printed its expected value. | none beyond the Rule's re-verify before use (phase 4 smoke on org-public; S15, S16, S17) |
+| OA2 | done 2026-09-27 | VERIFIED by the lead with block OA2: `steady-orchard/patch-steward-testbed-evidence` is private with 1 commit. Planner re-run at the amendment printed `[true,true]` and `1`. | none beyond the Rule's re-verify before S16 |
+| OA3 | done 2026-09-27 | NOT locally verifiable (needs the App key) | proved only by the S16 run (publish mints a store token for the evidence repository and commits there) |
+| OA4 | done 2026-09-27 | NOT locally verifiable (needs the App key) | proved only by the S15 run (publish to the personal test-bed's `steward-evidence`) |
+
+Rule (binding; unchanged by the status above): before the earliest phase or step listed in "Needed first by", the pipeline runs the
+OA's verify command (and re-runs it at the start of every later step that depends on it). If a check fails, it stops and returns `RESULT: needs-human` naming the
 missing action (e.g. "OA1 not done on steady-orchard/patch-steward-testbed-private: Environment secrets are ..."); it never works
 around a missing action. Verify output is compared literally; never print a secret value.
 
@@ -848,15 +882,16 @@ evidence-branch pushes are NOT configured in M06 (a later installation concern; 
 | 14 | Scenario suite (G10) | A | persistent `scenarios/`, S01–S16 plus S17 from Q9, test-bed-only sender guard, ambiguous and unavailable reads at fixture tier |
 | 15 | ADRs and docs (G11) | A | ADR-0071–ADR-0078; ADR-0011 `superseded by ADR-0077`; stance and inventory as written |
 | 16 | Interpretations | A | I1–I20 accepted; I21 added by this amendment to implement Q9's live check |
-| 17 | Owner actions | owner will perform OA1–OA4 (OA1 with the Q9 names) and report to the lead | NOT yet confirmed; verified per the Owner actions rule |
+| 17 | Owner actions | owner will perform OA1–OA4 (OA1 with the Q9 names) and report to the lead | owner reported OA1–OA4 done 2026-09-27; OA1 and OA2 verified; OA3 and OA4 proved only by S16 and S15 ("Owner actions", "Status"); still re-verified per the Owner actions rule |
 
 ## Constraints
 
 - Branch: all commits on `milestone/6-github-hosted-skeleton-gate-ownership-evidence-publish`; worktrees base on its current local HEAD.
   The pipeline MAY push this branch (and only `milestone/6-*` branches) to origin, never force-push, never push `develop` or `master`.
 - OWNER GATE APPROVED 2026-09-27 (ledger `owner-gate`): every gate item is binding exactly as written; rejected alternatives are never
-  implemented; changes need a planner amendment with owner approval. Owner actions are verified per "Owner actions" before the step
-  that first needs each; a failed verify returns `RESULT: needs-human` naming the missing OA.
+  implemented; changes need a planner amendment with owner approval. Owner actions (reported done 2026-09-27; OA1 and OA2 verified;
+  OA3 and OA4 proved only by S16 and S15) are re-verified per "Owner actions" before the step that first needs each; a failed verify,
+  or an S15 or S16 token-mint or permission failure attributable to OA4 or OA3, returns `RESULT: needs-human` naming the OA.
 - Secret names: the product (`.github/workflows/steward-screening.yml`, `templates/**`, `packages/**`, `scenarios/**`) uses only
   `PATCH_STEWARD_APP_ID` and `PATCH_STEWARD_APP_PRIVATE_KEY` from Environment `steward-publication`; it never references or reads the
   probe suite's `STEWARD_APP_ID`, `STEWARD_APP_PRIVATE_KEY`, or `STEWARD_APP_CLIENT_ID`, and the pipeline never modifies those probe
@@ -897,9 +932,9 @@ evidence-branch pushes are NOT configured in M06 (a later installation concern; 
 
 ## Assumptions
 
-- The owner answered the gate on 2026-09-27 (all recommendations except Q9 C). The owner completes OA1–OA4 before the phase or step
-  each is "Needed first by" (OA1 org-public: phase 4 smoke; the rest: phase 5); the pipeline escalates with `needs-human` naming the
-  action if a verify command fails.
+- The owner answered the gate on 2026-09-27 (all recommendations except Q9 C). The owner reported OA1–OA4 complete on 2026-09-27
+  (OA1 and OA2 verified; OA3 and OA4 assumed done until the S16 and S15 runs prove them); the configuration stays in place through
+  phase 5, and the pipeline escalates with `needs-human` naming the action if a re-verify or the S15 or S16 run shows otherwise.
 - GitHub keeps the probed semantics (PA02–PA09) during the milestone; a deviation observed in a scenario is recorded verbatim and
   escalated, never worked around.
 - `actions/upload-artifact`, `actions/download-artifact`, `actions/checkout`, `actions/setup-node` current major versions (v7, v8, v7, v7
