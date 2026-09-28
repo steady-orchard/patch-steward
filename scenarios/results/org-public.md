@@ -287,3 +287,69 @@ RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidenc
 ```
 
 Result: pass
+
+## S03 title edit by the test App keeps the owner
+
+Date (UTC): 2026-09-28. The test App edited the title of pull request 34 (event sender the App's bot user); the owner
+from the S01 run was kept and nothing was committed: https://github.com/steady-orchard/patch-steward-testbed-public/pull/34.
+Run: https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36413617643.
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-pr-34
+ARTIFACT id=10964952587 name=steward-ownership-pr-34 created_at=2026-09-28T10:54:56Z expires_at=2026-12-27T10:54:17Z expired=false run_id=36412442107 size=536
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-pr-34 count=1 unexpired=1
+```
+
+```text
+$ A=$(gh api "repos/steady-orchard/patch-steward-testbed-public/actions/runs?per_page=1" --jq '.workflow_runs[0].id // 0'); echo "A=$A"
+A=36412957123
+```
+
+```text
+$ bash scenarios/tools/app-edit.sh steady-orchard/patch-steward-testbed-public pr 34 title "[scenario S01] unstructured pull request (title edited by the test App)"
+DISPATCH run_id=36413596940 url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36413596940
+APP-EDIT log=app-edit installation status=200
+APP-EDIT log=app-edit token status=201
+APP-EDIT log=app-edit title status=200
+APP-EDIT log=app-edit revoke status=204
+APP-EDIT repo=steady-orchard/patch-steward-testbed-public kind=pr number=34 operation=title run=36413596940 url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36413596940 result=ok
+```
+
+```text
+$ bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-pr.yml "steward pr 34 author 2095171 event pull_request_target edited sender 331019482 Bot" 36412957123 1
+RUN id=36413617643 attempt=1 event=pull_request_target status=completed conclusion=success created_at=2026-09-28T11:06:08Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36413617643 title=steward pr 34 author 2095171 event pull_request_target edited sender 331019482 Bot
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-pr.yml after=36412957123 count=1 completed=1 result=complete
+```
+
+```text
+$ gh run view 36413617643 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=skipped
+```
+
+```text
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36413617643 1 gate | grep -E 'text=(event |policy |listing |dedup |disposition |- )'
+LOG job=gate ts=2026-09-28T11:06:41.8477261Z text=event pull_request_target edited pr 34 sender Bot
+LOG job=gate ts=2026-09-28T11:06:41.8478341Z text=policy trusted-branch revision d997b1e362c75af03942da0e7a1e8902ca5dbe51
+LOG job=gate ts=2026-09-28T11:06:41.8479070Z text=listing unique owner 36412442107-1
+LOG job=gate ts=2026-09-28T11:06:41.8479724Z text=dedup duplicate owner-unchanged owner 36412442107-1
+LOG job=gate ts=2026-09-28T11:06:41.8612518Z text=- Submission: `steady-orchard/patch-steward-testbed-public` pull request `34`
+LOG job=gate ts=2026-09-28T11:06:41.8614089Z text=- Run: `36413617643-1`
+LOG job=gate ts=2026-09-28T11:06:41.8614819Z text=- Status: `duplicate`
+LOG job=gate ts=2026-09-28T11:06:41.8615910Z text=- Snapshot: `sha256:42947737e5cd63d5d6451df8952195498eab7d2d9f795b90b9cbfe7ad8bba4c1`
+LOG job=gate ts=2026-09-28T11:06:41.8617236Z text=- Policy revision: `d997b1e362c75af03942da0e7a1e8902ca5dbe51`
+LOG job=gate ts=2026-09-28T11:06:41.8617977Z text=- Owner: kept `36412442107-1`
+```
+
+```text
+$ bash scenarios/tools/artifacts.sh steady-orchard/patch-steward-testbed-public steward-ownership-pr-34
+ARTIFACT id=10964952587 name=steward-ownership-pr-34 created_at=2026-09-28T10:54:56Z expires_at=2026-12-27T10:54:17Z expired=false run_id=36412442107 size=536
+ARTIFACTS repo=steady-orchard/patch-steward-testbed-public name=steward-ownership-pr-34 count=1 unexpired=1
+```
+
+```text
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public pr 34
+RECORD run=36412442107-1 kind=outcome outcome=needs-changes run_id=36412442107 run_attempt=1 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:42947737e5cd63d5d6451df8952195498eab7d2d9f795b90b9cbfe7ad8bba4c1 findings=submission.unstructured
+RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public subject=pr-34 runs=1 supersessions=0
+```
+
+Result: pass
