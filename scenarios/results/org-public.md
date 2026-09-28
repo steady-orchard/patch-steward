@@ -876,3 +876,113 @@ RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidenc
 ```
 
 Result: pass
+
+## S10 issue: close by the author, reopen, close by the App
+
+Date (UTC): 2026-09-28. Issue https://github.com/steady-orchard/patch-steward-testbed-public/issues/35 was closed by its
+author, reopened, then closed by the test App; run
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36420190205 (author close), run
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36420321847 (reopen), run
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36420497173 (App-edit helper), run
+https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36420516188 (App close).
+
+```text
+$ A=36419421470; gh issue close 35 -R steady-orchard/patch-steward-testbed-public
+Closed issue steady-orchard/patch-steward-testbed-public#35 ([scenario S10] issue lifecycle (title edited))
+$ bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-issues.yml "steward issue 35 author 2095171 event issues closed sender 2095171 User" 36419421470 1
+RUN id=36420190205 attempt=1 event=issues status=completed conclusion=success created_at=2026-09-28T12:11:01Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36420190205 title=steward issue 35 author 2095171 event issues closed sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-issues.yml after=36419421470 count=1 completed=1 result=complete
+```
+
+```text
+$ A=36420190205; gh issue reopen 35 -R steady-orchard/patch-steward-testbed-public
+Reopened issue steady-orchard/patch-steward-testbed-public#35 ([scenario S10] issue lifecycle (title edited))
+$ bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-issues.yml "steward issue 35 author 2095171 event issues reopened sender 2095171 User" 36420190205 1
+RUN id=36420321847 attempt=1 event=issues status=completed conclusion=success created_at=2026-09-28T12:12:14Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36420321847 title=steward issue 35 author 2095171 event issues reopened sender 2095171 User
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-issues.yml after=36420190205 count=1 completed=1 result=complete
+```
+
+```text
+$ A=36420321847; bash scenarios/tools/app-edit.sh steady-orchard/patch-steward-testbed-public issue 35 close
+APP-EDIT log=app-edit installation status=200
+APP-EDIT log=app-edit token status=201
+APP-EDIT log=app-edit close status=200
+APP-EDIT log=app-edit revoke status=204
+APP-EDIT repo=steady-orchard/patch-steward-testbed-public kind=issue number=35 operation=close run=36420497173 url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36420497173 result=ok
+DISPATCH run_id=36420497173 url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36420497173
+$ bash scenarios/tools/await-runs.sh steady-orchard/patch-steward-testbed-public steward-issues.yml "steward issue 35 author 2095171 event issues closed sender 331019482 Bot" 36420321847 1
+RUN id=36420516188 attempt=1 event=issues status=completed conclusion=success created_at=2026-09-28T12:14:04Z url=https://github.com/steady-orchard/patch-steward-testbed-public/actions/runs/36420516188 title=steward issue 35 author 2095171 event issues closed sender 331019482 Bot
+AWAIT repo=steady-orchard/patch-steward-testbed-public workflow=steward-issues.yml after=36420321847 count=1 completed=1 result=complete
+```
+
+```text
+$ gh run view 36420190205 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36420190205 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:11:39.7591820Z text=event issues closed issue 35 sender User
+LOG job=gate ts=2026-09-28T12:11:39.7692056Z text=listing unique owner 36419421470-1
+LOG job=gate ts=2026-09-28T12:11:39.7692654Z text=disposition closure resolution closed-by-author
+LOG job=gate ts=2026-09-28T12:11:39.7704715Z text=- Status: `closure`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36420190205 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence|- Freshness)'
+LOG job=publish ts=2026-09-28T12:11:57.4854657Z text=evidence commit 954f529f3ef0771759918aac3c8e5de741ac45f5 rebuilds 0
+LOG job=publish ts=2026-09-28T12:11:57.4867700Z text=- Status: `closure`
+LOG job=publish ts=2026-09-28T12:11:57.4870306Z text=- Evidence: commit `954f529f3ef0771759918aac3c8e5de741ac45f5` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/metrics/2026-09/36420190205-1.json`
+```
+
+```text
+$ gh run view 36420321847 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36420321847 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:12:54.3414391Z text=event issues reopened issue 35 sender User
+LOG job=gate ts=2026-09-28T12:12:54.3416934Z text=listing unique owner 36419421470-1
+LOG job=gate ts=2026-09-28T12:12:54.3417568Z text=dedup commit reopened
+LOG job=gate ts=2026-09-28T12:12:54.3417976Z text=disposition early-exit
+LOG job=gate ts=2026-09-28T12:12:54.3550514Z text=- Status: `early-exit`
+LOG job=gate ts=2026-09-28T12:12:54.3553553Z text=- Owner: committed `36420321847-1`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36420321847 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence|- Freshness)'
+LOG job=publish ts=2026-09-28T12:13:22.4754476Z text=evidence commit 65655a344c5b3418f727785b6c9b9a6e71cd9471 rebuilds 0
+LOG job=publish ts=2026-09-28T12:13:22.4755714Z text=freshness settle 10000 ms
+LOG job=publish ts=2026-09-28T12:13:22.4756208Z text=freshness listing ok
+LOG job=publish ts=2026-09-28T12:13:22.4756625Z text=freshness current
+LOG job=publish ts=2026-09-28T12:13:22.4913413Z text=- Status: `needs-changes`
+LOG job=publish ts=2026-09-28T12:13:22.4917651Z text=- Evidence: commit `65655a344c5b3418f727785b6c9b9a6e71cd9471` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/runs/issue-35/36420321847-1`
+LOG job=publish ts=2026-09-28T12:13:22.4918779Z text=- Freshness: `current`
+```
+
+```text
+$ gh run view 36420516188 -R steady-orchard/patch-steward-testbed-public --json jobs --jq '[.jobs[] | .name + "=" + .conclusion] | sort | join(",")'
+screen / build=success,screen / gate=success,screen / publish=success
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36420516188 1 gate | grep -E 'text=(event |listing |dedup |disposition |- Status|- Owner)'
+LOG job=gate ts=2026-09-28T12:14:43.0781436Z text=event issues closed issue 35 sender Bot
+LOG job=gate ts=2026-09-28T12:14:43.0784950Z text=listing unique owner 36420321847-1
+LOG job=gate ts=2026-09-28T12:14:43.0786277Z text=disposition closure resolution closed-by-maintainer
+LOG job=gate ts=2026-09-28T12:14:43.0907872Z text=- Status: `closure`
+$ bash scenarios/tools/run-log.sh steady-orchard/patch-steward-testbed-public 36420516188 1 publish | grep -E 'text=(evidence commit |freshness |- Status|- Evidence|- Freshness)'
+LOG job=publish ts=2026-09-28T12:15:00.7268864Z text=evidence commit e616191ad61f982e3578a7062951631def0d63f8 rebuilds 0
+LOG job=publish ts=2026-09-28T12:15:00.7400581Z text=- Status: `closure`
+LOG job=publish ts=2026-09-28T12:15:00.7403661Z text=- Evidence: commit `e616191ad61f982e3578a7062951631def0d63f8` at `https://github.com/steady-orchard/patch-steward-testbed-public/tree/steward-evidence/steady-orchard/patch-steward-testbed-public/metrics/2026-09/36420516188-1.json`
+```
+
+```text
+$ bash scenarios/tools/run-records.sh metrics steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public 36420190205-1
+METRIC file=steady-orchard/patch-steward-testbed-public/metrics/2026-09/36420190205-1.json kind=maintainer-resolution subject=submission action_kind=resolution resolution=closed-by-author paired_run=36419421470-1 paired_snapshot=sha256:2fb97073c26f5050567ed137da8ce458827634d8242852d92ab40cabf87ef411
+METRICS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public run=36420190205-1 files=1 events=1
+$ bash scenarios/tools/run-records.sh metrics steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public 36420516188-1
+METRIC file=steady-orchard/patch-steward-testbed-public/metrics/2026-09/36420516188-1.json kind=maintainer-resolution subject=submission action_kind=resolution resolution=closed-by-maintainer paired_run=36420321847-1 paired_snapshot=sha256:2fb97073c26f5050567ed137da8ce458827634d8242852d92ab40cabf87ef411
+METRICS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public run=36420516188-1 files=1 events=1
+$ bash scenarios/tools/run-records.sh runs steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public issue 35
+RECORD run=36419197068-1 kind=outcome outcome=needs-changes run_id=36419197068 run_attempt=1 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:63159a0ef32616ae2d3df41ea502d0be66f6137f61b3cdcbe29b95d9f2e0edf3 findings=submission.unstructured
+RECORD run=36419421470-1 kind=outcome outcome=needs-changes run_id=36419421470 run_attempt=1 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:2fb97073c26f5050567ed137da8ce458827634d8242852d92ab40cabf87ef411 findings=submission.unstructured
+RECORD run=36420321847-1 kind=outcome outcome=needs-changes run_id=36420321847 run_attempt=1 policy_revision=d997b1e362c75af03942da0e7a1e8902ca5dbe51 snapshot=sha256:2fb97073c26f5050567ed137da8ce458827634d8242852d92ab40cabf87ef411 findings=submission.unstructured
+RECORDS store=steady-orchard/patch-steward-testbed-public branch=steward-evidence target=steady-orchard/patch-steward-testbed-public subject=issue-35 runs=3 supersessions=0
+$ bash scenarios/tools/evidence.sh steady-orchard/patch-steward-testbed-public steward-evidence steady-orchard/patch-steward-testbed-public issue 35
+EVIDENCE append_only=yes
+EVIDENCE run=36419197068-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36419421470-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE run=36420321847-1 kind=outcome outcome=needs-changes manifest=verified metrics=verified errors=0
+EVIDENCE target=steady-orchard/patch-steward-testbed-public subject=issue-35 runs=3 verified=3 result=ok
+$ gh issue view 35 -R steady-orchard/patch-steward-testbed-public --json state --jq .state
+CLOSED
+```
+
+Result: pass
