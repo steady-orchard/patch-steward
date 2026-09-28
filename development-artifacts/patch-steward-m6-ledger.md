@@ -106,7 +106,7 @@ updates Steps and appends Revisions.
 | 3.10 | 3 | done | packages/core/src/evidence/store-world.test.ts, development-artifacts/patch-steward-m6-3.10-report.md | d15bbae033fa3d12151f2eeac84798c5498c9dd6 |
 | 3.11 | 3 | done | packages/core/src/pipeline/hosted-world.test.ts, development-artifacts/patch-steward-m6-3.11-report.md | 239c1774571e6f33c1aa13537bdd762a0df543f0 |
 | 3.12 | 3 | done | packages/core/src/pipeline/job-summary.ts, packages/core/src/pipeline/job-summary.test.ts, development-artifacts/patch-steward-m6-3.12-report.md | 260df842d1f188c69f14c00f0d77784ecbc6999c |
-| 3.13 | 3 | pending | packages/core/src/pipeline/hosted-gate.ts, packages/core/src/pipeline/hosted-gate.test.ts, development-artifacts/patch-steward-m6-3.13-report.md | |
+| 3.13 | 3 | done | packages/core/src/pipeline/hosted-gate.ts, packages/core/src/pipeline/hosted-gate.test.ts, development-artifacts/patch-steward-m6-3.13-report.md | 9bb0a997b82a36cd1d29a6cff2876f08ddf4e3f0 |
 | 3.14 | 3 | done | packages/core/src/pipeline/hosted-evidence.ts, packages/core/src/pipeline/hosted-evidence.test.ts, development-artifacts/patch-steward-m6-3.14-report.md | 9af2ecd4bd037b67e151cf27c0111388dfc41e36 |
 | 3.15 | 3 | done | packages/core/src/pipeline/hosted-freshness.ts, packages/core/src/pipeline/hosted-freshness.test.ts, development-artifacts/patch-steward-m6-3.15-report.md | 48b5fdf93575c41d94d6fc0f497b0fdf41751f9b |
 | 3.16 | 3 | pending | packages/core/src/pipeline/hosted-publish.ts, packages/core/src/pipeline/hosted-publish.test.ts, development-artifacts/patch-steward-m6-3.16-report.md | |
