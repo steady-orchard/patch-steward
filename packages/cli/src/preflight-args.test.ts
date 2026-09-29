@@ -102,6 +102,19 @@ describe('parsePreflightArgs', () => {
     expect(result.code).toBe('usage.invalid-arguments');
   });
 
+  it('parses the run flag', () => {
+    const on = parsePreflightArgs(['--pr', '--draft', 'd.md', '--run']);
+    expect(on.ok && on.args.run).toBe(true);
+    const off = parsePreflightArgs(['--pr', '--draft', 'd.md']);
+    expect(off.ok && off.args.run).toBe(false);
+    const issue = parsePreflightArgs(['--issue', 'defect', '--draft', 'd.md', '--run']);
+    expect(issue.ok && issue.args.run).toBe(true);
+  });
+
+  it('usage line names the run flag', () => {
+    expect(PREFLIGHT_USAGE).toContain('[--run]');
+  });
+
   it('preflight args report whether JSON was requested on failure', () => {
     const withJson = parsePreflightArgs(['--pr', '--json']);
     expect(withJson.ok).toBe(false);
@@ -112,7 +125,7 @@ describe('parsePreflightArgs', () => {
     if (!withoutJson.ok) expect(withoutJson.json).toBe(false);
 
     expect(PREFLIGHT_USAGE).toBe(
-      'usage: steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--json]',
+      'usage: steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--run] [--json]',
     );
   });
 });

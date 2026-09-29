@@ -6,7 +6,9 @@ import { findingRecordSchema } from '../records/finding.js';
 import { decisionRecordSchema } from '../records/decision.js';
 import { policyRevisionRecord } from '../policy/revision-record.js';
 import { DEFAULT_CHECKLIST_POLICY } from '../submission/default-checklist.js';
+import { executionRecordSchema } from '../records/execution-record.js';
 import { findingTexts } from '../report/finding-templates.js';
+import { executedCommandItem, provenanceLines } from '../report/templates.js';
 import { buildCheckSummaryInput, buildReportInput, findingTemplateContext, paddedSubjects } from './report-input.js';
 import type { ReportRecordSources } from './report-input.js';
 
@@ -161,6 +163,46 @@ function baseSources(overrides: Partial<ReportRecordSources> = {}): ReportRecord
     ...overrides,
   };
 }
+
+function makeExecutionRecord(overrides: Record<string, unknown> = {}) {
+  return executionRecordSchema.parse({
+    schema_version: 1,
+    record_type: 'execution-record',
+    run_id: RUN_ID,
+    run_attempt: 1,
+    plan_entry: 'entry-1',
+    command: ['pnpm', 'test'],
+    environment: { image_digest: `sha256:${'b'.repeat(64)}`, tool_versions: [{ name: 'node', version: '24.0.0' }] },
+    exit: { code: 0, signal: null, timed_out: false },
+    output: { head: 'starting', tail: 'done', truncated: false, total_bytes: 100 },
+    result_files: [],
+    test_identity: 'unit',
+    commits: { head: 'c'.repeat(40), base: 'd'.repeat(40), merge: null },
+    admissibility: 'evidence',
+    ...overrides,
+  });
+}
+
+function junitResultFile(path: string, tests: number, passed: number) {
+  return {
+    path,
+    content_hash: `sha256:${'c'.repeat(64)}`,
+    bytes: 200,
+    format: 'junit-xml' as const,
+    status: 'parsed' as const,
+    error_code: null,
+    stored_path: 'executions/execution-0001/result-1.xml',
+    stored_omitted: false,
+    junit: { tests, passed, failed: tests - passed, errored: 0, skipped: 0, duration_ms: 10, cases: [], cases_truncated: true },
+  };
+}
+
+const RUNNER = {
+  runtime: 'docker',
+  serverVersion: '29.8.2',
+  reference: 'docker.io/library/busybox@0123456789ab',
+  imageDigest: `sha256:${'0123456789ab'.repeat(5)}0123`,
+};
 
 describe('report-input', () => {
   it('finding template context comes from the submission record', () => {
@@ -319,5 +361,67 @@ describe('report-input', () => {
     const withoutShared = baseSources();
     const summaryWithout = buildCheckSummaryInput(withoutShared);
     expect(summaryWithout.sharedHeadPullRequests).toEqual([]);
+  });
+
+  it('lists executed commands from execution records', () => {
+    const withJunit = makeExecutionRecord({
+      plan_entry: 'entry-1',
+      exit: { code: 1, signal: null, timed_out: true, oom_killed: true, output_limited: true },
+      timing: { started_at: '2026-09-27T10:15:00.000Z', finished_at: '2026-09-27T10:15:02.500Z', duration_ms: 2500 },
+      result_files: [junitResultFile('a.xml', 5, 4), junitResultFile('b.xml', 3, 3)],
+    });
+    const without = makeExecutionRecord({ plan_entry: 'entry-2', exit: { code: null, signal: 'SIGKILL', timed_out: false } });
+    const result = buildReportInput(baseSources({ executions: { records: [withJunit, without], runner: null } }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.executedCommands).toEqual([
+      executedCommandItem({
+        entryId: 'entry-1',
+        commit: 'c'.repeat(40),
+        exitCode: 1,
+        signal: null,
+        timedOut: true,
+        oomKilled: true,
+        outputLimited: true,
+        durationMs: 2500,
+        junit: { passed: 7, tests: 8 },
+      }),
+      executedCommandItem({
+        entryId: 'entry-2',
+        commit: 'c'.repeat(40),
+        exitCode: null,
+        signal: 'SIGKILL',
+        timedOut: false,
+        oomKilled: false,
+        outputLimited: false,
+        durationMs: 0,
+        junit: null,
+      }),
+    ]);
+  });
+
+  it('renders the runner provenance line', () => {
+    const result = buildReportInput(baseSources({ executions: { records: [makeExecutionRecord()], runner: RUNNER } }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.provenance).toMatchObject({ runner: RUNNER });
+    const lines = provenanceLines(result.value.provenance);
+    expect(lines.some((line) => line.startsWith('- Runner: ') && line.includes('docker') && line.includes('29.8.2'))).toBe(true);
+    expect(lines).not.toContain('- Runner: no execution in this run');
+  });
+
+  it('keeps the report input unchanged without executions', () => {
+    const result = buildReportInput(baseSources());
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.executedCommands).toEqual([]);
+    expect(result.value.provenance).not.toHaveProperty('runner');
+    expect(provenanceLines(result.value.provenance)).toContain('- Runner: no execution in this run');
   });
 });

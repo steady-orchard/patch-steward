@@ -341,4 +341,64 @@ describe('assembleRunRecords', () => {
 
     expect(result.value.policyRevision.authoritative).toBe(true);
   });
+
+  it('records execution facts in the run record', () => {
+    const prepared = prepareFindings(findings(), ctx);
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    const decisionResult = decideOutcome({
+      freshness: 'current',
+      capacity: 'available',
+      admission: 'not-required',
+      findings: decisionFindings(prepared.value),
+      causes: [],
+      requiredStages: ['references', 'claim'],
+      stageResults: [],
+      requirements: [],
+    });
+    expect(decisionResult.kind).toBe('outcome');
+    if (decisionResult.kind !== 'outcome') return;
+
+    const runnerIdentity = 'docker 29.8.2 docker.io/library/busybox@0123456789ab';
+    const result = assembleRunRecords({
+      ...baseAssemblyInput(decisionResult, prepared.value),
+      execution: { runnerIdentity, executions: 2, containerSeconds: 3.5 },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.run.runner_identity).toBe(runnerIdentity);
+    expect(result.value.run.budget.executions).toBe(2);
+    expect(result.value.run.budget.container_seconds).toBe(3.5);
+    const cost = result.value.metricsEvents.find((event) => event.kind === 'cost');
+    expect(cost?.payload).toEqual({ model_calls: 0, tokens: null, ai_credits: null, container_seconds: 3.5 });
+  });
+
+  it('keeps the run record unchanged without execution facts', () => {
+    const prepared = prepareFindings(findings(), ctx);
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    const decisionResult = decideOutcome({
+      freshness: 'current',
+      capacity: 'available',
+      admission: 'not-required',
+      findings: decisionFindings(prepared.value),
+      causes: [],
+      requiredStages: ['references', 'claim'],
+      stageResults: [],
+      requirements: [],
+    });
+    expect(decisionResult.kind).toBe('outcome');
+    if (decisionResult.kind !== 'outcome') return;
+
+    const result = assembleRunRecords(baseAssemblyInput(decisionResult, prepared.value));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.run.runner_identity).toBeNull();
+    expect(result.value.run.budget.executions).toBe(0);
+    expect(result.value.run.budget.container_seconds).toBe(0);
+    const cost = result.value.metricsEvents.find((event) => event.kind === 'cost');
+    expect(cost?.payload).toEqual({ model_calls: 0, tokens: null, ai_credits: null, container_seconds: 0 });
+  });
 });

@@ -1,0 +1,2 @@
+<!DOCTYPE testsuites>
+<testsuites><testsuite name="s"><testcase classname="c" name="t" time="0.1"/></testsuite></testsuites>

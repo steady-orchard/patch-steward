@@ -8,7 +8,8 @@ from the command line. The deterministic submission contract check, which
 `steward preflight` runs, reads the trusted and execution-sensitive paths,
 categories, submission settings, modes, and GitHub and attachment limits.
 [`steward screen`](commands.md#steward-screen-available) also applies the
-policy at contract level and writes [local evidence](#local-evidence-and-reports-available).
+policy, runs a pull request's mandatory commands in local Docker or Podman
+containers, and writes [local evidence](#local-evidence-and-reports-available).
 No screening stage runs yet, so sections marked Proposed describe settings
 whose effects are not implemented. [Policy keys](#policy-keys-available) lists every
 key.
@@ -73,24 +74,24 @@ control and Markdown characters escaped. At most 100 errors are reported. An
 invalid trusted policy makes every run `inconclusive`, and no default is
 substituted beyond the documented ones (see [Defaults](#defaults)).
 
-| Code                          | Meaning                                                                                                                                                                                                                                                                                 |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `policy.version-missing`      | `version` is absent.                                                                                                                                                                                                                                                                    |
-| `policy.version-unsupported`  | `version` is not `1`.                                                                                                                                                                                                                                                                   |
-| `policy.unknown-key`          | A key the schema does not define.                                                                                                                                                                                                                                                       |
-| `policy.missing-key`          | A required key is absent, including a provider-specific `llm` key.                                                                                                                                                                                                                      |
-| `policy.invalid-value`        | Wrong type, enumeration value, or format; a container platform on a non-Linux OS or with a `ci_workflow`; a `ci-signal` platform without one.                                                                                                                                           |
-| `policy.limit-out-of-bounds`  | A limit that is not an integer or lies outside its minimum and hard maximum.                                                                                                                                                                                                            |
-| `policy.undeclared-reference` | An `execution.platforms[].commands` entry that names no declared command, or a git-loaded `runner.image.path` that is absent from the loaded tree or not a regular file.                                                                                                                |
-| `policy.duplicate-id`         | A repeated id in a declaring list, or a repeated entry in one platform's `commands`.                                                                                                                                                                                                    |
-| `policy.invalid-path`         | A path or glob that is not repository-relative POSIX (leading `/`, `..` segment, backslash, control character, over 512 characters), a `runner.image.path` outside `.github/patch-steward/runner/`, or a `ci_workflow` that is not a `.yml` or `.yaml` file under `.github/workflows/`. |
-| `policy.llm-pairing`          | `auth.type`, `options`, or provider-specific limits that do not match the provider.                                                                                                                                                                                                     |
-| `policy.llm-base-url`         | An unacceptable `llm.options.base_url`.                                                                                                                                                                                                                                                 |
-| `policy.stage-conflict`       | `challenge` listed with `challenge_rounds: 0`, or `fix-verification` not matching `regression_test: required`.                                                                                                                                                                          |
-| `policy.label-name`           | An invalid or colliding label name.                                                                                                                                                                                                                                                     |
-| `policy.dismissal-code`       | An invalid, repeated, or built-in project code, an invalid definition, or too many codes.                                                                                                                                                                                               |
-| `policy.redaction-pattern`    | A pattern outside the safe subset, or too many patterns.                                                                                                                                                                                                                                |
-| `policy.credential-value`     | A key or string value that matches a built-in credential detector (the message names the key path, never the value).                                                                                                                                                                    |
+| Code                          | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `policy.version-missing`      | `version` is absent.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `policy.version-unsupported`  | `version` is not `1`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `policy.unknown-key`          | A key the schema does not define.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `policy.missing-key`          | A required key is absent, including a provider-specific `llm` key.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `policy.invalid-value`        | Wrong type, enumeration value, or format; a container platform on a non-Linux OS or with a `ci_workflow`; a `ci-signal` platform without one; a cross-field execution-limit rule broken (`limits.execution.output_head_bytes` plus `limits.execution.output_tail_bytes` above `limits.execution.output_bytes`; `limits.execution.output_stream_bytes` below `limits.execution.output_bytes`; `limits.execution.prepared_checkout_bytes` below `limits.execution.checkout_bytes`; a command's `result_files` list longer than `limits.execution.result_files`). |
+| `policy.limit-out-of-bounds`  | A limit that is not an integer or lies outside its minimum and hard maximum.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `policy.undeclared-reference` | An `execution.platforms[].commands` entry that names no declared command, or a git-loaded `runner.image.path` that is absent from the loaded tree or not a regular file.                                                                                                                                                                                                                                                                                                                                                                                       |
+| `policy.duplicate-id`         | A repeated id in a declaring list, or a repeated entry in one platform's `commands`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `policy.invalid-path`         | A path or glob that is not repository-relative POSIX (leading `/`, `..` segment, backslash, control character, over 512 characters), a `runner.image.path` outside `.github/patch-steward/runner/`, or a `ci_workflow` that is not a `.yml` or `.yaml` file under `.github/workflows/`.                                                                                                                                                                                                                                                                        |
+| `policy.llm-pairing`          | `auth.type`, `options`, or provider-specific limits that do not match the provider.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `policy.llm-base-url`         | An unacceptable `llm.options.base_url`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `policy.stage-conflict`       | `challenge` listed with `challenge_rounds: 0`, or `fix-verification` not matching `regression_test: required`.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `policy.label-name`           | An invalid or colliding label name.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `policy.dismissal-code`       | An invalid, repeated, or built-in project code, an invalid definition, or too many codes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `policy.redaction-pattern`    | A pattern outside the safe subset, or too many patterns.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `policy.credential-value`     | A key or string value that matches a built-in credential detector (the message names the key path, never the value).                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 | Code                  | Meaning                                              |
 | --------------------- | ---------------------------------------------------- |
@@ -138,19 +139,38 @@ and hard maximum fixed by the steward; a value outside them is rejected
 (`policy.limit-out-of-bounds`), never clamped — see
 [architecture §12](../architecture.md#12-resource-cost-and-failure-controls) for
 the bounds. Template values shown below are what the template writes, not
-defaults. `version` must be the integer `1`.
+defaults, except for `runner.resources.scratch_mb` and the `limits.execution.*`
+keys added for sandboxed execution, whose defaults equal their template values
+(see [Defaults](#defaults)). `version` must be the integer `1`.
 
 ### Defaults
 
-| Key                                      | Default               |
-| ---------------------------------------- | --------------------- |
-| `llm.admission`                          | `all`                 |
-| `submission.unrequested_change`          | `propose-first`       |
-| `submission.free_form`                   | `false`               |
-| `runner.network`                         | `none`                |
-| `policy_change`                          | `enforced`            |
-| `labels.status.<state>`                  | see [Labels](#labels) |
-| `labels.classification.<classification>` | see [Labels](#labels) |
+| Key                                        | Default               |
+| ------------------------------------------ | --------------------- |
+| `llm.admission`                            | `all`                 |
+| `submission.unrequested_change`            | `propose-first`       |
+| `submission.free_form`                     | `false`               |
+| `runner.network`                           | `none`                |
+| `policy_change`                            | `enforced`            |
+| `runner.resources.scratch_mb`              | `1024`                |
+| `limits.execution.output_head_bytes`       | `262144`              |
+| `limits.execution.output_tail_bytes`       | `786432`              |
+| `limits.execution.output_stream_bytes`     | `268435456`           |
+| `limits.execution.result_files`            | `5`                   |
+| `limits.execution.result_test_cases`       | `1000`                |
+| `limits.execution.checkout_bytes`          | `536870912`           |
+| `limits.execution.checkout_files`          | `100000`              |
+| `limits.execution.prepared_checkout_bytes` | `2147483648`          |
+| `limits.execution.overlay_files`           | `200`                 |
+| `limits.execution.overlay_bytes`           | `10485760`            |
+| `limits.execution.materialize_seconds`     | `300`                 |
+| `limits.execution.image_pull_seconds`      | `600`                 |
+| `limits.execution.image_build_seconds`     | `1800`                |
+| `limits.execution.image_bytes`             | `4294967296`          |
+| `limits.execution.build_context_bytes`     | `10485760`            |
+| `limits.execution.container_start_seconds` | `120`                 |
+| `labels.status.<state>`                    | see [Labels](#labels) |
+| `labels.classification.<classification>`   | see [Labels](#labels) |
 
 Every other key is required; no other default is substituted. The resolved
 policy records the effective value of every key.
@@ -488,8 +508,8 @@ fetches; an attachment whose URL does not show its format gets the warning
 | `execution.commands[].run`                   | non-empty argument vector                                 | Never interpreted by a shell.                                                                                                                                                                        |
 | `execution.commands[].working_directory`     | path                                                      | `.` means the repository root.                                                                                                                                                                       |
 | `execution.commands[].mandatory`             | boolean                                                   | Mandatory commands are never removed; impact analysis may add others.                                                                                                                                |
-| `execution.commands[].result_files[].path`   | path                                                      |                                                                                                                                                                                                      |
-| `execution.commands[].result_files[].format` | `junit-xml`                                               | The only accepted format so far.                                                                                                                                                                     |
+| `execution.commands[].result_files[].path`   | path                                                      | Relative to the repository root, not to the command's working directory.                                                                                                                             |
+| `execution.commands[].result_files[].format` | `junit-xml`                                               | JUnit XML, read by a bounded parser; statuses `parsed`, `missing`, `not-regular`, `too-large`, `malformed`.                                                                                          |
 | `execution.platforms[].id`                   | unique id                                                 | `policy.duplicate-id` on repeats.                                                                                                                                                                    |
 | `execution.platforms[].os`                   | `linux`, `windows`, or `macos`                            |                                                                                                                                                                                                      |
 | `execution.platforms[].required`             | boolean                                                   |                                                                                                                                                                                                      |
@@ -497,7 +517,35 @@ fetches; an attachment whose URL does not show its format gets the warning
 | `execution.platforms[].ci_workflow`          | `.yml`/`.yaml` path under `.github/workflows/`, or `null` | Required (non-null) for `ci-signal`; must be `null` for `container`, else `policy.invalid-value`.                                                                                                    |
 | `execution.platforms[].commands`             | non-empty list of declared command ids, each at most once | Each platform lists the ids of the declared commands it runs, or whose coverage its CI workflow stands for; an undeclared id is `policy.undeclared-reference`, a repeated one `policy.duplicate-id`. |
 
-> **[NEEDS INPUT]** Result-file parsing (only `junit-xml` is accepted as a format so far) and the rules for platform coverage beyond Linux containers are not specified.
+The exit status of every command is always recorded as primary evidence. A
+declared result file (a path relative to the repository root) is copied out of the container as a tar stream that must
+hold exactly one regular file of at most `limits.execution.result_file_bytes`:
+a symlink, directory, or other type is `not-regular` (never followed), absence
+is `missing`, overflow is `too-large`, an unparsable file is `malformed`,
+otherwise `parsed`; a command declares at most `limits.execution.result_files`
+files. JUnit XML is the only format (Vitest and Jest reporters, cargo-nextest,
+CTest `--output-junit`, GoogleTest, Node's test runner). The steward's own
+bounded, entity-free parser accepts UTF-8, skips the XML declaration, comments,
+CDATA, and processing instructions, rejects any `<!DOCTYPE` or `<!ENTITY` as
+malformed (`junit.doctype-forbidden`), decodes only the five predefined and
+numeric character references, and bounds nesting depth (64), elements per file
+(200000), attributes per element (64), attribute values (65536 characters), and
+test case identities (4096 characters, longer ones cut and flagged
+`identity_truncated`). The root is `testsuites` or `testsuite`; each test
+case's status comes from its children (error, then failure, then skipped, else
+pass); the identity is `<classname>::<name>` in document order, duplicates
+kept; counts (tests, passed, failed, errored, skipped, duration) are computed
+from the cases, never from suite attributes; the record lists the first
+`limits.execution.result_test_cases` cases. Nothing is classified: a missing or
+malformed declared file is recorded as such, and a non-zero exit is never
+turned into a finding. Submitted code can still control the test runner, exit
+status, and result files; parsing bounds protect the steward, not the honesty
+of results.
+
+Today, for a pull request, `steward screen` runs the mandatory commands of
+`source: container` platforms on the head commit; `ci-signal` platforms are not
+read yet. Platform coverage beyond Linux containers is an open design item
+(architecture §15).
 
 ### Runner
 
@@ -506,17 +554,103 @@ fetches; an attachment whose URL does not show its format gets the warning
 | `runner.image.source`                      | `registry` or `dockerfile`                            |                                                                                                               |
 | `runner.image.reference`                   | image reference                                       | Registry only; template value `docker.io/library/debian:stable-slim`.                                         |
 | `runner.image.path`                        | Dockerfile path under `.github/patch-steward/runner/` | Dockerfile only; must exist there as a regular file when loaded from git, else `policy.undeclared-reference`. |
-| `runner.dependency_step`                   | `null` or an object                                   | The only step with egress.                                                                                    |
+| `runner.dependency_step`                   | `null` or an object                                   | The only step with egress; runs first in its own container.                                                   |
 | `runner.dependency_step.run`               | argument vector                                       |                                                                                                               |
 | `runner.dependency_step.working_directory` | path                                                  |                                                                                                               |
 | `runner.resources.cpus`                    | bounded integer (vCPU)                                | Template `2`.                                                                                                 |
 | `runner.resources.memory_mb`               | bounded integer (MiB)                                 | Template `4096`.                                                                                              |
 | `runner.resources.pids`                    | bounded integer (processes)                           | Template `512`.                                                                                               |
+| `runner.resources.scratch_mb`              | bounded integer (MiB)                                 | Template `1024`, default `1024`; the `/tmp` tmpfs size, its pages count against `memory_mb`.                  |
 
 `runner.network` (default `none`, the only value): egress is limited to the
-declared dependency step.
+declared dependency step. Execution containers always run with network `none`.
 
-> **[NEEDS INPUT]** How the runner image is provided or generated, and the network and service policy for the dependency step, are not specified.
+Runtimes: Docker and Podman, each driven only through its command-line binary
+by argument vector (no socket API, no shell). `auto` (default) tries Docker,
+then Podman, and uses the first that reports a server; an explicit
+`--container-runtime docker` or `podman` uses only that runtime; none gives
+`runner.runtime-unavailable`. The server OS must be `linux`
+(`runner.runtime-not-linux`), every container runs `--platform linux/amd64`,
+and all limits must be enforceable (`runner.limits-unenforceable`). Supported
+hosts: Linux; Windows with Docker Desktop (WSL2) or a Podman machine; macOS with
+Docker Desktop or a Podman machine. Verified on Windows with Docker Desktop and
+with a Podman machine, and on Ubuntu with Docker (the CI container job run
+locally); the CI Podman leg has not run on GitHub yet; macOS is supported but
+untested. Container execution in GitHub-hosted runs is not implemented.
+
+- Runner image, `source: registry`: a public image pulled within
+  `limits.execution.image_pull_seconds`; a tag is resolved to the repository
+  digest at pull (a reference pinned with `@sha256:` must equal it, else
+  `runner.image-digest-mismatch`), and containers run as
+  `<repository>@<digest>`, never by tag. The steward never passes or stores
+  registry credentials and leaves the host runtime's own configuration
+  unchanged; private images are unsupported.
+- Runner image, `source: dockerfile`: the build context is the regular files of
+  `.github/patch-steward/runner/` at the loaded policy revision, read from git
+  objects, never from a working tree; a symlink or gitlink there is
+  `runner.build-context-invalid`; the archive is at most
+  `limits.execution.build_context_bytes`. The image is built for
+  `linux/amd64` with no build arguments, secrets, or SSH, on the runtime's
+  default build network, within `limits.execution.image_build_seconds`, and
+  tagged `patch-steward-runner:<runner tree id>` (the git tree id of `runner/`).
+  The redacted build output is stored as `logs/image-build.txt`.
+- Image cache: an existing image with that tag and the matching label is
+  reused. The steward never prunes images; remove one manually, for example
+  `docker image rm patch-steward-runner:<runner tree id>` (or
+  `podman image rm patch-steward-runner:<runner tree id>`). Image size is
+  checked after pull or build against `limits.execution.image_bytes`
+  (`runner.image-too-large`). Under `--policy-file` a `dockerfile` image is
+  unavailable (`runner.image-source-unavailable`); registry images work. Images
+  are never generated from toolchain lists, and image caching for GitHub-hosted
+  runs is not implemented.
+- Dependency step: runs first, in its own container on the materialized copy,
+  with the runtime's default network (unrestricted egress), no credentials, and
+  the same user and resource limits, bounded by
+  `limits.execution.dependency_step_seconds`. Afterwards `/work/checkout` is
+  exported as a tar stream bounded by `limits.execution.prepared_checkout_bytes`
+  (`runner.prepared-copy-too-large`) and copied into each network-none
+  execution container. It is recorded as an execution and counts against
+  `limits.execution.executions_per_run` and
+  `limits.execution.run_execution_seconds`. A non-zero exit or a timeout is the
+  environment failure `runner.dependency-step-failed`: the run ends
+  `inconclusive`. Stated risk: submitted install scripts reach whatever the host
+  network reaches (the internet, the local network, link-local metadata
+  endpoints, `host.docker.internal` on Docker Desktop), but the container holds
+  nothing to exfiltrate; destinations are not blocked. Prefer dependencies baked
+  into a runner image built from the trusted branch.
+- Services: version 1 supports no services for reproductions; one container per
+  execution, and a reproduction needing network or services ends `inconclusive`
+  with a request to reduce it. No policy key allows services.
+- Container profile: user 65532, read-only root filesystem, all capabilities
+  dropped, no new privileges, network `none`, limits from `runner.resources`,
+  no host environment, tokens, runtime socket, or bind mounts. The checkout is
+  copied into a labeled `/work` volume with `cp`, and `/tmp` is a tmpfs sized by
+  `runner.resources.scratch_mb`. The container, then the volume, is always
+  removed (a cleanup failure after 30000 ms is `runner.cleanup-failed`); only
+  the steward's own labeled objects are removed. Output is captured as one
+  stream: the first `limits.execution.output_head_bytes` and last
+  `limits.execution.output_tail_bytes` are kept, and reading stops the execution
+  (`output_limited`) at `limits.execution.output_stream_bytes`. Timeouts,
+  memory kills, and output limits are results; an entrypoint that cannot start is
+  `runner.start-failed`. Too-low limits fail closed as environment failures
+  (`inconclusive`).
+- Stated limitation: the `/work` volume has no portable disk quota, so writes
+  under `/work/checkout` during an execution are bounded only by time
+  (`limits.execution.execution_seconds`, or
+  `limits.execution.dependency_step_seconds` for the dependency step).
+- Podman differences: Podman cannot mount `/work` without copying image
+  content, so images meant for Podman must leave `/work` absent or empty; a
+  once-per-image probe refuses a non-empty `/work` with the environment failure
+  `runner.create-failed` and message `image-work-not-empty` (`inconclusive`).
+  Podman adds `/etc/passwd`, `/etc/group`, `/run/.containerenv`, and an empty
+  `/run/secrets` inside the container; these are runtime-generated, not host
+  mounts. With `--cap-drop ALL` the proof of no capabilities under Podman is
+  the five masks `CapInh`, `CapPrm`, `CapEff`, `CapBnd`, and `CapAmb` all being
+  zero. On Windows the Podman client falls back to `podman volume export` and
+  `podman export` where `cp -` to standard output is unavailable.
+
+See [architecture §12](../architecture.md#12-resource-cost-and-failure-controls)
+and [SP17](../processes.md#sp17-sandboxed-execution).
 
 ### Inference
 
@@ -584,41 +718,69 @@ Every `limits.*` key below is a bounded integer. `llm.limits`,
 `runner.resources`, and `evidence.retention_days` are bounded the same way; see
 their own subsections.
 
-| Key                                        | Value                      | Notes               |
-| ------------------------------------------ | -------------------------- | ------------------- |
-| `limits.execution.execution_seconds`       | integer (s)                | template `1800`     |
-| `limits.execution.run_execution_seconds`   | integer (s)                | template `7200`     |
-| `limits.execution.executions_per_run`      | integer (count)            | template `40`       |
-| `limits.execution.output_bytes`            | integer (bytes)            | template `1048576`  |
-| `limits.execution.result_file_bytes`       | integer (bytes)            | template `5242880`  |
-| `limits.execution.dependency_step_seconds` | integer (s)                | template `600`      |
-| `limits.caps.daily_runs`                   | integer (runs per UTC day) | template `50`       |
-| `limits.caps.per_author_concurrent_runs`   | integer (runs)             | template `2`        |
-| `limits.github.requests_per_run`           | integer (requests)         | template `300`      |
-| `limits.github.retries_per_request`        | integer (count)            | template `3`        |
-| `limits.attachments.count`                 | integer (files)            | template `5`        |
-| `limits.attachments.file_bytes`            | integer (bytes)            | template `1048576`  |
-| `limits.attachments.total_bytes`           | integer (bytes)            | template `5242880`  |
-| `limits.attachments.decompressed_bytes`    | integer (bytes)            | template `10485760` |
-| `limits.attachments.redirects`             | integer (count)            | template `3`        |
-| `limits.attachments.fetch_seconds`         | integer (s)                | template `20`       |
-| `limits.references.count`                  | integer (references)       | template `50`       |
-| `limits.references.fetches_per_run`        | integer (fetches)          | template `20`       |
-| `limits.references.fetch_seconds`          | integer (s)                | template `10`       |
-| `limits.references.fetch_bytes`            | integer (bytes)            | template `1048576`  |
-| `limits.references.redirects`              | integer (count)            | template `3`        |
-| `limits.evidence.run_bytes`                | integer (bytes)            | template `10485760` |
-| `limits.evidence.write_retries`            | integer (count)            | template `5`        |
-| `limits.stale_check_minutes`               | integer (min)              | template `1440`     |
-| `limits.stage_seconds`                     | integer (s)                | template `3600`     |
-| `limits.audit_samples_per_week`            | integer (runs)             | template `5`        |
+| Key                                        | Value                      | Notes                                                                                                           |
+| ------------------------------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `limits.execution.execution_seconds`       | integer (s)                | template `1800`                                                                                                 |
+| `limits.execution.run_execution_seconds`   | integer (s)                | template `7200`                                                                                                 |
+| `limits.execution.executions_per_run`      | integer (count)            | template `40`                                                                                                   |
+| `limits.execution.output_bytes`            | integer (bytes)            | template `1048576`                                                                                              |
+| `limits.execution.result_file_bytes`       | integer (bytes)            | template `5242880`                                                                                              |
+| `limits.execution.dependency_step_seconds` | integer (s)                | template `600`                                                                                                  |
+| `limits.execution.output_head_bytes`       | integer (bytes)            | template `262144`, default `262144`; first output bytes kept per execution                                      |
+| `limits.execution.output_tail_bytes`       | integer (bytes)            | template `786432`, default `786432`; last output bytes kept per execution                                       |
+| `limits.execution.output_stream_bytes`     | integer (bytes)            | template `268435456`, default `268435456`; output bytes read before the execution is stopped (`output_limited`) |
+| `limits.execution.result_files`            | integer (files)            | template `5`, default `5`; declared result files per command and files copied out per execution                 |
+| `limits.execution.result_test_cases`       | integer (test cases)       | template `1000`, default `1000`; test cases listed per result file (all are counted)                            |
+| `limits.execution.checkout_bytes`          | integer (bytes)            | template `536870912`, default `536870912`; checkout archive bytes                                               |
+| `limits.execution.checkout_files`          | integer (files)            | template `100000`, default `100000`; checkout entries                                                           |
+| `limits.execution.prepared_checkout_bytes` | integer (bytes)            | template `2147483648`, default `2147483648`; the dependency step's exported copy                                |
+| `limits.execution.overlay_files`           | integer (files)            | template `200`, default `200`; overlay entries                                                                  |
+| `limits.execution.overlay_bytes`           | integer (bytes)            | template `10485760`, default `10485760`; overlay content bytes                                                  |
+| `limits.execution.materialize_seconds`     | integer (s)                | template `300`, default `300`; fetch, object reads, and archive build per commit                                |
+| `limits.execution.image_pull_seconds`      | integer (s)                | template `600`, default `600`; registry pull                                                                    |
+| `limits.execution.image_build_seconds`     | integer (s)                | template `1800`, default `1800`; Dockerfile build                                                               |
+| `limits.execution.image_bytes`             | integer (bytes)            | template `4294967296`, default `4294967296`; image size after pull or build                                     |
+| `limits.execution.build_context_bytes`     | integer (bytes)            | template `10485760`, default `10485760`; `runner/` build context archive                                        |
+| `limits.execution.container_start_seconds` | integer (s)                | template `120`, default `120`; volume and container creation, copy-in, and start                                |
+| `limits.caps.daily_runs`                   | integer (runs per UTC day) | template `50`                                                                                                   |
+| `limits.caps.per_author_concurrent_runs`   | integer (runs)             | template `2`                                                                                                    |
+| `limits.github.requests_per_run`           | integer (requests)         | template `300`                                                                                                  |
+| `limits.github.retries_per_request`        | integer (count)            | template `3`                                                                                                    |
+| `limits.attachments.count`                 | integer (files)            | template `5`                                                                                                    |
+| `limits.attachments.file_bytes`            | integer (bytes)            | template `1048576`                                                                                              |
+| `limits.attachments.total_bytes`           | integer (bytes)            | template `5242880`                                                                                              |
+| `limits.attachments.decompressed_bytes`    | integer (bytes)            | template `10485760`                                                                                             |
+| `limits.attachments.redirects`             | integer (count)            | template `3`                                                                                                    |
+| `limits.attachments.fetch_seconds`         | integer (s)                | template `20`                                                                                                   |
+| `limits.references.count`                  | integer (references)       | template `50`                                                                                                   |
+| `limits.references.fetches_per_run`        | integer (fetches)          | template `20`                                                                                                   |
+| `limits.references.fetch_seconds`          | integer (s)                | template `10`                                                                                                   |
+| `limits.references.fetch_bytes`            | integer (bytes)            | template `1048576`                                                                                              |
+| `limits.references.redirects`              | integer (count)            | template `3`                                                                                                    |
+| `limits.evidence.run_bytes`                | integer (bytes)            | template `10485760`                                                                                             |
+| `limits.evidence.write_retries`            | integer (count)            | template `5`                                                                                                    |
+| `limits.stale_check_minutes`               | integer (min)              | template `1440`                                                                                                 |
+| `limits.stage_seconds`                     | integer (s)                | template `3600`                                                                                                 |
+| `limits.audit_samples_per_week`            | integer (runs)             | template `5`                                                                                                    |
 
 In a local run, `limits.evidence.run_bytes` bounds all bytes of a run
 directory plus its metrics file; `limits.evidence.write_retries` applies only
-to the future branch or repository store, since local writes never retry;
+to the branch or repository store of GitHub-hosted publication, since local writes never retry;
 `limits.stage_seconds` bounds each phase; `limits.github.*` bound the
 submission reads; `hygiene.max_flagged` also caps the report's flagged items
 (at most 10).
+
+Cross-field rules (`policy.invalid-value`, reported at the key path of the
+second key named): `limits.execution.output_head_bytes` plus
+`limits.execution.output_tail_bytes` is at most `limits.execution.output_bytes`
+(the stored output per execution); `limits.execution.output_stream_bytes` is at
+least `limits.execution.output_bytes`; `limits.execution.prepared_checkout_bytes`
+is at least `limits.execution.checkout_bytes`; every `result_files` list has at
+most `limits.execution.result_files` entries. `limits.stage_seconds` still bounds
+the execute phase although `limits.execution.run_execution_seconds` has a larger
+template value: the smaller bound applies. Each execution record records the
+limits applied. At template values, `limits.evidence.run_bytes` holds about seven
+executions with full output plus the fixed run files.
 
 ### Policy change and modes
 
@@ -825,9 +987,12 @@ user data directory, never inside the checkout by default:
     report.json                           rendered report and check summary
     report.md                             same text as report.json "rendered"
     findings/finding-0001.json            one per finding, decision order (absent when none)
-    executions/execution-0001.json        (absent when none; always absent at contract level)
+    executions/execution-0001.json        one per execution, plan order (absent when none)
+    executions/execution-0001/output.txt  redacted bounded output
+    executions/execution-0001/result-1.xml  stored redacted result file
     maintainer-actions/action-0001.json   (absent when none; always absent in local runs)
     logs/steward.txt                      redacted, bounded run log
+    logs/image-build.txt                  redacted Dockerfile build log, when built
   metrics/<YYYY-MM>/<run-id>.json         the run's metrics events (UTC month of the run start)
 ```
 
@@ -854,7 +1019,17 @@ so no partial run directory remains.
 Size caps: logs are truncated first (head and tail kept) to at most 1048576
 bytes per file and at most 16 files; at most 4096 files per run directory;
 records and the report over `limits.evidence.run_bytes` fail the write.
-`steward report` verifies a run directory against its manifest.
+Over `limits.evidence.run_bytes`, stored result files are dropped one at a
+time, the latest execution in plan order first and within it the highest
+result file number; a dropped entry keeps its status, hash, bytes, and summary
+and records `stored_omitted_reason` `evidence-budget`. A result file whose
+decoded text exceeds 8388608 bytes is not stored and records
+`stored_omitted_reason` `redaction-input`. Execution records and output files
+are never dropped; a run still over the limit then fails as before, and a run
+directory that would exceed 4096 files ends `evidence.too-many-files`.
+`steward report` verifies a run directory against its manifest, including that
+each execution's output file and result files are listed, referenced exactly
+once, and within bounds.
 
 ### Report layout and report caps
 
@@ -864,6 +1039,12 @@ activity, What would change the outcome, Provenance, after a header with
 outcome, causes, submission, snapshot, commits, policy revision, run, and
 notices. Every section is a list; an empty section reads `- None.`; values
 from the submission or GitHub appear as code spans.
+
+Each executed command is one item, for example
+`` `test` at `<first 12 hex of the head commit>`: exit `1`; `12.4` s; JUnit `40`/`42` passed ``.
+Whenever at least one execution record exists, the provenance line reads
+`- Runner: <runtime> <server version>, image <reference> (<digest first 12 hex>)`
+instead of `- Runner: no execution in this run`.
 
 Report caps are hard-only constants:
 

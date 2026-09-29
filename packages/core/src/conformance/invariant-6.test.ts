@@ -24,6 +24,7 @@ import type {
 } from '../net/attachment-fetch.js';
 import { contentHash } from '../hash.js';
 import { fixedClock, fixedRandom } from '../clock.js';
+import { emptyPlanExecution } from '../execution/executor.js';
 import { screenSubmission } from '../pipeline/screen.js';
 import { reportDenylistMatches, maskCodeSpans } from '../report/denylist.js';
 import {
@@ -515,7 +516,7 @@ describe('invariant 6: report wording and authorship', { timeout: 60000 }, () =>
 
     const dir = fileURLToPath(reportsDir());
     const files = readdirSync(dir).filter((name) => name.endsWith('.txt'));
-    expect(files.length).toBe(16);
+    expect(files.length).toBe(20);
     for (const file of files) {
       const text = readFileSync(join(dir, file), 'utf8').replace(/\r\n/g, '\n');
       expect(reportDenylistMatches(maskCodeSpans(text))).toEqual([]);
@@ -569,6 +570,7 @@ describe('invariant 6: report wording and authorship', { timeout: 60000 }, () =>
             attachmentResolver: fakeResolver(),
             attachmentTransport: fakeTransport(),
             clock: fixedClock('2026-09-27T10:15:00.000Z'),
+            execution: { executor: async ({ plan }) => emptyPlanExecution(plan) },
             random: fixedRandom('3f9a1c2e'),
           });
         }

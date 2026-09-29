@@ -68,6 +68,17 @@ export function executionFilePath(sequence: number): string {
   return `executions/${sequenceId('execution', sequence)}.json`;
 }
 
+export function executionOutputFilePath(sequence: number): string {
+  return `executions/${sequenceId('execution', sequence)}/output.txt`;
+}
+
+export function executionResultFilePath(sequence: number, position: number): string {
+  if (!Number.isInteger(position) || position < 1 || position > 20) {
+    throw new RangeError('executionResultFilePath: position must be an integer between 1 and 20');
+  }
+  return `executions/${sequenceId('execution', sequence)}/result-${position}.xml`;
+}
+
 export function maintainerActionFilePath(sequence: number): string {
   return `maintainer-actions/${sequenceId('action', sequence)}.json`;
 }
@@ -140,6 +151,8 @@ export function latestRunDirectoryName(
 
 const FINDING_FILE_PATTERN = /^findings\/finding-[0-9]{4}\.json$/;
 const EXECUTION_FILE_PATTERN = /^executions\/execution-[0-9]{4}\.json$/;
+const EXECUTION_OUTPUT_FILE_PATTERN = /^executions\/execution-[0-9]{4}\/output\.txt$/;
+const EXECUTION_RESULT_FILE_PATTERN = /^executions\/execution-[0-9]{4}\/result-(?:[1-9]|1[0-9]|20)\.xml$/;
 const MAINTAINER_ACTION_FILE_PATTERN = /^maintainer-actions\/action-[0-9]{4}\.json$/;
 const LOG_FILE_PATTERN = /^logs\/[a-z0-9][a-z0-9-]{0,63}\.txt$/;
 
@@ -170,6 +183,9 @@ export function recordTypeForPath(path: string): RecordType | null | undefined {
   }
   if (MAINTAINER_ACTION_FILE_PATTERN.test(path)) {
     return 'maintainer-action';
+  }
+  if (EXECUTION_OUTPUT_FILE_PATTERN.test(path) || EXECUTION_RESULT_FILE_PATTERN.test(path)) {
+    return null;
   }
   if (LOG_FILE_PATTERN.test(path)) {
     return null;

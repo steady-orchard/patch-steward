@@ -63,12 +63,21 @@ function setPath(obj: Record<string, unknown>, path: string, value: unknown): vo
   node[last] = value;
 }
 
+const MAXIMUM_COMPANIONS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  'limits.execution.output_head_bytes': { 'limits.execution.output_bytes': 8388608 },
+  'limits.execution.output_tail_bytes': { 'limits.execution.output_bytes': 8388608 },
+  'limits.execution.checkout_bytes': { 'limits.execution.prepared_checkout_bytes': 8589934592 },
+};
+
 const rows = [...POLICY_LIMITS];
 
 describe('policy limit bounds', () => {
   it.each(rows)('limit $path accepts the hard maximum', (row) => {
     const raw = baseFor(row.provider);
     setPath(raw, row.path, row.max);
+    for (const [companion, value] of Object.entries(MAXIMUM_COMPANIONS[row.path] ?? {})) {
+      setPath(raw, companion, value);
+    }
     const result = validatePolicy(raw);
     expect(result.ok).toBe(true);
   });

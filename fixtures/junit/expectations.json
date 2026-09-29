@@ -1,0 +1,79 @@
+{
+  "samples/vitest.xml": {
+    "status": "parsed",
+    "tests": 3,
+    "passed": 1,
+    "failed": 1,
+    "errored": 0,
+    "skipped": 1,
+    "duration_ms": 3,
+    "identities": ["src/math.test.ts::math > adds", "src/math.test.ts::math > subtracts", "src/math.test.ts::math > divides"]
+  },
+  "samples/jest-junit.xml": {
+    "status": "parsed",
+    "tests": 2,
+    "passed": 1,
+    "failed": 1,
+    "errored": 0,
+    "skipped": 0,
+    "duration_ms": 9,
+    "identities": ["math adds::math adds", "math subtracts::math subtracts"]
+  },
+  "samples/cargo-nextest.xml": {
+    "status": "parsed",
+    "tests": 3,
+    "passed": 1,
+    "failed": 1,
+    "errored": 0,
+    "skipped": 1,
+    "duration_ms": 30,
+    "identities": ["demo-crate::tests::adds", "demo-crate::tests::panics", "demo-crate::tests::ignored"]
+  },
+  "samples/ctest.xml": {
+    "status": "parsed",
+    "tests": 3,
+    "passed": 1,
+    "failed": 1,
+    "errored": 0,
+    "skipped": 1,
+    "duration_ms": 70,
+    "identities": ["unit_add::unit_add", "unit_fail::unit_fail", "unit_skip::unit_skip"]
+  },
+  "samples/googletest.xml": {
+    "status": "parsed",
+    "tests": 3,
+    "passed": 1,
+    "failed": 1,
+    "errored": 0,
+    "skipped": 1,
+    "duration_ms": 3,
+    "identities": ["MathTest::Adds", "MathTest::Fails", "MathTest::Skipped"]
+  },
+  "samples/node-test.xml": {
+    "status": "parsed",
+    "tests": 3,
+    "passed": 2,
+    "failed": 1,
+    "errored": 0,
+    "skipped": 0,
+    "duration_ms": 1,
+    "identities": ["test::adds", "test::works", "test::throws"]
+  },
+  "samples/generic.xml": {
+    "status": "parsed",
+    "tests": 4,
+    "passed": 1,
+    "failed": 1,
+    "errored": 1,
+    "skipped": 1,
+    "duration_ms": 2000,
+    "identities": ["pkg.Suite::passes", "pkg.Suite::errors", "pkg.Suite::fails", "pkg.Suite::skips"]
+  },
+  "hostile/doctype.xml": { "status": "malformed", "error_code": "junit.doctype-forbidden" },
+  "hostile/internal-entity.xml": { "status": "malformed", "error_code": "junit.doctype-forbidden" },
+  "hostile/external-entity.xml": { "status": "malformed", "error_code": "junit.doctype-forbidden" },
+  "hostile/billion-laughs.xml": { "status": "malformed", "error_code": "junit.doctype-forbidden" },
+  "hostile/unknown-entity.xml": { "status": "malformed", "error_code": "junit.entity-unknown" },
+  "hostile/deep-nesting.xml": { "status": "malformed", "error_code": "junit.too-deep" },
+  "hostile/attribute-flood.xml": { "status": "malformed", "error_code": "junit.too-many-attributes" }
+}

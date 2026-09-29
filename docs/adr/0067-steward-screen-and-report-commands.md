@@ -1,6 +1,6 @@
 # ADR-0067: `steward screen` and `steward report` commands
 
-- Status: accepted
+- Status: superseded by ADR-0088
 - Date: 2026-09-27
 - Deciders: project owner
 - Source: `docs/architecture.md` §6.5; `docs/processes.md` SP20; `docs/user-manual/commands.md` "`steward

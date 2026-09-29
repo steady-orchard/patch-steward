@@ -22,6 +22,7 @@ import { policyRevisionRecordSchema } from '../policy/revision-record.js';
 import type { PolicyRevisionRecord } from '../policy/revision-record.js';
 import { err, ok } from '../result.js';
 import type { Result } from '../result.js';
+import type { ExecutionRecord } from '../records/execution-record.js';
 
 export interface RunVerificationWarning {
   readonly code: 'report.metrics-missing';
@@ -233,6 +234,74 @@ export async function verifyRunDirectory(directory: string): Promise<Result<Veri
         return invalid('a record does not match its content hash', entry.path);
       }
       recordsByPath.set(entry.path, result.data);
+    }
+
+    const OUTPUT_PATTERN = /^executions\/execution-[0-9]{4}\/output\.txt$/;
+    const RESULT_PATTERN = /^executions\/execution-[0-9]{4}\/result-(?:[1-9]|1[0-9]|20)\.xml$/;
+    const referencedOutputs = new Map<string, number>();
+    const referencedResults = new Map<string, number>();
+    for (const entry of manifest.files) {
+      if (entry.record_type !== 'execution-record') {
+        continue;
+      }
+      const record = recordsByPath.get(entry.path) as ExecutionRecord;
+      const digits = /^executions\/execution-([0-9]{4})\.json$/.exec(entry.path)?.[1] ?? '';
+      if (record.admissibility === 'claim') {
+        return invalid('a claim record is stored', entry.path);
+      }
+      const outputStored = record.output.stored_path;
+      if (outputStored !== undefined) {
+        if (outputStored === null) {
+          return invalid('an execution record has no stored output file', entry.path);
+        }
+        if (outputStored !== `executions/execution-${digits}/output.txt`) {
+          return invalid('an output file is referenced by the wrong record', entry.path);
+        }
+        if (!listedPaths.has(outputStored)) {
+          return invalid('a referenced output file is not listed', outputStored);
+        }
+        referencedOutputs.set(outputStored, (referencedOutputs.get(outputStored) ?? 0) + 1);
+        let outputBytes: Buffer;
+        try {
+          outputBytes = await fs.readFile(path.join(dir, ...outputStored.split('/')));
+        } catch {
+          return invalid('a listed file is missing', outputStored);
+        }
+        try {
+          new TextDecoder('utf-8', { fatal: true }).decode(outputBytes);
+        } catch {
+          return invalid('an output file is not valid UTF-8', outputStored);
+        }
+        if (record.limits === undefined) {
+          return invalid('an execution record lacks its limits', entry.path);
+        }
+        if (outputBytes.length > record.limits.output_head_bytes + record.limits.output_tail_bytes + 128) {
+          return invalid('an output file exceeds its bound', outputStored);
+        }
+      }
+      for (const [index, resultFile] of record.result_files.entries()) {
+        if (resultFile.status !== undefined && resultFile.stored_omitted === undefined) {
+          return invalid('a result file entry lacks its storage state', entry.path);
+        }
+        const resultStored = resultFile.stored_path;
+        if (typeof resultStored === 'string') {
+          if (resultStored !== `executions/execution-${digits}/result-${index + 1}.xml`) {
+            return invalid('a result file is referenced by the wrong entry', entry.path);
+          }
+          if (!listedPaths.has(resultStored)) {
+            return invalid('a referenced result file is not listed', resultStored);
+          }
+          referencedResults.set(resultStored, (referencedResults.get(resultStored) ?? 0) + 1);
+        }
+      }
+    }
+    for (const listed of listedPaths) {
+      if (OUTPUT_PATTERN.test(listed) && referencedOutputs.get(listed) !== 1) {
+        return invalid('an output file is not referenced by its record', listed);
+      }
+      if (RESULT_PATTERN.test(listed) && referencedResults.get(listed) !== 1) {
+        return invalid('a result file is not referenced by its entry', listed);
+      }
     }
 
     const run = recordsByPath.get('run.json') as RunRecord | undefined;

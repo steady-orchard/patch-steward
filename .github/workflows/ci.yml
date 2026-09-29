@@ -76,3 +76,31 @@ jobs:
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  container-tests:
+    name: Container tests / ${{ matrix.runtime }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [docker, podman]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Container tests
+        run: pnpm test:container
+        env:
+          STEWARD_CONTAINER_RUNTIME: ${{ matrix.runtime }}
+      - name: Leak checks
+        if: always()
+        run: |
+          test -z "$(${{ matrix.runtime }} ps -a -q --filter label=org.patch-steward.test)"
+          test -z "$(${{ matrix.runtime }} volume ls -q --filter label=org.patch-steward.test)"
+          test -z "$(${{ matrix.runtime }} image ls -q --filter label=org.patch-steward.test)"

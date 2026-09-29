@@ -67,7 +67,7 @@ export const MAINTAINER_ACTION_KINDS = [
 export const maintainerActionKindSchema = z.enum(MAINTAINER_ACTION_KINDS);
 export type MaintainerActionKind = z.infer<typeof maintainerActionKindSchema>;
 
-export const ADMISSIBILITY_VALUES = ['evidence', 'signal'] as const;
+export const ADMISSIBILITY_VALUES = ['evidence', 'signal', 'claim'] as const;
 export const admissibilitySchema = z.enum(ADMISSIBILITY_VALUES);
 export type Admissibility = z.infer<typeof admissibilitySchema>;
 

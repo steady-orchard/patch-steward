@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { RECORD_IDENTIFIER_MAX_LENGTH } from '../policy/bounds.js';
 import { modeSchema, submissionTypeSchema } from '../vocabulary.js';
 
 import {
@@ -14,6 +15,32 @@ import {
   recordTimestampSchema,
   recordCountSchema,
 } from './common.js';
+
+export const runnerIdentitySchema = z
+  .string()
+  .min(1)
+  .max(RECORD_IDENTIFIER_MAX_LENGTH)
+  .regex(/^[!-~]+(?: [!-~]+)*$/);
+
+export interface RunnerIdentityInput {
+  readonly runtime: 'docker' | 'podman';
+  readonly serverVersion: string;
+  readonly reference: string;
+  readonly imageDigest: string;
+}
+
+export function formatRunnerIdentity(input: RunnerIdentityInput): string {
+  const d = input.imageDigest.slice('sha256:'.length, 'sha256:'.length + 12);
+  const prefix = `${input.runtime} ${input.serverVersion} `;
+  const suffix = `@${d}`;
+  const full = `${prefix}${input.reference}${suffix}`;
+  if (full.length <= RECORD_IDENTIFIER_MAX_LENGTH) {
+    return full;
+  }
+  const ellipsis = '...';
+  const l = RECORD_IDENTIFIER_MAX_LENGTH - prefix.length - suffix.length - ellipsis.length;
+  return `${prefix}${input.reference.slice(0, l)}${ellipsis}${suffix}`;
+}
 
 export const runRecordSchema = z.strictObject({
   schema_version: recordSchemaVersionSchema,
@@ -52,7 +79,7 @@ export const runRecordSchema = z.strictObject({
       temperature: z.number().min(0).max(2).nullable(),
     })
     .nullable(),
-  runner_identity: recordIdentifierSchema.nullable(),
+  runner_identity: runnerIdentitySchema.nullable(),
   mode: modeSchema,
   started_at: recordTimestampSchema,
   finished_at: recordTimestampSchema.nullable(),

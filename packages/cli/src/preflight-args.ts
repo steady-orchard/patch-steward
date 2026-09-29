@@ -4,7 +4,7 @@ import type { GitHubRepositoryRef, IssueKind } from '@patch-steward/core';
 import { ISSUE_KINDS, repositoryRefFromFullName } from '@patch-steward/core';
 
 export const PREFLIGHT_USAGE =
-  'usage: steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--json]';
+  'usage: steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--run] [--json]';
 
 export const PREFLIGHT_USAGE_CODES = ['usage.unknown-option', 'usage.invalid-arguments', 'usage.conflicting-options'] as const;
 
@@ -17,6 +17,7 @@ export interface PreflightArgs {
   readonly draft: string;
   readonly repository: GitHubRepositoryRef | null;
   readonly base: string | null;
+  readonly run: boolean;
   readonly json: boolean;
 }
 
@@ -27,7 +28,7 @@ export type PreflightArgsResult =
 export function parsePreflightArgs(argv: readonly string[]): PreflightArgsResult {
   const json = argv.includes('--json');
 
-  let values: { issue?: string; pr?: boolean; draft?: string; repo?: string; base?: string; json?: boolean };
+  let values: { issue?: string; pr?: boolean; draft?: string; repo?: string; base?: string; run?: boolean; json?: boolean };
   try {
     ({ values } = parseArgs({
       args: [...argv],
@@ -37,6 +38,7 @@ export function parsePreflightArgs(argv: readonly string[]): PreflightArgsResult
         draft: { type: 'string' },
         repo: { type: 'string' },
         base: { type: 'string' },
+        run: { type: 'boolean' },
         json: { type: 'boolean' },
       },
       strict: true,
@@ -91,6 +93,7 @@ export function parsePreflightArgs(argv: readonly string[]): PreflightArgsResult
       draft: values.draft,
       repository,
       base: values.base ?? null,
+      run: values.run === true,
       json: values.json === true,
     },
   };

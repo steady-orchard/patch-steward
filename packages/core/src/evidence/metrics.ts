@@ -20,6 +20,7 @@ export interface RunMetricsInput {
   readonly phases: readonly RunPhaseLatency[];
   readonly finishedAt: string;
   readonly outcome: Outcome;
+  readonly containerSeconds?: number;
 }
 
 export type RunMetricsFailureCode = 'evidence.record-invalid';
@@ -50,7 +51,7 @@ export function buildRunMetricsEvents(input: RunMetricsInput): Result<readonly M
       subject,
       recorded_at: input.finishedAt,
       kind: 'cost',
-      payload: { model_calls: 0, tokens: null, ai_credits: null, container_seconds: 0 },
+      payload: { model_calls: 0, tokens: null, ai_credits: null, container_seconds: input.containerSeconds ?? 0 },
     },
     {
       schema_version: 1,

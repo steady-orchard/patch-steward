@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { publishRunEvidence } from './publish.js';
-import type { RunEvidenceInput } from './publish.js';
+import type { RunEvidenceInput, RunExecutionEvidence } from './publish.js';
 import { prepareFindings, decisionFindings } from './assemble.js';
 import type { RunAssemblyInput } from './assemble.js';
 import type { HandoffFinding } from '../pipeline/handoff.js';
@@ -24,6 +24,12 @@ import { reportDenylistMatches, maskCodeSpans } from '../report/denylist.js';
 import { reportCharacterViolations, reportFixedTextViolations } from '../report/escape.js';
 import { findCredentialDetector } from '../redaction/detectors.js';
 import type { Outcome } from '../vocabulary.js';
+import { OutputCaptureBuffer } from '../execution/output-capture.js';
+import type { ExecutionPlanEntry } from '../execution/plan.js';
+import { executionResultsTransportSchema } from '../execution/transport.js';
+import { buildCompletedExecution } from '../runner/record.js';
+import type { ExecutionRecordFacts } from '../runner/record.js';
+import type { RecordCause } from '../records/decision.js';
 
 const RUN_ID = 'local-20260927T101500Z-3f9a1c2e';
 const STARTED_AT = '2026-09-27T10:15:00.000Z';
@@ -138,6 +144,8 @@ interface BuildOptions {
   readonly findings: readonly HandoffFinding[];
   readonly classification: ClassificationInput;
   readonly loadedPolicy?: LoadedPolicy;
+  readonly causes?: readonly RecordCause[];
+  readonly executions?: RunExecutionEvidence;
 }
 
 function buildCaseInput(evidenceDir: string, opts: BuildOptions): RunEvidenceInput {
@@ -170,7 +178,7 @@ function buildCaseInput(evidenceDir: string, opts: BuildOptions): RunEvidenceInp
     capacity: 'available',
     admission: 'not-required',
     findings: decisionFindings(prepared.value),
-    causes: [],
+    causes: opts.causes ?? [],
     requiredStages: requiredStages(requiredStagesInput, loadedPolicy.policy.stages.per_category),
     stageResults: [],
     requirements: [],
@@ -207,7 +215,101 @@ function buildCaseInput(evidenceDir: string, opts: BuildOptions): RunEvidenceInp
     credentials: [],
     localRun: true,
     createdAt: CREATED_AT,
+    ...(opts.executions !== undefined ? { executions: opts.executions } : {}),
   };
+}
+
+const EXEC_RUNNER = {
+  runtime: 'docker' as const,
+  serverVersion: '29.8.2',
+  reference: 'docker.io/library/debian:stable-slim',
+  imageDigest: 'sha256:' + 'ab12cd34ef56'.repeat(5) + 'ab12',
+};
+
+const JUNIT_TWO_CASES =
+  '<testsuites><testsuite name="s"><testcase classname="c" name="passes"/>' +
+  '<testcase classname="c" name="fails"><failure message="boom"/></testcase></testsuite></testsuites>';
+
+function executedHeadTest() {
+  const enc = new TextEncoder();
+  const buffer = new OutputCaptureBuffer({ headBytes: 262144, tailBytes: 786432, streamBytes: 268435456 });
+  buffer.push(enc.encode('ok\n'));
+  const entry = {
+    id: 'head-test',
+    kind: 'command',
+    command_id: 'test',
+    run: ['npm', 'test'],
+    working_directory: '.',
+    commit_role: 'head',
+    commit: HEAD_COMMIT,
+    overlay: 'none',
+    expected: 'exit-zero',
+    network: 'none',
+    result_files: [{ path: 'junit.xml', format: 'junit-xml' as const }],
+  } as ExecutionPlanEntry;
+  return buildCompletedExecution({
+    runId: RUN_ID as ExecutionRecordFacts['runId'],
+    runAttempt: 1,
+    entry,
+    runner: 'container',
+    environment: {
+      image_digest: EXEC_RUNNER.imageDigest,
+      tool_versions: [
+        { name: 'docker-client', version: '29.8.2' },
+        { name: 'docker-server', version: '29.8.2' },
+      ],
+      runtime: { name: 'docker', client_version: '29.8.2', server_version: '29.8.2', os: 'linux', arch: 'amd64' },
+      image: {
+        source: 'registry',
+        reference: EXEC_RUNNER.reference,
+        digest: EXEC_RUNNER.imageDigest,
+        id: 'sha256:' + 'e'.repeat(64),
+        runner_tree_id: null,
+        cached: false,
+      },
+      platform: 'linux/amd64',
+      network: 'none',
+    } as ExecutionRecordFacts['environment'],
+    limits: {
+      execution_seconds: 1800,
+      output_head_bytes: 262144,
+      output_tail_bytes: 786432,
+      output_stream_bytes: 268435456,
+      cpus: 2,
+      memory_mb: 4096,
+      pids: 512,
+      scratch_mb: 1024,
+    } as ExecutionRecordFacts['limits'],
+    timing: {
+      started_at: '2026-09-27T10:15:01.000Z',
+      finished_at: '2026-09-27T10:15:13.400Z',
+      duration_ms: 12400,
+    } as ExecutionRecordFacts['timing'],
+    exit: { code: 1, signal: null, timedOut: false, oomKilled: false, outputLimited: false },
+    capture: buffer.result(),
+    resultFiles: [{ kind: 'file', bytes: enc.encode(JUNIT_TWO_CASES) }],
+    resultTestCases: 1000,
+    checkout: null,
+  });
+}
+
+const ENVIRONMENT_CAUSE: RecordCause = {
+  cause: 'environment-unavailable',
+  code: 'runner.runtime-unavailable',
+  message: 'An execution environment failure stopped the plan.',
+  subjects: [],
+} as RecordCause;
+
+function executionTransport(results: readonly unknown[], causes: readonly RecordCause[]) {
+  return executionResultsTransportSchema.parse({
+    transport: 'execution-results',
+    transport_version: 1,
+    run: { run_id: RUN_ID, run_attempt: 1 },
+    snapshot_hash: SNAPSHOT_HASH,
+    policy_revision: trustedPolicy.revision.id,
+    results,
+    causes,
+  });
 }
 
 function attachmentViolationFinding(detail: string, subjects: string[]): HandoffFinding {
@@ -416,6 +518,53 @@ const CASES: readonly GoldenCase[] = [
           attachmentViolationFinding('destination', [HOSTILE_URL]),
         ],
         classification: DEFAULT_PR_CLASSIFICATION,
+      }),
+  },
+  {
+    name: 'pr-executed',
+    outcome: 'inconclusive',
+    nonAuthoritative: false,
+    reportExtra: [
+      '`head-test` at `' + HEAD_COMMIT.slice(0, 12) + '`: exit `1`; `12.4` s; JUnit `1`/`2` passed',
+      '- Runner: `docker` `29.8.2`, image `docker.io/library/debian:stable-slim` (`' + EXEC_RUNNER.imageDigest.slice(7, 19) + '`)',
+    ],
+    summaryExtra: [],
+    reportExcludes: ['- Runner: no execution in this run'],
+    build: (dir) =>
+      buildCaseInput(dir, {
+        submission: makePrSubmission(),
+        findings: [],
+        classification: DEFAULT_PR_CLASSIFICATION,
+        executions: {
+          results: executionTransport([executedHeadTest()], []),
+          runner: EXEC_RUNNER,
+          buildLog: null,
+          containerSeconds: 12.4,
+        },
+      }),
+  },
+  {
+    name: 'pr-execution-environment-failure',
+    outcome: 'inconclusive',
+    nonAuthoritative: false,
+    reportExtra: ['The execution environment was unavailable.', '- Runner: no execution in this run'],
+    summaryExtra: [],
+    reportExcludes: [],
+    build: (dir) =>
+      buildCaseInput(dir, {
+        submission: makePrSubmission(),
+        findings: [],
+        classification: DEFAULT_PR_CLASSIFICATION,
+        causes: [ENVIRONMENT_CAUSE],
+        executions: {
+          results: executionTransport(
+            [{ kind: 'environment-failure', entry_id: 'head-test', code: 'runner.runtime-unavailable', subject: null }],
+            [ENVIRONMENT_CAUSE],
+          ),
+          runner: null,
+          buildLog: null,
+          containerSeconds: 0,
+        },
       }),
   },
 ];

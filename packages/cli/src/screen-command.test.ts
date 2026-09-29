@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { AttachmentAddress, AttachmentTransportResponse, DecisionResult } from '@patch-steward/core';
+import type { AttachmentAddress, AttachmentTransportResponse, DecisionResult, ScreenDeps } from '@patch-steward/core';
 import { fixedClock, fixedRandom, screenSubmission } from '@patch-steward/core';
 
 import { PREFLIGHT_UNAUTHENTICATED_WARNING } from './preflight-command.js';
@@ -634,5 +634,65 @@ describe('runScreenCommand', { timeout: 60000 }, () => {
     const parsed = JSON.parse(r.stdout) as { errors: { code: string; path: string; message: string }[]; outcome: unknown };
     expect(parsed.errors[0]).toEqual({ code: 'steward.internal-error', path: '', message: SCREEN_INTERNAL_ERROR_MESSAGE });
     expect(parsed.outcome).toBeNull();
+  });
+
+  async function captureDeps(
+    extra: readonly string[],
+    env?: Record<string, string>,
+  ): Promise<{ deps: ScreenDeps[]; env: Record<string, string> }> {
+    const tmp = makeTmpDir();
+    const ev = path.join(tmp, 'evidence');
+    const deps: ScreenDeps[] = [];
+    const commandEnv = env ?? { GH_TOKEN: 'token-a' };
+    await run(
+      [
+        '--issue',
+        '29',
+        '--repo',
+        'steady-orchard/patch-steward-testbed-public',
+        '--policy-file',
+        TEMPLATE,
+        '--evidence-dir',
+        ev,
+        ...extra,
+      ],
+      {
+        cwd: tmp,
+        env: commandEnv,
+        fetch: makeFetch(testbedRoutes(UNSTRUCTURED_BODY)) as never,
+        screen: (d) => {
+          deps.push(d);
+          return screenSubmission(d);
+        },
+      },
+    );
+    return { deps, env: commandEnv };
+  }
+
+  it('passes the container runtime choice to the screen', async () => {
+    const chosen = await captureDeps(['--container-runtime', 'podman']);
+    expect(chosen.deps.length).toBe(1);
+    expect(chosen.deps[0]?.execution?.runtime).toBe('podman');
+    const byDefault = await captureDeps([]);
+    expect(byDefault.deps[0]?.execution?.runtime).toBe('auto');
+  });
+
+  it('passes the command environment to the screen', async () => {
+    const captured = await captureDeps([], { GH_TOKEN: 'token-b' });
+    expect(captured.deps[0]?.execution?.hostEnv).toBe(captured.env);
+  });
+
+  it('rejects an unknown container runtime with exit 2', async () => {
+    const tmp = makeTmpDir();
+    let calls = 0;
+    const r = await run(['--issue', '29', '--container-runtime', 'nerdctl'], {
+      cwd: tmp,
+      screen: async (d) => {
+        calls += 1;
+        return screenSubmission(d);
+      },
+    });
+    expect(r.exit).toBe(2);
+    expect(calls).toBe(0);
   });
 });

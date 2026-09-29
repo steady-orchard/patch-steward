@@ -4,7 +4,9 @@ import type { FindingRecord } from '../records/finding.js';
 import type { DecisionRecord } from '../records/decision.js';
 import type { PolicyRevisionRecord } from '../policy/revision-record.js';
 import type { ResolvedPolicy } from '../policy/schema.js';
-import type { ClassificationInput, ProvenanceInput } from '../report/templates.js';
+import type { ExecutionRecord } from '../records/execution-record.js';
+import { executedCommandItem } from '../report/templates.js';
+import type { ClassificationInput, ExecutedCommandInput, ProvenanceInput, RunnerProvenanceInput } from '../report/templates.js';
 import type { ReportInput, ReportFindingItem } from '../report/render.js';
 import type { CheckSummaryInput } from '../report/summary.js';
 import type { FindingTemplateContext } from '../report/finding-templates.js';
@@ -26,6 +28,7 @@ export interface ReportRecordSources {
   readonly subjectTotals: readonly number[];
   readonly localRun: boolean;
   readonly storePath: string;
+  readonly executions?: { readonly records: readonly ExecutionRecord[]; readonly runner: RunnerProvenanceInput | null };
 }
 
 export type ReportInputFailureCode = 'report.template-missing';
@@ -68,6 +71,30 @@ function provenanceFor(revision: PolicyRevisionRecord['revision'], stewardVersio
     source: 'local-file',
     policyRevision: revision.id,
     stewardVersion,
+  };
+}
+
+function executedCommandInput(record: ExecutionRecord): ExecutedCommandInput {
+  let passed = 0;
+  let tests = 0;
+  let hasJunit = false;
+  for (const file of record.result_files) {
+    if (file.junit !== null && file.junit !== undefined) {
+      hasJunit = true;
+      passed += file.junit.passed;
+      tests += file.junit.tests;
+    }
+  }
+  return {
+    entryId: record.plan_entry,
+    commit: record.commits.head,
+    exitCode: record.exit.code,
+    signal: record.exit.signal,
+    timedOut: record.exit.timed_out,
+    oomKilled: record.exit.oom_killed ?? false,
+    outputLimited: record.exit.output_limited ?? false,
+    durationMs: record.timing?.duration_ms ?? 0,
+    junit: hasJunit ? { passed, tests } : null,
   };
 }
 
@@ -116,7 +143,10 @@ export function buildReportInput(sources: ReportRecordSources): Result<ReportInp
     runAttempt: sources.run.run_attempt,
   };
 
-  const provenance = provenanceFor(sources.policyRevision.revision, sources.run.steward_version);
+  const baseProvenance = provenanceFor(sources.policyRevision.revision, sources.run.steward_version);
+  const runner = sources.executions?.runner ?? null;
+  const provenance: ProvenanceInput = runner === null ? baseProvenance : { ...baseProvenance, runner };
+  const executedCommands = (sources.executions?.records ?? []).map((record) => executedCommandItem(executedCommandInput(record)));
 
   return ok({
     header,
@@ -124,7 +154,7 @@ export function buildReportInput(sources: ReportRecordSources): Result<ReportInp
     classification: sources.classification,
     findings: items,
     causes: sources.decision.causes ?? [],
-    executedCommands: [],
+    executedCommands,
     references: [],
     flagged: [],
     maxFlagged: sources.policyRevision.policy.hygiene.max_flagged,

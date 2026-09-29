@@ -250,7 +250,7 @@ describe('runPreflightCommand', () => {
     expect(r.stdout).toBe('');
     expect(r.stderr).toBe(
       'error usage.conflicting-options -: --issue and --pr cannot be used together\n' +
-        'usage: steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--json]\n',
+        'usage: steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--run] [--json]\n',
     );
 
     const seen2: Seen[] = [];

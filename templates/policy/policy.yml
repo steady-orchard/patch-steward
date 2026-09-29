@@ -116,6 +116,7 @@ runner:
     cpus: 2
     memory_mb: 4096
     pids: 512
+    scratch_mb: 1024
 
 llm:
   provider: copilot-sdk
@@ -168,6 +169,22 @@ limits:
     output_bytes: 1048576
     result_file_bytes: 5242880
     dependency_step_seconds: 600
+    output_head_bytes: 262144
+    output_tail_bytes: 786432
+    output_stream_bytes: 268435456
+    result_files: 5
+    result_test_cases: 1000
+    checkout_bytes: 536870912
+    checkout_files: 100000
+    prepared_checkout_bytes: 2147483648
+    overlay_files: 200
+    overlay_bytes: 10485760
+    materialize_seconds: 300
+    image_pull_seconds: 600
+    image_build_seconds: 1800
+    image_bytes: 4294967296
+    build_context_bytes: 10485760
+    container_start_seconds: 120
   attachments:
     count: 5
     file_bytes: 1048576

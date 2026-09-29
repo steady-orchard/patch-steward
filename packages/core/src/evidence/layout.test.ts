@@ -8,6 +8,8 @@ import { LOCAL_RUN_ID_PATTERN } from '../records/common.js';
 import {
   RUN_FILES,
   executionFilePath,
+  executionOutputFilePath,
+  executionResultFilePath,
   findingFilePath,
   findingId,
   latestRunDirectoryName,
@@ -146,5 +148,29 @@ describe('evidence layout', () => {
   it('run directory selection ignores other names', () => {
     const names = ['supersessions', '.staging', 'local-20260927T101500Z-3f9a1c2e', '0-1', '01-1', '1-0', '99999999999999999999-1'];
     expect(latestRunDirectoryName(names)).toBeNull();
+  });
+
+  it('builds execution output and result file paths', () => {
+    expect(executionOutputFilePath(1)).toBe('executions/execution-0001/output.txt');
+    expect(executionResultFilePath(12, 3)).toBe('executions/execution-0012/result-3.xml');
+    expect(() => executionResultFilePath(1, 0)).toThrow(RangeError);
+    expect(() => executionResultFilePath(1, 21)).toThrow(RangeError);
+  });
+
+  it('lists execution output and result files as non-records', () => {
+    expect(recordTypeForPath('executions/execution-0001/output.txt')).toBeNull();
+    expect(recordTypeForPath('executions/execution-0001/result-1.xml')).toBeNull();
+    expect(recordTypeForPath('executions/execution-0001/result-20.xml')).toBeNull();
+    for (const p of [
+      'executions/execution-0001/result-0.xml',
+      'executions/execution-0001/result-21.xml',
+      'executions/execution-0001/result-01.xml',
+      'executions/execution-1/output.txt',
+      'executions/execution-0001/x.txt',
+      'executions/other.txt',
+    ]) {
+      expect(recordTypeForPath(p)).toBeUndefined();
+    }
+    expect(recordTypeForPath('executions/execution-0001.json')).toBe('execution-record');
   });
 });

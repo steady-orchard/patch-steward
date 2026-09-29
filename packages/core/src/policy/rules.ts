@@ -397,6 +397,48 @@ function checkR9(policy: Policy, details: FailureDetail[]): void {
   });
 }
 
+function checkR10(policy: Policy, details: FailureDetail[]): void {
+  const execution = policy.limits.execution;
+  if (execution.output_head_bytes + execution.output_tail_bytes > execution.output_bytes) {
+    details.push(
+      detail(
+        'policy.invalid-value',
+        'limits.execution.output_bytes',
+        'limits.execution.output_head_bytes plus limits.execution.output_tail_bytes must not exceed limits.execution.output_bytes.',
+      ),
+    );
+  }
+  if (execution.output_stream_bytes < execution.output_bytes) {
+    details.push(
+      detail(
+        'policy.invalid-value',
+        'limits.execution.output_bytes',
+        'limits.execution.output_stream_bytes must be at least limits.execution.output_bytes.',
+      ),
+    );
+  }
+  if (execution.prepared_checkout_bytes < execution.checkout_bytes) {
+    details.push(
+      detail(
+        'policy.invalid-value',
+        'limits.execution.checkout_bytes',
+        'limits.execution.prepared_checkout_bytes must be at least limits.execution.checkout_bytes.',
+      ),
+    );
+  }
+  policy.execution.commands.forEach((command, index) => {
+    if (command.result_files.length > execution.result_files) {
+      details.push(
+        detail(
+          'policy.invalid-value',
+          'limits.execution.result_files',
+          `execution.commands.${index}.result_files has more entries than limits.execution.result_files allows.`,
+        ),
+      );
+    }
+  });
+}
+
 export function checkPolicyRules(policy: Policy): FailureDetail[] {
   const details: FailureDetail[] = [];
   checkR1(policy, details);
@@ -408,5 +450,6 @@ export function checkPolicyRules(policy: Policy): FailureDetail[] {
   checkR7(policy, details);
   checkR8(policy, details);
   checkR9(policy, details);
+  checkR10(policy, details);
   return details;
 }

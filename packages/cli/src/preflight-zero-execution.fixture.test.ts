@@ -9,6 +9,7 @@ interface RecordedCall {
   readonly fn: string;
   readonly file: string;
   readonly args: string[];
+  readonly cwd: string | null;
 }
 
 const spy = vi.hoisted(() => ({ calls: [] as RecordedCall[] }));
@@ -16,12 +17,23 @@ const spy = vi.hoisted(() => ({ calls: [] as RecordedCall[] }));
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
 
+  function optionsCwd(args: unknown[]): string | null {
+    for (const candidate of args.slice(1)) {
+      if (typeof candidate === 'object' && candidate !== null && !Array.isArray(candidate)) {
+        const cwd = (candidate as { cwd?: unknown }).cwd;
+        return typeof cwd === 'string' ? cwd : null;
+      }
+    }
+    return null;
+  }
+
   function wrap<T extends (...args: never[]) => unknown>(fn: string, original: T): T {
     return ((...args: unknown[]) => {
       spy.calls.push({
         fn,
         file: String(args[0]),
         args: Array.isArray(args[1]) ? args[1].map(String) : [],
+        cwd: optionsCwd(args),
       });
       return Reflect.apply(original, undefined, args);
     }) as unknown as T;
@@ -48,6 +60,13 @@ import type { PreflightReport } from './preflight-output.js';
 const submissionsDir = fileURLToPath(new URL('../../../fixtures/submissions/', import.meta.url));
 const githubFixturesDir = fileURLToPath(new URL('../../../fixtures/github/testbed/', import.meta.url));
 const REPOSITORY_FULL_NAME = 'steady-orchard/patch-steward-testbed-public';
+
+function spawnedName(call: RecordedCall): string {
+  return path
+    .basename(call.file)
+    .replace(/\.[^.]*$/, '')
+    .toLowerCase();
+}
 
 function crlfToLf(text: string): string {
   return text.replace(/\r\n/g, '\n');
@@ -198,11 +217,12 @@ describe('zero model calls and zero executions', () => {
     fs.rmSync(configDir, { recursive: true, force: true, maxRetries: 3 });
   });
 
-  it('zero model calls and zero executions', async () => {
+  it('without run only read-only git and gh auth token are spawned', async () => {
     spy.calls.length = 0;
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const fetch = recordedFetch();
 
+    const seen: RecordedCall[] = [];
     for (const bodyFile of listBodyFiles()) {
       const isPullRequest = bodyFile.startsWith('pr-');
       const draftPath = path.join(submissionsDir, bodyFile);
@@ -225,8 +245,11 @@ describe('zero model calls and zero executions', () => {
       };
       const capture = stdoutCapture();
       const runContext: PreflightCommandContext = { ...context, io: capture.io };
+      spy.calls.length = 0;
       const exitCode = await runPreflightCommand(argv, runContext);
       expect([0, 1, 2]).toContain(exitCode);
+      expect(spy.calls.filter((call) => spawnedName(call) === 'gh')).toHaveLength(0);
+      seen.push(...spy.calls);
       const report = JSON.parse(capture.text()) as PreflightReport;
       expect(report.unverified).toBe(true);
       if (report.contract !== null) {
@@ -243,6 +266,7 @@ describe('zero model calls and zero executions', () => {
       fetch,
       ghBinary: missingGhDir,
     };
+    spy.calls.length = 0;
     const positiveExit = await runPreflightCommand(
       ['--pr', '--draft', path.join(submissionsDir, 'pr-bugfix-complete.txt'), '--json'],
       positiveContext,
@@ -252,21 +276,22 @@ describe('zero model calls and zero executions', () => {
     expect(positiveReport.contract?.disposition).toBe('met');
     expect(positiveReport.paths?.policy_change?.proposed?.status).toBe('valid');
 
-    expect(spy.calls.length).toBeGreaterThan(0);
+    expect(spy.calls.filter((call) => spawnedName(call) === 'gh').length).toBeLessThanOrEqual(1);
+    seen.push(...spy.calls);
+    expect(seen.length).toBeGreaterThan(0);
     let sawGhAuthToken = false;
     let sawDiffTree = false;
     let sawMergeBase = false;
     let sawCatFile = false;
-    for (const call of spy.calls) {
-      const base = path.basename(call.file).replace(/\.[^.]*$/, '');
+    for (const call of seen) {
+      const base = spawnedName(call);
       if (base === 'git') {
         expect(['rev-parse', 'merge-base', 'diff-tree', 'ls-tree', 'cat-file', 'remote']).toContain(call.args[0]);
         if (call.args[0] === 'diff-tree') sawDiffTree = true;
         if (call.args[0] === 'merge-base') sawMergeBase = true;
         if (call.args[0] === 'cat-file') sawCatFile = true;
       } else if (base === 'gh') {
-        expect(call.args[0]).toBe('auth');
-        expect(call.args[1]).toBe('token');
+        expect(call.args).toEqual(['auth', 'token', '--hostname', 'github.com']);
         sawGhAuthToken = true;
       } else {
         throw new Error(`unexpected process file ${call.file}`);
@@ -279,5 +304,245 @@ describe('zero model calls and zero executions', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
+  }, 240000);
+});
+
+const RUN_REPO_NAME = 'example-owner/example-repo';
+const RUN_REPO_PATH = '/repos/example-owner/example-repo';
+const RUN_TREE_SHA = 'a8c2485882b52f63db71b1ec63b12f5039220e03';
+const RUN_BLOB_SHA = '716098133e97314ccf047f5034cc8f76161d8f0d';
+const rootDir = fileURLToPath(new URL('../../../', import.meta.url));
+const publishedFixturesDir = path.join(rootDir, 'fixtures', 'github');
+
+const POLICY_ARGV: readonly (readonly string[])[] = [
+  ['-e', 'process.exit(0)'],
+  ['-e', 'process.exit(0); // second'],
+  ['-e', 'process.exit(0); // dependency'],
+];
+
+function publishedJson(relative: string): Record<string, unknown> {
+  return JSON.parse(fs.readFileSync(path.join(publishedFixturesDir, relative), 'utf8')) as Record<string, unknown>;
+}
+
+function flowCommand(argv: readonly string[]): string {
+  return `[node, ${argv.map((part) => JSON.stringify(part)).join(', ')}]`;
+}
+
+function commandBlock(id: string, argv: readonly string[]): string {
+  return `    - id: ${id}\n      kind: test\n      run: ${flowCommand(argv)}\n      working_directory: .\n      mandatory: true\n      result_files: []\n`;
+}
+
+function publishedPolicyText(): string {
+  const template = crlfToLf(fs.readFileSync(path.join(rootDir, 'templates', 'policy', 'policy.yml'), 'utf8'));
+  const original = commandBlock('test', []).replace('[node, ]', '[make, test]');
+  expect(template).toContain(original);
+  let text = template.replace(
+    original,
+    commandBlock('test', POLICY_ARGV[0] as readonly string[]) + commandBlock('test-two', POLICY_ARGV[1] as readonly string[]),
+  );
+  expect(text).toContain('      commands: [test]');
+  text = text.replace('      commands: [test]', '      commands: [test, test-two]');
+  expect(text).toContain('  dependency_step: null');
+  text = text.replace(
+    '  dependency_step: null',
+    `  dependency_step:\n    run: ${flowCommand(POLICY_ARGV[2] as readonly string[])}\n    working_directory: .`,
+  );
+  return text;
+}
+
+function publishedFetch(): GitHubFetch {
+  const bytes = Buffer.from(publishedPolicyText(), 'utf8');
+  const blob = publishedJson('policy-directory/blob-policy.json');
+  blob['content'] = bytes.toString('base64');
+  blob['size'] = bytes.length;
+  const repository = { ...publishedJson('testbed/repository.json') };
+  repository['full_name'] = RUN_REPO_NAME;
+  repository['default_branch'] = 'main';
+  const table: Record<string, unknown> = {
+    [RUN_REPO_PATH]: repository,
+    [`${RUN_REPO_PATH}/issues/29`]: publishedJson('testbed/issue-29.json'),
+    [`${RUN_REPO_PATH}/git/ref/heads/main`]: publishedJson('policy-directory/ref-heads-main.json'),
+    [`${RUN_REPO_PATH}/contents/.github`]: publishedJson('policy-directory/contents-github.json'),
+    [`${RUN_REPO_PATH}/git/trees/${RUN_TREE_SHA}`]: publishedJson('policy-directory/tree.json'),
+    [`${RUN_REPO_PATH}/git/blobs/${RUN_BLOB_SHA}`]: blob,
+  };
+  return (url: string) => {
+    const pathname = new URL(url).pathname;
+    return Promise.resolve(pathname in table ? jsonResponse(table[pathname]) : notFoundResponse());
+  };
+}
+
+function isInside(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function isNodeExecutable(file: string): boolean {
+  if (path.resolve(file) === path.resolve(process.execPath)) return true;
+  const name = path.basename(file).toLowerCase();
+  if (name !== 'node' && name !== 'node.exe') return false;
+  if (path.basename(file) === file) return true;
+  const dirs = (process.env['PATH'] ?? process.env['Path'] ?? '').split(path.delimiter);
+  return dirs.some((dir) => dir !== '' && path.resolve(dir) === path.resolve(path.dirname(file)));
+}
+
+describe('preflight with run spawns', () => {
+  let checkoutDir: string;
+  let configDir: string;
+  let globalConfigPath: string;
+  let baseCommit: string;
+
+  function runEnv(): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value === undefined || key.toUpperCase().startsWith('GIT_')) continue;
+      if (['GITHUB_ACTIONS', 'GITHUB_TOKEN', 'GH_TOKEN'].includes(key.toUpperCase())) continue;
+      result[key] = value;
+    }
+    return result;
+  }
+
+  function git(args: readonly string[]): string {
+    const env = runEnv();
+    env['GIT_CONFIG_NOSYSTEM'] = '1';
+    env['GIT_CONFIG_GLOBAL'] = globalConfigPath;
+    env['GIT_AUTHOR_NAME'] = 'Fixture';
+    env['GIT_AUTHOR_EMAIL'] = 'fixture@example.com';
+    env['GIT_COMMITTER_NAME'] = 'Fixture';
+    env['GIT_COMMITTER_EMAIL'] = 'fixture@example.com';
+    return execFileSync('git', args, { cwd: checkoutDir, env, encoding: 'utf8' }).trim();
+  }
+
+  function write(relative: string, text: string): void {
+    const target = path.join(checkoutDir, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, text);
+  }
+
+  beforeAll(() => {
+    checkoutDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'patch-steward-zero-run-')));
+    configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patch-steward-zero-run-cfg-'));
+    globalConfigPath = path.join(configDir, 'gitconfig');
+    fs.writeFileSync(globalConfigPath, '');
+    git(['-c', 'init.defaultBranch=main', 'init', '-q']);
+    git(['remote', 'add', 'origin', 'https://github.com/example-owner/example-repo.git']);
+    write('package.json', '{ "name": "fixture", "version": "1.0.0" }\n');
+    write('src/app.js', 'export const answer = 1;\n');
+    git(['add', '-A']);
+    git(['commit', '-q', '-m', 'base']);
+    baseCommit = git(['rev-parse', 'HEAD']);
+    git(['update-ref', 'refs/remotes/origin/main', baseCommit]);
+    write('src/app.js', 'export const answer = 2;\n');
+    write('src/parse.test.ts', 'export const parsed = true;\n');
+    git(['add', '-A']);
+    git(['commit', '-q', '-m', 'head']);
+  }, 60000);
+
+  afterAll(() => {
+    fs.rmSync(checkoutDir, { recursive: true, force: true, maxRetries: 3 });
+    fs.rmSync(configDir, { recursive: true, force: true, maxRetries: 3 });
+  });
+
+  it('with run only the policy commands and preview git commands are spawned', async () => {
+    spy.calls.length = 0;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const capture = stdoutCapture();
+    const ghParent = fs.mkdtempSync(path.join(os.tmpdir(), 'patch-steward-zero-gh-'));
+    const context: PreflightCommandContext = {
+      cwd: checkoutDir,
+      io: capture.io,
+      env: runEnv(),
+      fetch: publishedFetch(),
+      ghBinary: path.join(ghParent, 'missing-bin', 'gh'),
+    };
+    const argv = [
+      '--pr',
+      '--draft',
+      path.join(submissionsDir, 'pr-bugfix-complete.txt'),
+      '--repo',
+      RUN_REPO_NAME,
+      '--run',
+      '--json',
+    ];
+    try {
+      const exitCode = await runPreflightCommand(argv, context);
+      expect([0, 1]).toContain(exitCode);
+      const report = JSON.parse(capture.text()) as { run?: { preview: unknown } };
+      expect(report.run?.preview).not.toBeNull();
+
+      const temps = [os.tmpdir(), fs.realpathSync(os.tmpdir())];
+      const inTemp = (candidate: string): boolean => temps.some((root) => isInside(root, path.resolve(candidate)));
+      const worktrees = new Set<string>();
+      for (const call of spy.calls) {
+        if (call.args[0] === '-c' && call.args[3] === 'add') worktrees.add(path.resolve(call.args[5] ?? ''));
+      }
+      let adds = 0;
+      let removes = 0;
+      let prunes = 0;
+      let ghCalls = 0;
+      const policySeen = POLICY_ARGV.map(() => 0);
+
+      for (const call of spy.calls) {
+        const name = spawnedName(call);
+        const a = call.args;
+        expect(isInside(checkoutDir, path.resolve(call.file))).toBe(false);
+        for (const root of worktrees) {
+          expect(isInside(root, path.resolve(call.file))).toBe(false);
+        }
+        if (name === 'git') {
+          if (a[0] === '-c') {
+            expect(a).toHaveLength(7);
+            expect(a[1]?.startsWith('core.hooksPath=')).toBe(true);
+            expect(inTemp((a[1] as string).slice('core.hooksPath='.length))).toBe(true);
+            expect(a.slice(2, 5)).toEqual(['worktree', 'add', '--detach']);
+            expect(inTemp(a[5] as string)).toBe(true);
+            expect(a[6]).toBe(baseCommit);
+            adds += 1;
+          } else if (a[0] === 'worktree' && a[1] === 'remove') {
+            expect(a).toHaveLength(4);
+            expect(a[2]).toBe('--force');
+            expect(inTemp(a[3] as string)).toBe(true);
+            removes += 1;
+          } else if (a[0] === 'worktree') {
+            expect(a).toEqual(['worktree', 'prune']);
+            prunes += 1;
+          } else if (a[0] === '--no-optional-locks') {
+            expect(a[1]).toBe('status');
+          } else {
+            expect(['rev-parse', 'merge-base', 'diff-tree', 'ls-tree', 'cat-file', 'remote', 'status']).toContain(a[0]);
+          }
+        } else if (name === 'gh') {
+          expect(a).toEqual(['auth', 'token', '--hostname', 'github.com']);
+          ghCalls += 1;
+        } else if (isNodeExecutable(call.file)) {
+          const index = POLICY_ARGV.findIndex((expected) => JSON.stringify(expected) === JSON.stringify(a));
+          expect(index, `unexpected node argv ${JSON.stringify(a)}`).toBeGreaterThanOrEqual(0);
+          policySeen[index] = (policySeen[index] ?? 0) + 1;
+          expect(call.cwd, 'policy command cwd').not.toBeNull();
+          const cwd = path.resolve(call.cwd as string);
+          expect(isInside(checkoutDir, cwd) || [...worktrees].some((root) => isInside(root, cwd))).toBe(true);
+        } else if (process.platform === 'win32' && name === 'cmd') {
+          expect(a.slice(0, 3)).toEqual(['/d', '/s', '/c']);
+        } else if (process.platform === 'win32' && name === 'taskkill') {
+          expect(a[0]).toBe('/PID');
+          expect(a).toContain('/T');
+          expect(a).toContain('/F');
+        } else {
+          throw new Error(`unexpected process ${JSON.stringify(call)}`);
+        }
+      }
+
+      expect(adds).toBeGreaterThanOrEqual(1);
+      expect(removes).toBeGreaterThanOrEqual(1);
+      expect(prunes).toBeGreaterThanOrEqual(1);
+      expect(ghCalls).toBeLessThanOrEqual(1);
+      for (const count of policySeen) {
+        expect(count).toBeGreaterThanOrEqual(1);
+      }
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+      fs.rmSync(ghParent, { recursive: true, force: true, maxRetries: 3 });
+    }
   }, 240000);
 });

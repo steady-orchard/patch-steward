@@ -181,7 +181,7 @@ describe('zero-execution: screen and report commands', () => {
     fs.rmSync(configDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
 
-  it('zero model calls and zero executions in the screen and report commands', async () => {
+  it('zero model calls in the screen and report commands', async () => {
     const evidenceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'm5-czx-'));
     const missingGhDir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'm5-czx-')), 'missing-gh', 'gh');
     try {
@@ -262,58 +262,159 @@ describe('zero-execution: screen and report commands', () => {
     }
   }, 120000);
 
+  interface PullRequestRun {
+    readonly exit: number;
+    readonly recorded: { url: string; method: string }[];
+    readonly calls: RecordedCall[];
+    readonly evidenceDir: string;
+    readonly runDir: string;
+  }
+
+  async function screenPullRequest(tmp: string, env: Record<string, string>, ghBinary?: string): Promise<PullRequestRun> {
+    const ev = path.join(tmp, 'evidence');
+    const binDir = fs.mkdtempSync(path.join(tmp, 'bin-'));
+    const dockerBinary = path.join(binDir, process.platform === 'win32' ? 'docker.exe' : 'docker');
+    const podmanBinary = path.join(binDir, process.platform === 'win32' ? 'podman.exe' : 'podman');
+    const recorded: { url: string; method: string }[] = [];
+    const prBody = readSubmissionText('pr-bugfix-complete.txt');
+    const routes: RouteMap = {
+      [T]: () => jsonResponse(readGitHubFixture('repository.json')),
+      [`${T}/pulls/26`]: () => jsonResponse(withBody('pull-26.json', prBody)),
+      [`${T}/pulls/26/files`]: () => jsonResponse(readGitHubFixture('pull-26-files.json')),
+      [`${T}/commits/${HEAD_SHA}/pulls`]: () => jsonResponse(readGitHubFixture('commit-pulls-b46eef5.json')),
+      [`${T}/issues/29`]: () => jsonResponse(readGitHubFixture('issue-29.json')),
+    };
+    const inner = routedFetch(routes);
+    const recordingFetch: GitHubFetch = (url: string, init: GitHubFetchInit) => {
+      recorded.push({ url, method: init.method });
+      return inner(url, init);
+    };
+
+    const capture = stdoutCapture();
+    const context: ScreenCommandContext = {
+      cwd: tmp,
+      io: capture.io,
+      env,
+      ...(ghBinary !== undefined ? { ghBinary } : {}),
+      fetch: recordingFetch,
+      attachmentResolver: fakeAttachmentResolver,
+      attachmentTransport: fakeAttachmentTransport,
+      clock: fixedClock('2026-09-27T10:15:00.000Z'),
+      random: fixedRandom('3f9a1c2e'),
+      sleep: noopSleep,
+      execution: { binaries: { docker: dockerBinary, podman: podmanBinary } },
+    };
+    spy.calls.length = 0;
+    const exit = await runScreenCommand(
+      [
+        '--pr',
+        '26',
+        '--repo',
+        'steady-orchard/patch-steward-testbed-public',
+        '--policy-file',
+        TEMPLATE,
+        '--evidence-dir',
+        ev,
+        '--json',
+      ],
+      context,
+    );
+    const runDir = path.join(ev, 'steady-orchard', 'patch-steward-testbed-public', 'runs', 'pr-26', RUN_ID);
+    return { exit, recorded, calls: [...spy.calls], evidenceDir: ev, runDir };
+  }
+
+  function baseName(file: string): string {
+    return path.basename(file).replace(/\.[^.]*$/, '');
+  }
+
+  function isInside(parent: string, file: string): boolean {
+    const relative = path.relative(path.resolve(parent), path.resolve(file));
+    return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+  }
+
+  function readJsonRecords(runDir: string): string {
+    const texts: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith('.json')) texts.push(fs.readFileSync(full, 'utf8'));
+      }
+    };
+    walk(runDir);
+    return texts.join('\n');
+  }
+
+  function assertSpawnSet(run: PullRequestRun, env: Record<string, string>): void {
+    expect(run.calls.length).toBeGreaterThan(0);
+    const tokenSet = env['GH_TOKEN'] !== undefined || env['GITHUB_TOKEN'] !== undefined;
+    let ghCount = 0;
+    let firstGh = -1;
+    let firstRuntime = -1;
+    run.calls.forEach((call, index) => {
+      const base = baseName(call.file);
+      expect(['git', 'docker', 'podman', 'gh']).toContain(base);
+      if (base === 'docker' || base === 'podman') {
+        expect(call.args[0]).toBe('version');
+        if (firstRuntime === -1) firstRuntime = index;
+      }
+      if (base === 'gh') {
+        expect(call.args).toEqual(['auth', 'token', '--hostname', 'github.com']);
+        ghCount += 1;
+        if (firstGh === -1) firstGh = index;
+      }
+      expect(isInside(run.evidenceDir, call.file)).toBe(false);
+      expect(isInside(repoDir, call.file)).toBe(false);
+    });
+    expect(ghCount).toBeLessThanOrEqual(1);
+    if (tokenSet) expect(ghCount).toBe(0);
+    if (ghCount === 1 && firstRuntime !== -1) expect(firstGh).toBeLessThan(firstRuntime);
+  }
+
   it('screen command makes only GET requests', async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'm5-czx-'));
-    const ev = path.join(tmp, 'evidence');
     try {
-      const recorded: { url: string; method: string }[] = [];
-      const prBody = readSubmissionText('pr-bugfix-complete.txt');
-      const routes: RouteMap = {
-        [T]: () => jsonResponse(readGitHubFixture('repository.json')),
-        [`${T}/pulls/26`]: () => jsonResponse(withBody('pull-26.json', prBody)),
-        [`${T}/pulls/26/files`]: () => jsonResponse(readGitHubFixture('pull-26-files.json')),
-        [`${T}/commits/${HEAD_SHA}/pulls`]: () => jsonResponse(readGitHubFixture('commit-pulls-b46eef5.json')),
-        [`${T}/issues/29`]: () => jsonResponse(readGitHubFixture('issue-29.json')),
-      };
-      const inner = routedFetch(routes);
-      const recordingFetch: GitHubFetch = (url: string, init: GitHubFetchInit) => {
-        recorded.push({ url, method: init.method });
-        return inner(url, init);
-      };
+      const env = { GH_TOKEN: 'token-a' };
+      const run = await screenPullRequest(tmp, env);
+      expect(run.exit).toBe(3);
+      assertSpawnSet(run, env);
+      const records = readJsonRecords(run.runDir);
+      expect(records).toContain('runner.runtime-unavailable');
+      expect(records).toContain('environment-unavailable');
 
-      const capture = stdoutCapture();
-      const context: ScreenCommandContext = {
-        cwd: tmp,
-        io: capture.io,
-        env: { GH_TOKEN: 'token-a' },
-        fetch: recordingFetch,
-        attachmentResolver: fakeAttachmentResolver,
-        attachmentTransport: fakeAttachmentTransport,
-        clock: fixedClock('2026-09-27T10:15:00.000Z'),
-        random: fixedRandom('3f9a1c2e'),
-        sleep: noopSleep,
-      };
-      const exit = await runScreenCommand(
-        [
-          '--pr',
-          '26',
-          '--repo',
-          'steady-orchard/patch-steward-testbed-public',
-          '--policy-file',
-          TEMPLATE,
-          '--evidence-dir',
-          ev,
-          '--json',
-        ],
-        context,
-      );
-      expect(exit).toBe(3);
-
-      expect(recorded.length).toBeGreaterThanOrEqual(5);
-      for (const call of recorded) {
+      expect(run.recorded.length).toBeGreaterThanOrEqual(5);
+      for (const call of run.recorded) {
         expect(call.method).toBe('GET');
         expect(call.url.startsWith('https://api.github.com/')).toBe(true);
       }
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
+  }, 120000);
+
+  it('screen spawns only git, the runtime, and gh auth token', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'm5-czx-'));
+    try {
+      const env: Record<string, string> = {};
+      const ghBinary = path.join(tmp, 'missing-gh', process.platform === 'win32' ? 'gh.exe' : 'gh');
+      const run = await screenPullRequest(tmp, env, ghBinary);
+      assertSpawnSet(run, env);
+      expect(run.calls.some((c) => baseName(c.file) === 'gh')).toBe(true);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
+  }, 120000);
+
+  it('screen resolves credentials once before any runtime call', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'm5-czx-'));
+    try {
+      const env: Record<string, string> = {};
+      const ghBinary = path.join(tmp, 'missing-gh', process.platform === 'win32' ? 'gh.exe' : 'gh');
+      const run = await screenPullRequest(tmp, env, ghBinary);
+      const bases = run.calls.map((c) => baseName(c.file));
+      expect(bases.filter((b) => b === 'gh').length).toBe(1);
+      const firstRuntime = bases.findIndex((b) => b === 'docker' || b === 'podman');
+      if (firstRuntime !== -1) expect(bases.indexOf('gh')).toBeLessThan(firstRuntime);
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }

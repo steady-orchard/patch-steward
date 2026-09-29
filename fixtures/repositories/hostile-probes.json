@@ -1,0 +1,34 @@
+{
+  "description": "Sandbox probes for the container tier: identity and capability, network, runtime socket, and mount probes, and a canary reader that searches the container environment, process environments, and filesystem for host canary values.",
+  "commit": {
+    "message": "hostile probes",
+    "time": 1700000000
+  },
+  "entries": [
+    {
+      "path": "identity.sh",
+      "mode": "100755",
+      "content": "id -u\nid -g\ngrep -E '^(CapEff|NoNewPrivs):' /proc/self/status\n"
+    },
+    {
+      "path": "network.sh",
+      "mode": "100755",
+      "content": "ls /sys/class/net\nwget -q -T 3 -O /dev/null http://1.1.1.1 2>/dev/null || echo wget-failed\n"
+    },
+    {
+      "path": "sockets.sh",
+      "mode": "100755",
+      "content": "for s in /var/run/docker.sock /run/docker.sock /run/podman/podman.sock; do\n  if [ -e \"$s\" ]; then echo \"$s present\"; else echo \"$s absent\"; fi\ndone\n"
+    },
+    {
+      "path": "mounts.sh",
+      "mode": "100755",
+      "content": "cat /proc/self/mountinfo\n"
+    },
+    {
+      "path": "canary.sh",
+      "mode": "100755",
+      "content": "env\nfor f in /proc/[0-9]*/environ; do\n  tr '\\000' '\\n' < \"$f\" 2>/dev/null\ndone\nfind / -path /proc -prune -o -path /sys -prune -o -path /dev -prune -o -type f -exec grep -a -H PATCH_STEWARD_CANARY {} + 2>/dev/null\necho canary-scan-done\n"
+    }
+  ]
+}

@@ -14,5 +14,11 @@
   { "case": "pr-shared-head", "report": "pr-shared-head.report.txt", "summary": "pr-shared-head.summary.txt" },
   { "case": "pr-local-policy", "report": "pr-local-policy.report.txt", "summary": "pr-local-policy.summary.txt" },
   { "case": "pr-overflow", "report": "pr-overflow.report.txt", "summary": "pr-overflow.summary.txt" },
-  { "case": "pr-hostile", "report": "pr-hostile.report.txt", "summary": "pr-hostile.summary.txt" }
+  { "case": "pr-hostile", "report": "pr-hostile.report.txt", "summary": "pr-hostile.summary.txt" },
+  { "case": "pr-executed", "report": "pr-executed.report.txt", "summary": "pr-executed.summary.txt" },
+  {
+    "case": "pr-execution-environment-failure",
+    "report": "pr-execution-environment-failure.report.txt",
+    "summary": "pr-execution-environment-failure.summary.txt"
+  }
 ]

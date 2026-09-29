@@ -1,0 +1,4 @@
+<!DOCTYPE testsuites [
+<!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<testsuites><testsuite name="&xxe;"><testcase classname="c" name="t" time="0.1"/></testsuite></testsuites>

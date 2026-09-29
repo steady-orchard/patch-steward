@@ -1,6 +1,6 @@
 # Patch Steward Processes
 
-**Status:** design document. Apart from policy loading and validation and the `steward policy` command (SP01), the deterministic part of `steward preflight` (SP05 CLI steps 1–2), the deterministic contract check of SP06 steps 3–7 with the submission capture it needs (without the merge-group branch, stored-validation reuse, or the author-response ledger), SP13 steps 1-3 and SP18 step 1 for local runs, the never-pass rule of SP19 step 8 including its `stage-incomplete` cause, `steward screen` at contract level with `steward report` (SP20 steps 1-3, without stages, a container, or publication), and a GitHub-hosted skeleton that runs in observe mode at contract level (SP06 steps 1 and 8, SP13 steps 3–4, SP18 steps 1 and 6, SP19 steps 1 and 3, and the closure recording of SP03 step 2, without check runs, report comments, labels, stages, or model calls), verified only on dedicated test-bed repositories, nothing described here is implemented. Each
+**Status:** design document. Apart from policy loading and validation and the `steward policy` command (SP01), `steward preflight` (SP05 CLI steps 1–3 and 5: the contract check and the opt-in `--run` claim runner on the contributor's own checkout, without self-review), the deterministic contract check of SP06 steps 3–7 with the submission capture it needs (without the merge-group branch, stored-validation reuse, or the author-response ledger), SP13 steps 1-3 and SP18 step 1 for local runs, the never-pass rule of SP19 step 8 including its `stage-incomplete` cause, `steward screen` with `steward report` (SP20 steps 1-3: the contract check, then for a pull request the dependency step and the mandatory container commands on the head commit in local Docker or Podman containers, without stages, model calls, or publication), sandboxed execution by the local container runner and the T2 claim runner (SP17 steps 1–5), and a GitHub-hosted skeleton that runs in observe mode at contract level (SP06 steps 1 and 8, SP13 steps 3–4, SP18 steps 1 and 6, SP19 steps 1 and 3, and the closure recording of SP03 step 2, without check runs, report comments, labels, stages, or model calls), verified only on dedicated test-bed repositories, nothing described here is implemented. Each
 process below runs on the components defined in
 [architecture.md](architecture.md) and addresses numbered issues from the
 [problem statement](problem-statement.md). Methodology comes from the
@@ -441,14 +441,14 @@ Measures: the scoring outputs.
 
 ### SP05. Contributor preflight
 
-| Field      | Value                                                                                                         |
-| ---------- | ------------------------------------------------------------------------------------------------------------- |
-| Addresses  | P02, P04, P06, P07, P09; reduces P01 load                                                                     |
-| Actors     | Contributor; CLI (T2); browser assistant (Z6)                                                                 |
-| Trigger    | Contributor prepares an issue or PR                                                                           |
-| Topologies | T2; browser app (zone Z6)                                                                                     |
-| Inputs     | Published policy subset; contributor's draft; contributor's branch (CLI); optional inference credential (CLI) |
-| Outputs    | Prefilled issue-form URL or PR body text; preflight report marked unverified                                  |
+| Field      | Value                                                                                                                      |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Addresses  | P02, P04, P06, P07, P09; reduces P01 load                                                                                  |
+| Actors     | Contributor; CLI (T2); browser assistant (Z6)                                                                              |
+| Trigger    | Contributor prepares an issue or PR                                                                                        |
+| Topologies | T2; browser app (zone Z6)                                                                                                  |
+| Inputs     | Published policy subset; contributor's draft; contributor's branch (CLI); optional inference credential (CLI)              |
+| Outputs    | Prefilled issue-form URL or PR body text; preflight report marked unverified; `steward preflight --run` results are claims |
 
 Browser assistant steps:
 
@@ -486,9 +486,36 @@ CLI steps:
    base ref and `HEAD`; the linked issue's existence is read through the GitHub
    API; attachments are checked statically and never fetched; there is no
    snapshot and no shared-head check.
-3. Run the mandatory commands on the contributor's machine without a sandbox.
-   For a declared regression test, run it against a temporary checkout of the
-   base commit and against the branch to preview the before-and-after result.
+3. Opt-in with `--run`: after a published valid policy is loaded, every
+   `mandatory: true` command runs in `execution.commands` order in the
+   contributor's own checkout without a sandbox, whatever the contract result
+   (a dirty tree adds the warning `preflight.working-tree-dirty`). Each argument
+   vector is printed before it runs. The run directory must be the checkout
+   reported by `git rev-parse --show-toplevel` (or a preview worktree this
+   invocation created); a bare repository, a directory outside any work tree, a
+   command working directory that leaves the checkout, and any run under
+   `GITHUB_ACTIONS=true` are refused (`runner.not-own-checkout`). The process
+   environment is passed minus `GH_TOKEN`, `GITHUB_TOKEN`,
+   `STEWARD_LLM_API_KEY`, and any variable equal to a resolved credential;
+   commands run as argument vectors with no shell, except that on Windows a
+   `.cmd` or `.bat` shim runs through `cmd.exe` with strict escaping and the
+   output says so. The execution time and output bounds of SP17 apply
+   (`limits.execution.execution_seconds`, the output keys, `executions_per_run`,
+   `run_execution_seconds`); a timed-out or output-limited process tree is
+   stopped. For a PR with a declared regression test and at least one changed
+   test path, the before-and-after preview runs the mandatory `kind: test`
+   commands in a detached temporary worktree of the merge base created with
+   hooks disabled, with the `HEAD` versions of the test paths applied; "after"
+   is the result in the checkout. Otherwise the preview is skipped with the note
+   `preflight.preview-skipped` and its reason. Without a published policy
+   (default checklist) nothing runs and the warning
+   `preflight.run-without-policy` is printed. Without `--run` no repository or
+   policy command runs. Syntax:
+
+   ```text
+   steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--run] [--json]
+   ```
+
 4. Optional self-review, when the contributor selects a shipped adapter and
    model and supplies their own credential; any adapter may be used because
    the output is unverified advice. Before sending, the CLI lists exactly what
@@ -499,14 +526,25 @@ CLI steps:
 5. Print the preflight report marked as produced on the contributor's machine
    and unverified, with exit status `0` when the contract is met, `1` for
    `needs-changes` or `uncertain`, and `3` for an `inconclusive` contract result.
-   The contributor may paste its summary into the
+   With `--run`, a mandatory command that exits non-zero, times out, or is output
+   limited gives `1`; a guard refusal or an environment failure (for example a
+   command that cannot start) gives `2`; precedence is `2`, `3`, `1`, `0`. A plan
+   above `limits.execution.executions_per_run` runs nothing
+   (`preflight.run-over-budget`, exit `3`), and exhausting
+   `limits.execution.run_execution_seconds` marks the remaining commands skipped
+   (`execution.time-exhausted`, exit `3`). The output carries the notice
+   `Commands ran on this machine without a sandbox; their results are claims, not evidence.`
+   verbatim. The contributor may paste its summary into the
    submission; the steward treats it as a claim.
 
 Controls: no writes to GitHub; the GitHub token, resolved from `GH_TOKEN`,
 `GITHUB_TOKEN`, or `gh auth token`, is never stored or printed; the inference
 credential is used only for the
 selected adapter and only after the disclosure; no telemetry leaves the
-contributor's machine or browser.
+contributor's machine or browser. With `--run` nothing is stored or written to
+GitHub, results have admissibility `claim`, and output is redacted (built-in
+detectors, policy patterns, and the exact value of the resolved GitHub token).
+Optional self-review (step 4) is not implemented.
 
 Failure handling: a project without a published policy gets the default
 checklist from the steward template. A published but invalid policy is never
@@ -514,7 +552,8 @@ replaced by the default: the CLI exits with status `2` and prints the validation
 errors. Usage errors, an unreadable or oversize draft, a missing upstream remote,
 an unresolvable base, and GitHub or git failures also exit with status `2`;
 an `inconclusive` contract result exits with status `3`; reading a missing or
-private repository without a token asks for one.
+private repository without a token asks for one. Preview failures are warnings
+`preflight.preview-unavailable` and never change the exit status.
 
 Measures: none collected client-side; the contract pass rate at first
 submission (SP06) indicates preflight effectiveness.
@@ -855,8 +894,9 @@ Steps:
 5. Record execution records with environment identity.
 
 Controls: reproductions must be self-contained; a reproduction needing
-network or services ends `inconclusive` with a request to reduce it, unless
-the policy declares allowed services (open item).
+network or services ends `inconclusive` with a request to reduce it. Version 1
+supports no services: one container per execution, network `none`, and no
+policy key declares allowed services.
 
 Failure handling: environment unavailable ends `inconclusive`; it is never
 recorded as "not reproduced".
@@ -1356,29 +1396,40 @@ Measures: flagged activity counts; maintainer confirmation during audits.
 | Trigger    | Any execution plan entry                                                                                                       |
 | Topologies | T1, T3, T4; T2 uses the separate unsandboxed claim-only runner                                                                 |
 | Inputs     | Plan entry (commit, command, working directory, expected result, declared result files, limits, network setting); runner image |
-| Outputs    | Execution record marked `evidence` or `signal`                                                                                 |
+| Outputs    | Execution record marked `evidence`, `signal`, or `claim`                                                                       |
 
 Steps:
 
-1. Fetch the commit by id into an inert host checkout in the execution job.
-   Disable hooks, external filters, automatic submodule commands, and
-   credential persistence; do not run repository commands during preparation.
-   Validate overlay paths against traversal/symlink escapes before applying
-   declared test-only patches or generated files to a copy. Any preparation
-   needing repository-controlled code runs inside the container. Host
-   materialization is permitted; host execution of submitted code is not.
-   Compute the environment identity: image digest and tool versions.
+1. Fetch the commit by id into an inert host copy: a depth-1 fetch by commit
+   id into a temporary bare repository with hooks, filters, fsmonitor,
+   submodule commands, and credential persistence disabled; the commit id is
+   verified afterwards. No repository command runs during preparation. The
+   steward builds a tar archive of the checkout from the git objects (no
+   working tree, no attribute processing), validating every path. Overlay
+   paths (test-only patches or generated files) are validated against
+   traversal and symlink escapes and applied only while building the copy.
+   Host materialization is permitted; host execution of submitted code is not.
+   Compute the environment identity: runtime, image digest, and tool
+   versions. Under Podman only, an image whose `/work` is not absent or empty
+   is refused before use (`image-work-not-empty`).
 2. Start the container with no host environment, no tokens, no container
-   socket, a writable scratch area, a non-root user, CPU, memory, process, and
-   time limits, and network disabled. A policy-declared dependency step may
-   run first with egress; dependencies are preferably baked into the image
-   built from the trusted branch.
-3. Capture exit status, bounded output (head and tail with a truncation
-   marker), declared result files with size caps, and timing. Redact with the
-   policy's redaction patterns. Treat everything as data.
-4. Destroy the container and the checkout copy.
-5. Mark admissibility: `evidence` for container runs started by a trusted job;
-   `signal` for results ingested from external CI.
+   socket, a writable scratch area, a non-root user, no capabilities, CPU,
+   memory, process, and time limits, and network disabled; the checkout enters
+   only as a copy stream. A policy-declared dependency step may run first in its
+   own container with egress; its prepared copy feeds the network-none
+   executions. Dependencies are preferably baked into the image built from the
+   trusted branch.
+3. Capture exit status, bounded output (head and tail with an omission marker,
+   a stream bound, and the results `timed_out`, `oom_killed`, and
+   `output_limited`), declared result files copied out as tar streams with size
+   caps and parsed as JUnit XML, and timing. Redact with the policy's redaction
+   patterns before storage (stored output file and result files, architecture
+   §11). Treat everything as data.
+4. Remove the container, its volume, and the temporary files every time, even
+   after failures.
+5. Mark admissibility: `evidence` for container runs started by a trusted job
+   or the local runner; `claim` for runs of the T2 runner; `signal` for
+   results ingested from external CI.
 6. Ingest external CI artifacts only after verifying their originating
    repository, workflow, attempt, actual tested commit, environment, and schema;
    never accept contributor-supplied identity fields as proof. Apply SP12's
@@ -1390,10 +1441,18 @@ Controls: commands are constructed from the policy, except the contributor's
 declared reproduction command, which runs only inside the container and is
 recorded verbatim; per-execution and per-run caps.
 
-Failure handling: image build or pull failure and runner unavailability are
-environment failures ending `inconclusive`, distinct from a failing result.
-The unsandboxed runner (T2) refuses anything other than the contributor's own
-checkout and marks results as claims.
+Failure handling: environment failures are typed codes with cause
+`environment-unavailable` (for example `runner.runtime-unavailable`,
+`runner.image-pull-failed`, `runner.create-failed`,
+`runner.dependency-step-failed`, `materialize.fetch-failed`, and
+`materialize.overlay-rejected`) and end `inconclusive`, never "not reproduced"
+or a failing result. The unsandboxed runner (T2) refuses anything other than
+the contributor's own checkout (`runner.not-own-checkout`) and marks results as
+claims.
+
+Implemented so far: the local container runner used by `steward screen` (T3)
+and the claim runner of `steward preflight --run` (T2). T1 execution jobs, T4,
+and step 6 are not implemented.
 
 Measures: container minutes; environment failure rate.
 
@@ -1594,7 +1653,10 @@ credential, including a disabled Copilot policy), `capability-mismatch`, `model-
 `rate-limited`, `budget-exhausted`, `environment-unavailable`, `baseline-unavailable`, `coverage-missing`,
 `attachment-fetch-failed`, `policy-unavailable`, `policy-invalid`, `llm-not-configured`, `cancelled`,
 `steward-defect`, and `stage-incomplete` (a required stage produced no result: not run, skipped,
-or not available in this steward version).
+or not available in this steward version). `environment-unavailable` carries a typed
+`runner.*` or `materialize.*` code, and `budget-exhausted` also covers an execution
+plan above `limits.execution.executions_per_run` (`execution.over-budget`) or an
+exhausted `limits.execution.run_execution_seconds` (`execution.time-exhausted`).
 
 Measures: budget utilization and soft-cap overshoot; cancellations; queued
 and awaiting-approval ages, admission rates, and abandoned holds; `inconclusive`
@@ -1613,11 +1675,12 @@ counts by cause.
 
 Steps:
 
-1. Authenticate with the maintainer's token; fetch the submission and commits
-   through the GitHub API. `steward screen` syntax:
+1. Authenticate with the maintainer's token; read the submission through the
+   GitHub API and fetch its head commit by id over HTTPS git. `steward screen`
+   syntax:
 
    ```text
-   steward screen (--issue <number> | --pr <number>) [--repo owner/name] [--policy-file <path>] [--evidence-dir <dir>] [--json]
+   steward screen (--issue <number> | --pr <number>) [--repo owner/name] [--policy-file <path>] [--evidence-dir <dir>] [--container-runtime auto|docker|podman] [--json]
    ```
 
 2. Run SP06 through SP13 with the local container runner and the maintainer's
@@ -1628,13 +1691,22 @@ Steps:
    local file is named explicitly with `--policy-file` (non-authoritative,
    revision `local:<sha256>`), which is useful for testing a proposed
    policy against existing submissions before merging it. The current
-   implementation runs at contract level only (SP06 capture and the
-   deterministic contract check, then SP13 steps 1-3), with no stage,
-   container, or model call, so a run ends `needs-changes` or `inconclusive`
-   (cause `stage-incomplete`).
-3. Write the report and evidence locally, to `--evidence-dir` or the user
-   data directory, never the checkout; `steward report <run-dir> [--json]`
-   verifies and prints the stored run. Every output is labeled a local run
+   implementation runs SP06 capture and the deterministic contract check, then,
+   for a pull request, the dependency step and the mandatory container commands
+   on the head commit in local Docker or Podman containers (SP17), recorded as
+   evidence. `--container-runtime` selects the runtime (default `auto`). No
+   stage or model call runs, so a run ends `needs-changes` or `inconclusive`
+   (cause `stage-incomplete`, plus `environment-unavailable` or
+   `budget-exhausted` when they occur). The command starts only `git`, the
+   selected container runtime binary, and `gh auth token` for credential
+   resolution; never a repository command on the host.
+3. Write the report and evidence locally, by default to the user data
+   directory, which is never inside the checkout, or to an explicit
+   `--evidence-dir`; an `--evidence-dir` inside the git work tree of the current
+   directory is accepted with the warning `screen.evidence-inside-checkout`
+   (never commit run directories); the evidence includes an execution record,
+   output file, and stored result files per execution and the Dockerfile build
+   log; `steward report <run-dir> [--json]` verifies and prints the stored run. Every output is labeled a local run
    and not the official result, and a run under a local policy file is
    labeled non-authoritative in the report, the check summary, and the
    command output. With

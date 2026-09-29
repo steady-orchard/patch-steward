@@ -1,6 +1,7 @@
 import process from 'node:process';
 
 import type {
+  Clock,
   ContractDisposition,
   GitHubFetch,
   GitHubRepositoryRef,
@@ -26,6 +27,7 @@ import {
   readProposedPolicyFromGit,
   readRepository,
   resolveCommit,
+  systemClock,
 } from '@patch-steward/core';
 
 import type { PolicyCommandContext } from './policy-command.js';
@@ -38,11 +40,14 @@ import type { PreflightDraftFailureCode } from './preflight-draft.js';
 import { PREFLIGHT_DRAFT_FAILURE_CODES, readPreflightDraft } from './preflight-draft.js';
 import type { PreflightError, PreflightPathsReport, PreflightReport, PreflightWarning } from './preflight-output.js';
 import { PREFLIGHT_NOTICE, renderPreflightJson, renderPreflightText } from './preflight-output.js';
+import type { PreflightRunPullRequest } from './preflight-run.js';
+import { runPreflightExecutions } from './preflight-run.js';
 
 export interface PreflightCommandContext extends PolicyCommandContext {
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly fetch?: GitHubFetch;
   readonly ghBinary?: string;
+  readonly clock?: Clock;
 }
 
 export type PreflightExitCode = 0 | 1 | 2 | 3;
@@ -126,6 +131,13 @@ function fail(
   };
   emit(context, report, json);
   return 2;
+}
+
+function combineExit(a: PreflightExitCode, b: PreflightExitCode): PreflightExitCode {
+  for (const code of [2, 3, 1] as const) {
+    if (a === code || b === code) return code;
+  }
+  return 0;
 }
 
 function singleError(code: string, message: string): PreflightError[] {
@@ -283,6 +295,7 @@ export async function runPreflightCommand(argv: readonly string[], context: Pref
     const contractRepository = { fullName, defaultBranch };
     let contract;
     let paths: PreflightPathsReport | null = null;
+    let runPullRequest: PreflightRunPullRequest | null = null;
 
     if (!isPullRequest) {
       const kind = args.submission.issueKind;
@@ -385,6 +398,14 @@ export async function runPreflightCommand(argv: readonly string[], context: Pref
         attachments,
       });
 
+      const regressionField = body.structured ? body.fields['regression-test'] : undefined;
+      runPullRequest = {
+        head: headId,
+        mergeBase,
+        changes: changed.kind === 'complete' ? changed.changes : null,
+        regressionTest: regressionField !== undefined && !regressionField.trivial,
+      };
+
       const flags = contract.flags;
       paths = {
         base,
@@ -403,6 +424,26 @@ export async function runPreflightCommand(argv: readonly string[], context: Pref
 
     for (const warning of contract.warnings) {
       state.warnings.push({ code: warning.code, message: PREFLIGHT_FORMAT_UNVERIFIED_WARNING, subjects: warning.subjects });
+    }
+
+    let runOutcome: Awaited<ReturnType<typeof runPreflightExecutions>> | null = null;
+    if (args.run) {
+      runOutcome = await runPreflightExecutions({
+        policy,
+        published: state.policy?.source === 'published',
+        cwd: context.cwd,
+        env: context.env ?? process.env,
+        credentials: auth.token !== null ? [auth.token] : [],
+        pullRequest: runPullRequest,
+        clock: context.clock ?? systemClock,
+        ...(json
+          ? {}
+          : {
+              onRun: (line: string) =>
+                context.io.stdout(`${line}
+`),
+            }),
+      });
     }
 
     const report: PreflightReport = {
@@ -424,11 +465,13 @@ export async function runPreflightCommand(argv: readonly string[], context: Pref
         template: contract.template,
       },
       paths,
-      warnings: state.warnings,
-      errors: [],
+      ...(runOutcome !== null ? { run: runOutcome.report } : {}),
+      warnings: runOutcome !== null ? [...state.warnings, ...runOutcome.warnings] : state.warnings,
+      errors: runOutcome !== null ? runOutcome.errors : [],
     };
     emit(context, report, json);
-    return PREFLIGHT_EXIT_BY_DISPOSITION[contract.disposition];
+    const contractExit = PREFLIGHT_EXIT_BY_DISPOSITION[contract.disposition];
+    return runOutcome !== null ? combineExit(contractExit, runOutcome.exitStatus) : contractExit;
   } catch {
     return fail(
       context,

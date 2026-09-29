@@ -84,14 +84,41 @@ Sources: [package scripts](../../package.json), [repository commands](../../CLAU
    `3` that the result is `inconclusive` because a required read failed. It
    needs no inference account and writes nothing to GitHub.
 
+   To also run the policy's mandatory commands on your own checkout, add
+   `--run`:
+
+   ```sh
+   node packages/cli/dist/main.js preflight --pr --draft pr.md --run
+   ```
+
+   With a published policy, every `mandatory: true` command runs in policy
+   order in your working tree, as it is, whatever the contract result; without
+   a published policy nothing runs and the warning `preflight.run-without-policy`
+   is printed. Before each execution the output prints
+   `run <entry id>: <argument vector as a JSON array> in <directory>`, then the
+   notice `Commands ran on this machine without a sandbox; their results are claims, not evidence.`,
+   and per result the exit code, duration, any JUnit counts, and for a failed
+   command its redacted output tail. The commands run without a sandbox, with
+   `GH_TOKEN`, `GITHUB_TOKEN`, and `STEWARD_LLM_API_KEY` removed from their
+   environment, and only in the checkout root; anywhere else, or under
+   `GITHUB_ACTIONS=true`, the run is refused (`runner.not-own-checkout`). When
+   the draft names a regression test and the branch changes a test path, the
+   steward also runs the mandatory test commands on the merge base with your
+   test files applied, in a temporary worktree outside the checkout, so you see
+   the "before" and "after" results; otherwise it prints
+   `preflight.preview-skipped` with the reason. A failing, timed-out, or
+   output-limited command gives exit status `1`; a refusal or a command that
+   cannot start gives `2`; a plan over the execution budget gives `3`. Nothing
+   is stored or written to GitHub. With `--json` the object gains a `run`
+   member.
+
 4. Address the requests. You may include the preflight summary in your
    submission; official screening treats it as a claim to verify and repeats
    every check.
 
-Proposed and not yet implemented: running the mandatory commands locally without
-a sandbox and previewing a declared regression test on the base and branch;
-optional self-review with a shipped adapter and your own credential, after the
-CLI discloses exactly what leaves the machine; and the browser assistant, which
+Proposed and not yet implemented: optional self-review with a shipped adapter
+and your own credential, after the CLI discloses exactly what leaves the
+machine; and the browser assistant, which
 offers the same intake fields and deterministic checks and produces a prefilled
 issue-form URL or PR-body text with a compare URL, without running code or
 inference.
@@ -273,7 +300,9 @@ Source: [SP15](../processes.md#sp15-maintainer-triage-override-and-appeal).
 1. Build the CLI: `pnpm build`.
 2. Run `steward screen` with `--pr <number>` or `--issue <number>`, and
    optionally `--repo owner/name` and `--policy-file <path>` to test a proposed
-   policy against an existing submission before merging it.
+   policy against an existing submission before merging it. For a pull request,
+   a running Docker or Podman server is needed; `--container-runtime auto|docker|podman`
+   (default `auto`) selects the runtime.
 3. Read the printed local-run and non-authoritative lines, the outcome, any
    numbered requests, and the run directory.
 4. Run `steward report <run directory>` to verify and print the stored report.
@@ -283,6 +312,12 @@ Source: [SP15](../processes.md#sp15-maintainer-triage-override-and-appeal).
 pnpm build
 node packages/cli/dist/main.js screen --issue 29 --repo steady-orchard/patch-steward-testbed-public --policy-file templates/policy/policy.yml
 node packages/cli/dist/main.js report <run directory printed by screen>
+```
+
+For a pull request, the runtime can be chosen explicitly:
+
+```sh
+node packages/cli/dist/main.js screen --pr <number> --repo owner/name --container-runtime podman
 ```
 
 Against a public test-bed repository without a published policy, the first
@@ -295,10 +330,37 @@ loads the trusted-branch policy, or a local policy file with `--policy-file`;
 a repository without a published policy needs `--policy-file`, otherwise the
 command exits 2 with `screen.policy-missing`. It checks the submission
 contract, decides the outcome, and writes a report and evidence to a local run
-directory. No stage, container, or model runs yet, so the outcome is
-`needs-changes` when the contract fails and otherwise `inconclusive` with
-cause `stage-incomplete`; the report's "What would change the outcome" names
-the missing stages. Every run is a local run, not the repository's official
+directory.
+
+For a pull request whose contract check did not fail, the head commit is
+fetched by id over HTTPS git (nothing is written to GitHub), and the steward
+runs the declared `runner.dependency_step` (if any) and then every
+`mandatory: true` command of a `source: container` platform in local
+containers, each expected to exit zero. An issue has nothing to execute, and a
+contract failure ends `needs-changes` before any execution. A command's
+non-zero exit status is recorded, never classified or turned into a finding.
+The [`limits.execution`](configuration.md#limits) keys bound the execution: a
+plan above `executions_per_run` executes nothing, and exhausting
+`run_execution_seconds` skips the rest (cause `budget-exhausted`). Under
+`--policy-file` a `dockerfile` runner image is unavailable
+(`runner.image-source-unavailable`); registry images work. The runtime must
+be Docker or Podman with a Linux server and enforceable limits, and under
+Podman every runner image must leave `/work` absent or empty; see
+[`runner`](configuration.md#runner).
+
+No screening stage exists, so the outcome is `needs-changes` when the contract
+fails and otherwise `inconclusive` with cause `stage-incomplete`; the report's
+"What would change the outcome" names the missing stages. An environment
+failure (for example no running runtime, a runtime that is not Linux, limits
+that cannot be enforced, an image that cannot be pulled or built, or a failed
+dependency step) stops the plan and adds the cause `environment-unavailable`
+with its `runner.*` or `materialize.*` code; it is never read as "not
+reproduced" or as a failing result. `steward screen` and `steward report`
+exit `3` for such a run. The run directory also holds `executions/` records
+with each command's bounded output and stored JUnit result files, the image
+build log `logs/image-build.txt` for a Dockerfile image, and the runner
+identity and execution budget in the run record; `steward report` verifies
+them. Every run is a local run, not the repository's official
 screening result; it creates no check, comment, or label. `steward report`
 verifies a stored run directory's manifest, sizes, hashes, and record schemas;
 tampered or incomplete evidence exits 1 with `report.evidence-invalid`. See
@@ -306,9 +368,9 @@ tampered or incomplete evidence exits 1 with `report.evidence-invalid`. See
 [`steward report`](commands.md#steward-report-available) for exit statuses and
 options.
 
-Proposed and not yet implemented for local screening: the local container and
-stages, use of the maintainer's own inference credential, and optional
-attributed publication.
+Proposed and not yet implemented for local screening: the screening stages,
+use of the maintainer's own inference credential, and optional attributed
+publication.
 
 > **[NEEDS INPUT]** The explicit publication flag of SP20, which would post an attributed report comment, is not named.
 

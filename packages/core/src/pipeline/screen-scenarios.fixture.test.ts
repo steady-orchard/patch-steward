@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { fixedClock, fixedRandom } from '../clock.js';
+import { emptyPlanExecution } from '../execution/executor.js';
 import { exactValueForms } from '../redaction/redact.js';
 import { maskCodeSpans, reportDenylistMatches } from '../report/denylist.js';
 import { reportCharacterViolations } from '../report/escape.js';
@@ -391,6 +392,7 @@ describe('screen scenario fixture corpus', () => {
         attachmentResolver: fakeResolver(),
         attachmentTransport: fakeTransport(testCase.attachments),
         clock: CLOCK,
+        execution: { executor: async ({ plan }) => emptyPlanExecution(plan) },
         random: RANDOM,
       });
 

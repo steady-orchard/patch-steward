@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { FAILURE_CAUSES, OUTCOMES } from '../vocabulary.js';
 
-import { reportDenylistMatches } from './denylist.js';
+import { maskCodeSpans, reportDenylistMatches } from './denylist.js';
 import { REPORT_HEADING_MAX_LENGTH } from './caps.js';
+import { reportCharacterViolations, reportFixedTextViolations } from './escape.js';
 import {
   CAUSE_TEMPLATES,
   CHECK_SUMMARY_TEMPLATES,
@@ -22,6 +23,7 @@ import {
   REPORT_TITLE,
   causeLine,
   classificationLine,
+  executedCommandItem,
   nonAuthoritativeNotice,
   overflowLine,
   provenanceLines,
@@ -189,6 +191,110 @@ describe('templates', () => {
       '- Adapter and runtime: none',
       '- Runner: no execution in this run',
     ]);
+  });
+
+  it('executed command items use the core template', () => {
+    expect(
+      executedCommandItem({
+        entryId: 'head-test',
+        commit: 'a'.repeat(40),
+        exitCode: 1,
+        signal: null,
+        timedOut: false,
+        oomKilled: false,
+        outputLimited: false,
+        durationMs: 12400,
+        junit: { passed: 40, tests: 42 },
+      }),
+    ).toBe('`head-test` at `aaaaaaaaaaaa`: exit `1`; `12.4` s; JUnit `40`/`42` passed');
+  });
+
+  it('executed command items show status flags', () => {
+    expect(
+      executedCommandItem({
+        entryId: 'head-test',
+        commit: 'a'.repeat(40),
+        exitCode: 137,
+        signal: null,
+        timedOut: true,
+        oomKilled: true,
+        outputLimited: true,
+        durationMs: 5,
+        junit: null,
+      }),
+    ).toBe('`head-test` at `aaaaaaaaaaaa`: exit `137`, timed out, out of memory, output limited; `0.0` s');
+  });
+
+  it('executed command items show a signal without an exit code', () => {
+    expect(
+      executedCommandItem({
+        entryId: 'head-test',
+        commit: 'a'.repeat(40),
+        exitCode: null,
+        signal: 'SIGKILL',
+        timedOut: false,
+        oomKilled: false,
+        outputLimited: false,
+        durationMs: 0,
+        junit: null,
+      }),
+    ).toContain('signal `SIGKILL`');
+    expect(
+      executedCommandItem({
+        entryId: 'head-test',
+        commit: 'a'.repeat(40),
+        exitCode: null,
+        signal: null,
+        timedOut: false,
+        oomKilled: false,
+        outputLimited: false,
+        durationMs: 0,
+        junit: null,
+      }),
+    ).toContain('no exit status');
+  });
+
+  it('executed command items keep derived values in code spans', () => {
+    const hostile = '@octocat #1 <b>x</b> ' + '$' + '{{ secrets.X }} ' + '`'.repeat(3);
+    const s = executedCommandItem({
+      entryId: hostile,
+      commit: 'b'.repeat(40),
+      exitCode: null,
+      signal: hostile,
+      timedOut: false,
+      oomKilled: false,
+      outputLimited: false,
+      durationMs: 1000,
+      junit: null,
+    });
+    expect(reportDenylistMatches(maskCodeSpans(s))).toEqual([]);
+    expect(reportFixedTextViolations(maskCodeSpans(s))).toEqual([]);
+    expect(reportCharacterViolations(s)).toEqual([]);
+  });
+
+  it('provenance names the runner when executions ran', () => {
+    const lines = provenanceLines({
+      source: 'trusted-branch',
+      policyRevision: 'h'.repeat(40),
+      ref: 'main',
+      commit: 'i'.repeat(40),
+      stewardVersion: '1.0.0',
+      runner: {
+        runtime: 'docker',
+        serverVersion: '29.8.0',
+        reference: 'docker.io/library/debian:stable-slim',
+        imageDigest: 'sha256:' + '0123456789ab' + 'c'.repeat(52),
+      },
+    });
+    const withoutRunner = provenanceLines({
+      source: 'trusted-branch',
+      policyRevision: 'h'.repeat(40),
+      ref: 'main',
+      commit: 'i'.repeat(40),
+      stewardVersion: '1.0.0',
+    });
+    expect(lines[4]).toBe('- Runner: `docker` `29.8.0`, image `docker.io/library/debian:stable-slim` (`0123456789ab`)');
+    expect(lines.slice(0, 4)).toEqual(withoutRunner.slice(0, 4));
   });
 
   it('notices use the approved wording', () => {

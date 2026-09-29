@@ -35,7 +35,7 @@ quality. Passing checks does not establish project value or authorize merging.
 
 This is a **WORK IN PROGRESS**
 
-Project scaffold, design documentation, the policy layer, submission intake, a local screening skeleton, and a GitHub-hosted skeleton. Implemented: loading a policy from an explicit git revision, the GitHub API, or a named local file; strict validation against the version-1 schema with hard bounds; the policy revision (the git tree id of `.github/patch-steward/`); the resolved policy and its public subset; shared vocabularies; version-1 record schemas; a redaction module; the submission module, which parses issue-form and pull request template bodies through a versioned field mapping, classifies changed paths, applies the attachment rules, hashes the snapshot, and decides the deterministic contract result, with a GitHub adapter and git reads; the issue forms and PR template; the decision module, which applies the required-stage plan and the label mappings as pure rules; the report module, which builds a fixed-order report and check-run summary within report caps; the evidence module, which assembles, redacts, and stores records in a local evidence store or commits them to an orphan branch or a separate repository; the phase sequence (gate, intake, execute, assess, rounds, publish), run in one process with intake, execute, and assess as pass-throughs; the `steward policy` command, the deterministic part of `steward preflight`, `steward report`, and `steward screen` at contract level; and the GitHub-hosted skeleton, in observe mode at contract level: the reusable workflow `.github/workflows/steward-screening.yml`, called by the wrapper templates in `templates/workflows/`, whose credential-free `build` job compiles the steward at the pinned commit and whose `gate` and `publish` jobs authenticate the event, mint scoped App tokens, deduplicate by snapshot, apply approximate caps from the run list, commit an ownership artifact, and write evidence before their job summaries. It has run only on dedicated test-bed repositories, verified by the scenario suite in scenarios/. Screening stages (reference verification, claim validation, reproduction, fix verification, regression, challenge), the local container runner, model calls and LLM adapters, check runs, report comments, labels, and review requests, publication of local results, the maintenance workflow and restarts of queued runs, installation in a target repository, the browser app, `steward init`, `steward replay`, and preflight's mandatory commands and self-review are, however, not implemented yet. The probes/ directory holds the platform-assumption probe suite and its findings for disposable test-bed repositories; it is not product code and never runs in CI.
+Project scaffold, design documentation, the policy layer, submission intake, a local screening skeleton, and a GitHub-hosted skeleton. Implemented: loading a policy from an explicit git revision, the GitHub API, or a named local file; strict validation against the version-1 schema with hard bounds; the policy revision (the git tree id of `.github/patch-steward/`); the resolved policy and its public subset; shared vocabularies; version-1 record schemas; a redaction module; the submission module, which parses issue-form and pull request template bodies through a versioned field mapping, classifies changed paths, applies the attachment rules, hashes the snapshot, and decides the deterministic contract result, with a GitHub adapter and git reads; the issue forms and PR template; the decision module, which applies the required-stage plan and the label mappings as pure rules; the report module, which builds a fixed-order report and check-run summary within report caps; the evidence module, which assembles, redacts, and stores records in a local evidence store or commits them to an orphan branch or a separate repository; the phase sequence (gate, intake, execute, assess, rounds, publish), run in one process with assess as a pass-through; the execution planner; inert materialization of a commit from git objects; the local container runner for Docker and Podman with a hardened profile; JUnit XML result parsing; bounded, redacted execution records with stored output and result files; the `steward policy` command, `steward preflight` (contract check, and with `steward preflight --run` the mandatory commands and the before-and-after preview, run without a sandbox as claims), `steward report`, and `steward screen`, which checks the contract and executes a pull request's head commit in local containers; and the GitHub-hosted skeleton, in observe mode at contract level: the reusable workflow `.github/workflows/steward-screening.yml`, called by the wrapper templates in `templates/workflows/`, whose credential-free `build` job compiles the steward at the pinned commit and whose `gate` and `publish` jobs authenticate the event, mint scoped App tokens, deduplicate by snapshot, apply approximate caps from the run list, commit an ownership artifact, and write evidence before their job summaries. It has run only on dedicated test-bed repositories, verified by the scenario suite in scenarios/. Screening stages (reference verification, claim validation, reproduction, fix verification, regression, challenge), container execution in GitHub-hosted runs (the GitHub-hosted skeleton still runs no stage, container, or model call), model calls and LLM adapters, check runs, report comments, labels, and review requests, publication of local results, the maintenance workflow and restarts of queued runs, installation in a target repository, the browser app, `steward init`, `steward replay`, and preflight self-review are, however, not implemented yet. The probes/ directory holds the platform-assumption probe suite and its findings for disposable test-bed repositories; it is not product code and never runs in CI. Local container execution is verified on Windows with Docker Desktop and with a Podman machine, and on Ubuntu with Docker (the CI container job run locally); the CI Podman leg has not run on GitHub yet; macOS is supported but untested.
 
 The [user manual](docs/user-manual/README.md) covers scaffold setup, proposed
 workflows, configuration, and troubleshooting, with explicit documentation gaps.
@@ -56,7 +56,7 @@ a provider-independent LLM adapter for inference (a Copilot SDK adapter
 authenticated with the workflow's GitHub token, or an OpenAI-compatible
 provider with a project-supplied key, selected in the project's policy), a
 GitHub App identity for bot writes, GitHub Actions events as triggers, and
-containers started by trusted jobs as the sandbox. It invokes existing Git, build, and test tools and can screen
+containers started by trusted jobs as the sandbox. Local screening already runs submitted code only inside Docker or Podman containers started by `steward screen` without credentials. It invokes existing Git, build, and test tools and can screen
 repositories written in other languages.
 
 No hosted backend exists. Continuous screening runs in GitHub Actions in the
@@ -78,6 +78,12 @@ pnpm format:check
 pnpm coverage
 ```
 
+The container tier runs the `*.container.test.ts` files against a real container runtime (a running Docker or Podman is required; it pulls pinned public test images, fails rather than skips when the runtime is unavailable, and removes everything it creates). `pnpm test` never needs a runtime or network.
+
+```sh
+STEWARD_CONTAINER_RUNTIME=docker pnpm test:container
+```
+
 Validate a policy with the built CLI (the packages are private, so no global
 `steward` command is installed):
 
@@ -92,8 +98,13 @@ Check a draft issue or pull request against a repository's submission contract
 node packages/cli/dist/main.js preflight --issue defect --draft fixtures/submissions/defect-complete.txt --repo steady-orchard/patch-steward-testbed-public
 ```
 
-Screen an issue or pull request locally at contract level (reads GitHub,
-writes a run directory under the user data directory, never the official
+Add `--run` to run the policy's mandatory commands in your own checkout (and, for a pull request with a regression test, the before-and-after preview). The commands run without a sandbox and their results are claims:
+
+```sh
+node packages/cli/dist/main.js preflight --pr --draft <draft file> --repo <owner/name> --run
+```
+
+Screen an issue or pull request locally (reads GitHub with GET requests only; a pull request's head commit is materialized from git objects and its mandatory commands run in local containers selected with `--container-runtime auto|docker|podman`; writes a run directory under the user data directory, never the official
 result), then verify and print the stored run:
 
 ```sh
@@ -114,7 +125,7 @@ bash scenarios/tools/audit.sh steady-orchard/patch-steward-testbed-public
 bash scenarios/tools/steady-state.sh steady-orchard/patch-steward-testbed-public plan
 ```
 
-- packages/: workspace packages. core holds the policy module, shared vocabularies, version-1 record schemas, the redaction module, the submission module, the GitHub adapter (reads, App token minting, and the evidence-commit writer), git reads, the attachment fetcher, the ownership module, the decision module, the report module, the evidence module with the local, orphan-branch, and repository stores, the phase sequence with the GitHub-hosted gate and publish, and invariant conformance tests; cli implements `steward policy`, `steward preflight`, `steward screen`, and `steward report`; action runs the core's gate and publish inside workflow jobs; web holds toolchain smoke code only.
+- packages/: workspace packages. core holds the policy module, shared vocabularies, version-1 record schemas, the redaction module, the submission module, the GitHub adapter (reads, App token minting, and the evidence-commit writer), git reads, the attachment fetcher, the ownership module, the decision module, the report module, the evidence module with the local, orphan-branch, and repository stores, the execution planner, the JUnit parser, the tar codec, inert materialization, the container runner, the unsandboxed runner used only by `steward preflight --run`, the phase sequence with the GitHub-hosted gate and publish, and invariant conformance tests; cli implements `steward policy`, `steward preflight`, `steward screen`, and `steward report`; action runs the core's gate and publish inside workflow jobs; web holds toolchain smoke code only.
 - fixtures/: shared corpus for fixture-tier tests: valid, invalid, and hostile
   policies, submission bodies and diffs with expected contract results,
   recorded GitHub responses, golden reports and check summaries, and local
@@ -139,7 +150,7 @@ bash scenarios/tools/steady-state.sh steady-orchard/patch-steward-testbed-public
 ## Automation
 
 CI builds, type-checks, and tests on Node 24 on Windows and Linux for PRs targeting any
-branch and for pushes to master, develop, and release branches. Lint and
+branch and for pushes to master, develop, and release branches. The `container-tests` job runs the container tier on Ubuntu with a Docker and Podman matrix (`fail-fast: false`, read-only permissions, no secrets) and then checks that no labeled container, volume, or image leaked. Lint and
 formatting checks run for PRs. Coverage uploads from develop use the
 CODECOV_TOKEN repository secret. GitHub Pages deployment
 is omitted because this local project has no Pages configuration.
@@ -155,8 +166,8 @@ CI and CD validate this project's scaffold. The reusable screening workflow has 
 ## Trust boundaries
 
 Submitted code and contributor-supplied reproductions run only inside
-disposable containers that a trusted job starts without credentials, never
-directly on a maintainer's host. Worktrees and subprocesses alone are not
+disposable containers that a trusted job or the local CLI (`steward screen`) starts without credentials, never
+directly on a maintainer's host. The one exception is `steward preflight --run`, which runs the policy's commands in the contributor's own checkout without a sandbox; its results are claims. Worktrees and subprocesses alone are not
 security isolation. Results from project CI retain their signal provenance.
 Container isolation protects hosts and credentials; it does not make test
 results trustworthy. Submitted code can manipulate reporters, result files, and

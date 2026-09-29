@@ -9,8 +9,9 @@ For the existing development scaffold:
 - A local checkout of this repository.
 - Node.js 24. The CI workflows pin Node 24; the CLI package declares `engines.node >=24`.
 - pnpm **10.20.0**, as pinned in `package.json`.
+- Optional: Docker (Docker Desktop on Windows and macOS) or Podman (a Podman machine on Windows and macOS) with a running server, for `pnpm test:container` and for container execution in `steward screen`. Only Linux containers (`linux/amd64`) are used; Podman needs cgroup v2 with the `cpu`, `memory`, and `pids` controllers.
 
-The scaffold's CI runs builds, type-checks, and tests on Windows and Linux.
+The scaffold's CI runs builds, type-checks, and tests on Windows and Linux, and the container tests on Ubuntu with Docker and Podman. Container execution is verified on Windows with Docker Desktop and with a Podman machine, and on Ubuntu with Docker (the CI container job run locally); the CI Podman leg has not run on GitHub yet; macOS is supported but untested.
 Its packages are private and unpublished; the CLI package declares a `steward` executable that runs from the build output.
 
 > **[NEEDS INPUT]** The sources do not specify Node.js/pnpm installation
@@ -88,6 +89,15 @@ unauthenticated rate limit:
 GH_TOKEN=$(gh auth token) pnpm test:live
 ```
 
+With a running Docker or Podman server, the container tier exercises the runner against public images (pulled anonymously). It fails, never skips, when the selected runtime is unavailable; `STEWARD_CONTAINER_RUNTIME` is `docker` (the default) or `podman`. Under Podman it also fails when `/run/secrets` is not empty, which happens when a default mount in the host's `mounts.conf` places host data there; empty those mounts. Afterwards the label leak checks must print nothing (use `podman` in place of `docker` for a Podman run):
+
+```sh
+STEWARD_CONTAINER_RUNTIME=docker pnpm test:container
+docker ps -a --filter label=org.patch-steward.test -q
+docker volume ls -q --filter label=org.patch-steward.test
+docker image ls -q --filter label=org.patch-steward.test
+```
+
 Sources: [sample test](../../packages/core/src/index.test.ts), [package scripts](../../package.json),
 [CI workflow](../../.github/workflows/ci.yml), [`steward policy`](commands.md#steward-policy-available).
 
@@ -104,7 +114,7 @@ The following is the documented adoption sequence. The policy template, issue fo
 - The selected inference adapter, model, and credential.
 - An evidence store: an orphan branch in the target repository by default, or a separate repository.
 - GitHub Pages if an authorized public dashboard is wanted.
-- Docker or Podman for maintainer local screening or replay.
+- Docker or Podman, required for container execution in `steward screen` (and for replay when it exists). Runner images must be public, and an image used under Podman must leave `/work` absent or an empty directory; see [`runner`](configuration.md#runner).
 
 ### Setup sequence
 

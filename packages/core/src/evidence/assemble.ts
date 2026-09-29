@@ -90,6 +90,7 @@ export interface RunAssemblyInput {
   readonly decision: Extract<DecisionResult, { readonly kind: 'outcome' }>;
   readonly githubRequests: number;
   readonly retries: number;
+  readonly execution?: { readonly runnerIdentity: string | null; readonly executions: number; readonly containerSeconds: number };
 }
 
 export interface AssembledRun {
@@ -125,7 +126,7 @@ export function assembleRunRecords(input: RunAssemblyInput): Result<AssembledRun
     reported_model: null,
     adapter_version: null,
     generation: null,
-    runner_identity: null,
+    runner_identity: input.execution?.runnerIdentity ?? null,
     mode: input.mode,
     started_at: input.startedAt,
     finished_at: input.finishedAt,
@@ -133,8 +134,8 @@ export function assembleRunRecords(input: RunAssemblyInput): Result<AssembledRun
       model_calls: 0,
       tokens: null,
       ai_credits: null,
-      container_seconds: 0,
-      executions: 0,
+      container_seconds: input.execution?.containerSeconds ?? 0,
+      executions: input.execution?.executions ?? 0,
       github_requests: input.githubRequests,
       retries: input.retries,
     },
@@ -214,6 +215,7 @@ export function assembleRunRecords(input: RunAssemblyInput): Result<AssembledRun
     phases: input.phases,
     finishedAt: input.finishedAt,
     outcome: decision.outcome,
+    ...(input.execution === undefined ? {} : { containerSeconds: input.execution.containerSeconds }),
   });
   if (!metricsResult.ok) {
     return metricsResult;

@@ -65,6 +65,7 @@ import type {
   AttachmentTransportResponse,
 } from '../net/attachment-fetch.js';
 import { fixedClock, fixedRandom } from '../clock.js';
+import { emptyPlanExecution } from '../execution/executor.js';
 import { screenSubmission } from '../pipeline/screen.js';
 import { verifyRunDirectory } from '../evidence/verify.js';
 
@@ -405,7 +406,7 @@ describe('zero model calls and zero executions', () => {
       expect(['rev-parse', 'merge-base', 'diff-tree', 'ls-tree', 'cat-file', 'remote']).toContain(call.args[0]);
     }
 
-    // (f) the core screenSubmission path: no spawned process, a run with zero model calls and executions.
+    // (f) the core screenSubmission path: only git or a container runtime may spawn, a run with zero model calls and executions.
     spy.calls.length = 0;
     const screenTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'm5-zx-'));
     try {
@@ -420,6 +421,7 @@ describe('zero model calls and zero executions', () => {
         attachmentResolver: fakeAttachmentResolver(),
         attachmentTransport: fakeAttachmentTransport(),
         clock: fixedClock('2026-09-27T10:15:00.000Z'),
+        execution: { executor: async ({ plan }) => emptyPlanExecution(plan) },
         random: fixedRandom('3f9a1c2e'),
       });
       expect(screenResult.kind).toBe('completed');
@@ -434,13 +436,20 @@ describe('zero model calls and zero executions', () => {
     } finally {
       fs.rmSync(screenTmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
-    expect(spy.calls).toEqual([]);
+    const screenRoot = path.resolve(screenTmp);
+    for (const call of spy.calls) {
+      const base = path.basename(call.file).replace(/\.[^.]*$/, '');
+      expect(['git', 'docker', 'podman'], `screen spawned ${call.file}`).toContain(base);
+      const resolved = path.resolve(call.file);
+      const insideScreenDir = resolved === screenRoot || resolved.startsWith(screenRoot + path.sep);
+      expect(insideScreenDir, `screen ran a repository command ${call.file}`).toBe(false);
+    }
 
     // (d) the network spy was never triggered by any of the above.
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
 
-    // (e) static scan: no submission, adapter, or CLI module imports a model or execution module.
+    // (e) static scan: no model module is imported anywhere and only the process, git, materialize, and runner directories spawn processes.
     const scanRoots = [
       fileURLToPath(new URL('../submission/', import.meta.url)),
       fileURLToPath(new URL('../github/', import.meta.url)),
@@ -455,15 +464,10 @@ describe('zero model calls and zero executions', () => {
       fileURLToPath(new URL('../../../action/src/', import.meta.url)),
     ];
 
-    const forbiddenNamePattern = /(llm|model|copilot|openai|anthropic|sandbox|container|docker|runner)/i;
-    const forbiddenSpecifiers = new Set([
-      'node:child_process',
-      'child_process',
-      'node:vm',
-      'vm',
-      'node:worker_threads',
-      'worker_threads',
-    ]);
+    const modelPattern = /(llm|model|copilot|openai|anthropic)/i;
+    const bannedRuntimeSpecifiers = new Set(['node:vm', 'vm', 'node:worker_threads', 'worker_threads']);
+    const childProcessSpecifiers = new Set(['node:child_process', 'child_process']);
+    const toPosix = (p: string): string => p.split(path.sep).join('/');
     const specifierPattern = /(?:from\s+|import\s*\(\s*)['"]([^'"]+)['"]|^\s*import\s+['"]([^'"]+)['"]/gm;
 
     function listTsFiles(dir: string): string[] {
@@ -480,21 +484,61 @@ describe('zero model calls and zero executions', () => {
       return files;
     }
 
+    function specifiersOf(file: string): string[] {
+      const text = fs.readFileSync(file, 'utf8');
+      const found: string[] = [];
+      let match: RegExpExecArray | null;
+      specifierPattern.lastIndex = 0;
+      while ((match = specifierPattern.exec(text)) !== null) {
+        found.push(match[1] ?? match[2] ?? '');
+      }
+      return found;
+    }
+
+    const coreSrc = toPosix(fileURLToPath(new URL('../', import.meta.url)));
+    const gitDir = `${coreSrc}git/`;
+    const processDirs = [`${coreSrc}process/`, gitDir, `${coreSrc}materialize/`, `${coreSrc}runner/`];
+
     let scannedCount = 0;
     for (const root of scanRoots) {
       for (const file of listTsFiles(root)) {
         scannedCount += 1;
-        const text = fs.readFileSync(file, 'utf8');
-        let match: RegExpExecArray | null;
-        specifierPattern.lastIndex = 0;
-        while ((match = specifierPattern.exec(text)) !== null) {
-          const specifier = match[1] ?? match[2] ?? '';
-          expect(forbiddenNamePattern.test(specifier), `${file} imports forbidden module ${specifier}`).toBe(false);
-          expect(forbiddenSpecifiers.has(specifier), `${file} imports forbidden module ${specifier}`).toBe(false);
+        for (const specifier of specifiersOf(file)) {
+          expect(modelPattern.test(specifier), `${file} imports model module ${specifier}`).toBe(false);
+          expect(bannedRuntimeSpecifiers.has(specifier), `${file} imports forbidden module ${specifier}`).toBe(false);
+          if (childProcessSpecifiers.has(specifier)) {
+            expect(toPosix(file).startsWith(gitDir), `${file} imports ${specifier}`).toBe(true);
+          }
         }
       }
     }
     expect(scannedCount).toBeGreaterThanOrEqual(60);
+
+    const allRoots = [
+      fileURLToPath(new URL('../', import.meta.url)),
+      fileURLToPath(new URL('../../../cli/src/', import.meta.url)),
+      fileURLToPath(new URL('../../../action/src/', import.meta.url)),
+      fileURLToPath(new URL('../../../web/src/', import.meta.url)),
+    ];
+    let allCount = 0;
+    const childProcessImporters: string[] = [];
+    for (const root of allRoots) {
+      for (const file of listTsFiles(root)) {
+        allCount += 1;
+        for (const specifier of specifiersOf(file)) {
+          expect(modelPattern.test(specifier), `${file} imports model module ${specifier}`).toBe(false);
+          if (childProcessSpecifiers.has(specifier)) {
+            childProcessImporters.push(toPosix(file));
+            expect(
+              processDirs.some((dir) => toPosix(file).startsWith(dir)),
+              `${file} imports ${specifier} outside the process directories`,
+            ).toBe(true);
+          }
+        }
+      }
+    }
+    expect(allCount).toBeGreaterThanOrEqual(150);
+    expect(childProcessImporters).toContain(`${coreSrc}process/stream-process.ts`);
   }, 60000);
 });
 
@@ -553,6 +597,7 @@ describe('screen requests', { timeout: 60000 }, () => {
         attachmentResolver: fakeAttachmentResolver(),
         attachmentTransport: recordingTransport(),
         clock: fixedClock('2026-09-27T10:15:00.000Z'),
+        execution: { executor: async ({ plan }) => emptyPlanExecution(plan) },
         random: fixedRandom('3f9a1c2e'),
       });
       expect(prResult.kind).toBe('completed');
@@ -581,6 +626,7 @@ describe('screen requests', { timeout: 60000 }, () => {
         attachmentResolver: fakeAttachmentResolver(),
         attachmentTransport: recordingTransport(),
         clock: fixedClock('2026-09-27T10:15:00.000Z'),
+        execution: { executor: async ({ plan }) => emptyPlanExecution(plan) },
         random: fixedRandom('3f9a1c2e'),
       });
       expect(issueResult.kind).toBe('not-started');

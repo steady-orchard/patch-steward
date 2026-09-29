@@ -16,10 +16,17 @@ Current entries:
 - `smoke/greeting.txt` — smoke entry proving the fixture-tier wiring.
 - `policies/valid/` — valid policies: minimal without inference, Copilot SDK, OpenAI-compatible, and one whose free-text
   fields carry prompt-injection and shell text that must stay data.
-- `policies/invalid/` — policies that each break one validation rule; `.txt` so the formatter never rewrites them.
+- `policies/invalid/` — policies that each break one validation rule, among them the four cross-field execution-limit rules (output head plus tail above `output_bytes`, an output stream bound below `output_bytes`, a prepared-checkout bound below the checkout bound, and more declared result files than `result_files` allows); `.txt` so the formatter never rewrites them.
 - `policies/hostile/` — hostile YAML: aliases, anchors, duplicate keys, custom tags, multiple documents, deep nesting,
   prototype keys, a catastrophic redaction pattern, non-string keys.
 - `policies/expectations.json` — validity and failure codes per fixture; the fixture-tier test checks it both ways.
+- `junit/` — JUnit XML result files: `samples/` hand-written in the documented shapes of the Vitest and Jest (`jest-junit`) reporters, cargo-nextest, CTest `--output-junit`, GoogleTest, and the Node.js test runner, plus a generic file with an error case; `hostile/` a DOCTYPE, internal and external entities, billion laughs, an unknown entity, nesting deeper than the parser bound, and an attribute flood; `expectations.json` holds the status, counts, total duration, and test identities or the failure code per file, and the fixture-tier test checks it both ways. Invalid UTF-8 is built in test code, never committed.
+- `repositories/` — target repositories as JSON manifests (`description`; `commit` with message and epoch time; `entries` of regular files with `mode` and UTF-8 `content` or `base64`, symlinks with their target, and gitlinks with a commit id), built by test code into temporary bare repositories with git plumbing commands so their bytes never depend on line-ending settings: `hostile-materialization.json` carries an attribute filter and line-ending rules, export-subst, CRLF line endings, an LFS pointer, a submodule declaration with its gitlink, and escaping symlinks, all of which materialization must leave inert. Hostile host git configuration (hooks, filter drivers, fsmonitor, URL rewriting, template directories, submodule update commands), hostile tree entry names, and submodule declarations that git's object check rejects are generated in test code, never committed; no live `.gitattributes` or `.gitmodules` file is committed.
+- `repositories/shell-sample.json` — a shell project for the container tier: it prints a line and the user id, writes one JUnit result file, and exits with status 3.
+- `repositories/typescript-sample.json` — a zero-dependency TypeScript project for the container tier: Node's built-in test runner runs one passing and one failing test by type stripping and writes a JUnit result file.
+- `repositories/hostile-limits.json` — resource-exhaustion probes for the container tier: a fork bomb, a memory hog, a sleeper, an output flood, an invalid UTF-8 output flood, and a scratch filler, each a shell script the sandbox limits must stop.
+- `repositories/hostile-probes.json` — sandbox probes for the container tier: identity and capability, network, runtime socket, and mount probes, and a canary reader that searches the container environment, process environments, and filesystem for host canary values.
+- `repositories/hostile-results.json` — result-file and injection probes for the container tier: a test script that writes a JUnit file whose test names and output carry shell, Markdown, mention, and workflow-expression text, a committed symlink to a system file, a result path that is a directory, a small binary result file, and a 2796203-byte 0xFF result file generated at run time; one declared result file is never written.
 - `submissions/` — issue and pull request bodies, also used as preflight drafts, rendered in the issue-form and pull
   request template layouts as byte-exact `.txt`: complete, missing, duplicated, and unstructured cases, severity
   wording, and hostile or injection text that must stay data. Control and format characters are generated in test
@@ -62,7 +69,8 @@ Current entries:
 - `reports/` — golden screening reports and check-run summaries as byte-exact `.txt`, one pair per case listed in
   `reports/cases.json`: an unstructured issue, a complete defect issue, a pull request with a missing field and an attachment
   violation, an execution-sensitive change, a shared head commit, a run under a local policy file, more blockers than a
-  report lists, and hostile derived text. The fixture-tier test builds each run in a temporary directory with a fixed
+  report lists, hostile derived text, a pull request whose head was executed in a container, and a pull request whose
+  execution plan ended in an environment failure. The fixture-tier test builds each run in a temporary directory with a fixed
   clock, random source, and steward version and compares after CRLF-to-LF normalization; control and format characters
   and credential samples are generated in test code, and no run directory is committed.
 - `screen/expectations.json` — local screening scenarios run end to end through the core screening path: each case

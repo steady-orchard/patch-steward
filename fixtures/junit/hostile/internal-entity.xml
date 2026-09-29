@@ -1,0 +1,4 @@
+<!DOCTYPE testsuites [
+<!ENTITY secret "leaked">
+]>
+<testsuites><testsuite name="&secret;"><testcase classname="c" name="t" time="0.1"/></testsuite></testsuites>

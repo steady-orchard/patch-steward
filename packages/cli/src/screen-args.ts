@@ -1,10 +1,10 @@
 import { parseArgs } from 'node:util';
 
-import type { GitHubRepositoryRef } from '@patch-steward/core';
+import type { ContainerRuntimeChoice, GitHubRepositoryRef } from '@patch-steward/core';
 import { repositoryRefFromFullName } from '@patch-steward/core';
 
 export const SCREEN_USAGE =
-  'usage: steward screen (--issue <number> | --pr <number>) [--repo owner/name] [--policy-file <path>] [--evidence-dir <dir>] [--json]';
+  'usage: steward screen (--issue <number> | --pr <number>) [--repo owner/name] [--policy-file <path>] [--evidence-dir <dir>] [--container-runtime auto|docker|podman] [--json]';
 
 export const SCREEN_USAGE_CODES = ['usage.unknown-option', 'usage.invalid-arguments', 'usage.conflicting-options'] as const;
 
@@ -17,6 +17,7 @@ export interface ScreenArgs {
   readonly repository: GitHubRepositoryRef | null;
   readonly policyFile: string | null;
   readonly evidenceDir: string | null;
+  readonly containerRuntime: ContainerRuntimeChoice;
   readonly json: boolean;
 }
 
@@ -29,7 +30,15 @@ const NUMBER_PATTERN = /^[1-9][0-9]*$/;
 export function parseScreenArgs(argv: readonly string[]): ScreenArgsResult {
   const json = argv.includes('--json');
 
-  let values: { issue?: string; pr?: string; repo?: string; 'policy-file'?: string; 'evidence-dir'?: string; json?: boolean };
+  let values: {
+    issue?: string;
+    pr?: string;
+    repo?: string;
+    'policy-file'?: string;
+    'evidence-dir'?: string;
+    'container-runtime'?: string;
+    json?: boolean;
+  };
   try {
     ({ values } = parseArgs({
       args: [...argv],
@@ -39,6 +48,7 @@ export function parseScreenArgs(argv: readonly string[]): ScreenArgsResult {
         repo: { type: 'string' },
         'policy-file': { type: 'string' },
         'evidence-dir': { type: 'string' },
+        'container-runtime': { type: 'string' },
         json: { type: 'boolean' },
       },
       strict: true,
@@ -83,6 +93,11 @@ export function parseScreenArgs(argv: readonly string[]): ScreenArgsResult {
     return { ok: false, code: 'usage.invalid-arguments', message: '--evidence-dir must not be empty', json };
   }
 
+  const runtime = values['container-runtime'] ?? 'auto';
+  if (runtime !== 'auto' && runtime !== 'docker' && runtime !== 'podman') {
+    return { ok: false, code: 'usage.invalid-arguments', message: '--container-runtime must be auto, docker, or podman', json };
+  }
+
   return {
     ok: true,
     args: {
@@ -90,6 +105,7 @@ export function parseScreenArgs(argv: readonly string[]): ScreenArgsResult {
       repository,
       policyFile: values['policy-file'] ?? null,
       evidenceDir: values['evidence-dir'] ?? null,
+      containerRuntime: runtime,
       json: values.json === true,
     },
   };

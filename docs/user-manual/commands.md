@@ -6,19 +6,22 @@
 
 Run from this repository's root with pnpm 10.20.0.
 
-| Command                                           | Purpose                                                                                                                                                          |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm install --frozen-lockfile`                  | Install dependencies using the lockfile.                                                                                                                         |
-| `pnpm build`                                      | Run `tsc` in each package; output goes to `packages/*/dist/`.                                                                                                    |
-| `pnpm typecheck`                                  | Type-check each package's sources and tests with `tsc --noEmit`; writes no files.                                                                                |
-| `pnpm test`                                       | Run the Vitest suite once.                                                                                                                                       |
-| `pnpm test:live`                                  | Run the live-probe tier (`*.live.test.ts`) read-only against a public test-bed repository; needs network access, uses `GH_TOKEN` when set, and never runs in CI. |
-| `pnpm coverage`                                   | Run Vitest with coverage and the LCOV reporter.                                                                                                                  |
-| `pnpm lint`                                       | Run ESLint.                                                                                                                                                      |
-| `pnpm format`                                     | Apply Prettier formatting.                                                                                                                                       |
-| `pnpm format:check`                               | Check Prettier formatting.                                                                                                                                       |
-| `pnpm vitest run packages/core/src/index.test.ts` | Run the sample test file.                                                                                                                                        |
-| `pnpm vitest run -t 'greets by name'`             | Run the named sample test.                                                                                                                                       |
+| Command                                           | Purpose                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm install --frozen-lockfile`                  | Install dependencies using the lockfile.                                                                                                                                                                                                                                                                                                         |
+| `pnpm build`                                      | Run `tsc` in each package; output goes to `packages/*/dist/`.                                                                                                                                                                                                                                                                                    |
+| `pnpm typecheck`                                  | Type-check each package's sources and tests with `tsc --noEmit`; writes no files.                                                                                                                                                                                                                                                                |
+| `pnpm test`                                       | Run the Vitest suite once.                                                                                                                                                                                                                                                                                                                       |
+| `pnpm test:live`                                  | Run the live-probe tier (`*.live.test.ts`) read-only against a public test-bed repository; needs network access, uses `GH_TOKEN` when set, and never runs in CI.                                                                                                                                                                                 |
+| `pnpm test:container`                             | Run the container tier (`*.container.test.ts`) through `vitest.container.config.ts`; the runtime comes from `STEWARD_CONTAINER_RUNTIME`, `docker` (default) or `podman`. Needs a running runtime and network access for public image pulls, fails (never skips) without the runtime, and leaves nothing labeled `org.patch-steward.test` behind. |
+| `pnpm coverage`                                   | Run Vitest with coverage and the LCOV reporter.                                                                                                                                                                                                                                                                                                  |
+| `pnpm lint`                                       | Run ESLint.                                                                                                                                                                                                                                                                                                                                      |
+| `pnpm format`                                     | Apply Prettier formatting.                                                                                                                                                                                                                                                                                                                       |
+| `pnpm format:check`                               | Check Prettier formatting.                                                                                                                                                                                                                                                                                                                       |
+| `pnpm vitest run packages/core/src/index.test.ts` | Run the sample test file.                                                                                                                                                                                                                                                                                                                        |
+| `pnpm vitest run -t 'greets by name'`             | Run the named sample test.                                                                                                                                                                                                                                                                                                                       |
+
+Example: `STEWARD_CONTAINER_RUNTIME=podman pnpm test:container`. `pnpm test` never needs a container runtime or network access.
 
 Documented verification sequence:
 
@@ -145,10 +148,11 @@ Sources: [architecture §6.5](../architecture.md#65-command-line-interface-packa
 ## `steward preflight` (Available)
 
 Checks a draft issue or pull request against the target repository's submission
-contract before you submit it. This is the deterministic part of contributor
-preflight: running the policy's mandatory commands on your machine and the
-optional self-review session are proposed and not implemented. The result is a
-claim; official screening repeats every check.
+contract before you submit it. This covers the contract check of contributor
+preflight; with `--run` it also runs the policy's mandatory commands on your own
+checkout, without a sandbox, and previews the declared tests against the merge
+base; the optional self-review session is proposed and not implemented. The
+result is a claim; official screening repeats every check.
 
 After `pnpm build`, run the built entry point, as for
 [`steward policy`](#steward-policy-available):
@@ -160,7 +164,7 @@ node packages/cli/dist/main.js preflight --issue defect --draft fixtures/submiss
 Syntax:
 
 ```text
-steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--json]
+steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo owner/name] [--base <ref>] [--run] [--json]
 ```
 
 | Option                                 | Effect                                                                                                                                                                                                                                                                                   |
@@ -170,12 +174,20 @@ steward preflight (--issue defect|proposal | --pr) --draft <file.md> [--repo own
 | `--draft <file.md>`                    | Required. The draft, relative to the current directory: Markdown in the rendered issue-form or pull request template layout (see the [submission settings](configuration.md#submission)), at most 262144 bytes of UTF-8; one leading byte-order mark and CRLF line endings are accepted. |
 | `--repo owner/name`                    | The upstream repository. Default: the GitHub repository of the `upstream` remote, else of `origin`.                                                                                                                                                                                      |
 | `--base <ref>`                         | Pull requests only: the base to compare with. Default: the local remote-tracking ref of the upstream default branch, such as `refs/remotes/origin/main`.                                                                                                                                 |
+| `--run`                                | Also runs the policy's mandatory commands on your own checkout without a sandbox; see "With `--run`" below. Without it nothing changes and no repository or policy command runs.                                                                                                         |
 | `--json`                               | Emits one JSON object on stdout instead of text lines.                                                                                                                                                                                                                                   |
+
+With the policy's commands and the preview on your own checkout:
+
+```sh
+node packages/cli/dist/main.js preflight --pr --draft pr.md --run
+```
 
 The command reads the upstream repository and its policy through the GitHub API
 and reads the local repository with read-only git plumbing. It never writes to
 GitHub, fetches git objects, reads the working tree, runs a repository or policy
-command, or sends telemetry.
+command, or sends telemetry; with `--run` it runs the policy's commands as
+described under "With `--run`".
 
 - Policy: the published policy on the upstream default branch
   (`.github/patch-steward/policy.yml`), identified by its revision, the git tree
@@ -289,6 +301,85 @@ Usage errors print `error <code> -: <message>` and the preflight usage line on
 stderr. A draft over 262144 bytes, or with more than 65536 characters, GitHub's
 limit for an issue or pull request body, fails with `preflight.draft-too-large`.
 
+With `--run`:
+
+With `--run` and a published valid policy, every command with `mandatory: true`
+runs in `execution.commands` order in your own checkout (the working tree as it
+is; a dirty tree adds the warning `preflight.working-tree-dirty`), whatever the
+contract result. Without a published policy (the default checklist) nothing
+runs and the warning `preflight.run-without-policy` is printed.
+
+- Own-checkout guard: the run directory's real path must equal that of
+  `git rev-parse --show-toplevel` from the working directory, or be a preview
+  worktree this invocation created under the OS temp directory whose git common
+  directory is the checkout's. A bare repository, a directory outside any work
+  tree, a command working directory that leaves the checkout, and any run under
+  `GITHUB_ACTIONS=true` are refused (`runner.not-own-checkout`).
+- Environment: the process environment minus `GH_TOKEN`, `GITHUB_TOKEN`,
+  `STEWARD_LLM_API_KEY`, and any variable whose value equals a credential the
+  process resolved. Commands run as argument vectors without a shell, except
+  that on Windows a command whose executable resolves to a `.cmd` or `.bat` shim
+  (for example `pnpm.cmd`) runs as `cmd.exe /d /s /c <escaped command line>`
+  with strict escaping of every argument; the output says `ran through cmd.exe`.
+- Bounds: `limits.execution.execution_seconds`, the output keys,
+  `executions_per_run`, and `run_execution_seconds` apply as for containers; the
+  resource keys and container constants do not. A timed-out or output-limited
+  process tree is stopped (on Windows with `taskkill.exe /PID <pid> /T /F`). A
+  plan above `limits.execution.executions_per_run` runs nothing (error
+  `preflight.run-over-budget`, exit `3`); exhausting
+  `limits.execution.run_execution_seconds` marks the remaining commands skipped
+  (`execution.time-exhausted`, exit `3`).
+- Preview (`--pr` only): when the draft's regression-test field is non-empty and
+  at least one path changed between the merge base and `HEAD` is a test path, the
+  command creates a detached worktree of the merge base outside the checkout with
+  `git -c core.hooksPath=<empty temp dir> worktree add --detach <temp dir> <merge base>`
+  (your own filters and line-ending settings apply; only hooks are disabled),
+  applies the `HEAD` versions of the test-class paths (deletions and renames
+  applied), runs the declared dependency step there if any, then every mandatory
+  `kind: test` command ("before"). "After" is the result of the same commands in
+  the checkout (no second run). Afterwards the worktree is removed with
+  `git worktree remove --force` and `git worktree prune`. Otherwise the preview is
+  skipped with the note `preflight.preview-skipped` and its reason. Preview
+  failures are warnings `preflight.preview-unavailable` and never change the exit
+  status. Declared test scaffolding is not applied.
+- Entry ids: `head-<command id>` in the checkout; `base-dependency-step` and
+  `base-<command id>` in the preview.
+- Results are claims (admissibility `claim`); nothing is written to GitHub or
+  stored; there is no telemetry. Output is redacted (built-in detectors, policy
+  patterns, exact values of the resolved GitHub token).
+
+Text output gains, before each execution, the line
+`run <entry id>: <argument vector as a JSON array> in <directory>`. After the
+contract lines come the line
+`Commands ran on this machine without a sandbox; their results are claims, not evidence.`
+and, per result,
+`result <entry id>: exit <code>[, timed out][, output limited]; <seconds> s[; JUnit <passed>/<tests> passed, <failed> failed, <errored> errors, <skipped> skipped][; ran through cmd.exe]`,
+followed for a completed command by its bounded, redacted output tail as
+`  | <line>` lines. A command that was refused, could not start, or was skipped
+prints `result <entry id>: refused <code>`, `result <entry id>: not started <code>`,
+or `result <entry id>: skipped <code>`. A preview adds
+`preview <base>: <n> test paths applied`, then `before <entry id>: ...` lines
+(with the output tail) and `after <entry id>: ...` lines in the same form.
+
+With `--json` and `--run`, the output is still exactly one line on stdout and
+nothing on stderr; the object gains `run`: `requested` (`true`), `notice`,
+`executions` (per entry `id`, `argv`, `directory`, `via_cmd`, `status`
+`completed`, `refused`, `environment-failure`, or `skipped`, `code`, `exit_code`,
+`signal`, `timed_out`, `output_limited`, `duration_ms`, `junit`, `output_tail`,
+`admissibility`), and `preview` (`base`, `overlay_paths`, `before`, `after`, with
+entries in the same form) or `null`.
+
+Exit status with `--run`: as above for the contract; a mandatory command with a
+non-zero exit, `timed_out`, or `output_limited` gives `1`; a guard refusal or an
+environment failure (for example a command that cannot start) gives `2`. When
+several apply, `2` wins over `3`, `3` over `1`, and `1` over `0`.
+
+Host processes: without `--run`, only read-only `git` and
+`gh auth token --hostname github.com` (credential resolution). With `--run`,
+additionally the policy's commands (directly, or through `cmd.exe` for Windows
+batch shims), the preview worktree's `git worktree` commands with hooks disabled,
+and on Windows `taskkill.exe` to stop a timed-out or output-limited process tree.
+
 Example, a complete defect draft checked against a repository without a
 published policy:
 
@@ -309,7 +400,7 @@ Sources: [architecture §6.5](../architecture.md#65-command-line-interface-packa
 
 ## `steward screen` (Available)
 
-Screens an existing issue or pull request locally at contract level and records local evidence and a report. The result is a local run, never the repository's official screening result.
+Screens an existing issue or pull request locally and records local evidence and a report. For a pull request it also runs the policy's mandatory commands in a container. The result is a local run, never the repository's official screening result.
 
 After `pnpm build`, run the built entry point, as for [`steward policy`](#steward-policy-available):
 
@@ -317,28 +408,37 @@ After `pnpm build`, run the built entry point, as for [`steward policy`](#stewar
 node packages/cli/dist/main.js screen --issue 29 --repo steady-orchard/patch-steward-testbed-public --policy-file templates/policy/policy.yml
 ```
 
+A pull request runs its commands in a container:
+
+```sh
+node packages/cli/dist/main.js screen --pr 26 --repo steady-orchard/patch-steward-testbed-public --policy-file templates/policy/policy.yml --container-runtime docker
+```
+
 Syntax:
 
 ```text
-steward screen (--issue <number> | --pr <number>) [--repo owner/name] [--policy-file <path>] [--evidence-dir <dir>] [--json]
+steward screen (--issue <number> | --pr <number>) [--repo owner/name] [--policy-file <path>] [--evidence-dir <dir>] [--container-runtime auto|docker|podman] [--json]
 ```
 
-| Option                 | Effect                                                                                                                                             |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--issue <number>`     | Screens the named issue. A positive decimal number, no sign or leading zero, at most 2147483647. Cannot be combined with `--pr`.                   |
-| `--pr <number>`        | Screens the named pull request, with the same number format. Cannot be combined with `--issue`; both give `usage.conflicting-options`.             |
-| `--repo owner/name`    | The upstream repository. Default: the GitHub repository of the `upstream` remote, else of `origin`; git remotes are read only without this option. |
-| `--policy-file <path>` | Reads the policy from a local file, relative to the current directory. The run is non-authoritative.                                               |
-| `--evidence-dir <dir>` | The evidence store root, relative to the current directory. See below for the default.                                                             |
-| `--json`               | Emits one JSON object on stdout instead of text lines.                                                                                             |
+| Option                                          | Effect                                                                                                                                             |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--issue <number>`                              | Screens the named issue. A positive decimal number, no sign or leading zero, at most 2147483647. Cannot be combined with `--pr`.                   |
+| `--pr <number>`                                 | Screens the named pull request, with the same number format. Cannot be combined with `--issue`; both give `usage.conflicting-options`.             |
+| `--repo owner/name`                             | The upstream repository. Default: the GitHub repository of the `upstream` remote, else of `origin`; git remotes are read only without this option. |
+| `--policy-file <path>`                          | Reads the policy from a local file, relative to the current directory. The run is non-authoritative.                                               |
+| `--evidence-dir <dir>`                          | The evidence store root, relative to the current directory. See below for the default.                                                             |
+| `--container-runtime <auto, docker, or podman>` | The container runtime for the plan. Default: `auto`. An invalid value is a usage error (exit `2`).                                                 |
+| `--json`                                        | Emits one JSON object on stdout instead of text lines.                                                                                             |
 
 Policy: without `--policy-file`, the command reads `.github/patch-steward/policy.yml` from the upstream default branch through the GitHub API; the revision is the git tree id of `.github/patch-steward/`, and the branch and commit are recorded. This policy is authoritative. When the default branch has no published policy, the command fails with `screen.policy-missing` (exit `2`) and the message "The repository has no published policy on its default branch. Pass --policy-file <path> to screen under a local policy file." An invalid published policy fails with `screen.policy-invalid` (exit `2`) and the validation errors. Unlike [`steward preflight`](#steward-preflight-available), the default checklist is never used. With `--policy-file`, the revision is `local:<sha256 of the file bytes>`; an invalid file fails with `screen.policy-file-invalid` (exit `1`) and the validation errors; a missing or unreadable file fails with a `file.*` code (exit `2`).
 
-What runs: `gate` loads the policy, reads the issue or pull request through the GitHub API as in [SP06](../processes.md#sp06-intake-and-submission-contract-check) (its linked issue, attachments per policy, open pull requests sharing the head commit), hashes the snapshot, checks the contract, and plans the required stages. A run exists only once `gate` succeeds; a failure before that writes nothing and exits `2` (`1` for an invalid policy file). No stage, model call, or execution runs. `publish` decides the outcome, renders the report and check-run summary, and writes the run directory. Author responses to earlier requests are not read yet. Closed issues and pull requests are screened like open ones.
+What runs: `gate` loads the policy, reads the issue or pull request through the GitHub API as in [SP06](../processes.md#sp06-intake-and-submission-contract-check) (its linked issue, attachments per policy, open pull requests sharing the head commit), hashes the snapshot, checks the contract, and plans the required stages. A run exists only once `gate` succeeds; a failure before that writes nothing and exits `2` (`1` for an invalid policy file). No screening stage and no model call runs. `execute` runs the plan in containers: for a pull request whose contract check did not fail, the declared `runner.dependency_step` (if any) on the snapshot head commit, then every `mandatory: true` command named by an `execution.platforms[]` entry with `source: container`, deduplicated, in `execution.commands` order, each expected to exit zero (entry ids `head-dependency-step` and `head-<command id>`). Issues get an empty plan, a contract failure ends `needs-changes` before any execution, and an empty plan starts no runtime command. A plan larger than `limits.execution.executions_per_run` executes nothing (cause `budget-exhausted`, code `execution.over-budget`); exhausting `limits.execution.run_execution_seconds` mid-plan skips the rest (`budget-exhausted`, `execution.time-exhausted`). The executor stops at the first environment failure and after a failed dependency step, and the phase is bounded by `limits.stage_seconds`. A command's non-zero exit status is recorded, never classified or turned into a finding. Under `--policy-file` a `dockerfile` runner image is unavailable (`runner.image-source-unavailable`); registry images work. `assess` passes through, and `publish` decides the outcome, renders the report and check-run summary, and writes the run directory. Author responses to earlier requests are not read yet. Closed issues and pull requests are screened like open ones.
 
-Outcomes at contract level: `needs-changes` when the contract fails, including a head commit shared with other open pull requests; otherwise `inconclusive` with cause `stage-incomplete`, because every run requires reference verification and claim validation (plus reproduction for a defect issue, plus the stages the policy's `stages.per_category` lists for a pull request's plausible categories) and no stage exists yet. A contract cause such as `github-unavailable` or `attachment-fetch-failed` also ends `inconclusive`. Findings, including `uncertain` ones, stay in the report and evidence.
+Outcomes without screening stages: `needs-changes` when the contract fails, including a head commit shared with other open pull requests; otherwise `inconclusive` with cause `stage-incomplete`, because every run requires reference verification and claim validation (plus reproduction for a defect issue, plus the stages the policy's `stages.per_category` lists for a pull request's plausible categories) and no stage exists yet. A contract cause such as `github-unavailable` or `attachment-fetch-failed` also ends `inconclusive`. An environment failure adds the cause `environment-unavailable` with an escaped subject, and an exhausted budget adds `budget-exhausted`; neither is ever read as a negative result. The environment failure codes are `runner.runtime-unavailable`, `runner.runtime-not-linux`, `runner.limits-unenforceable`, `runner.image-pull-failed`, `runner.image-digest-mismatch`, `runner.image-too-large`, `runner.image-build-failed`, `runner.build-context-invalid`, `runner.image-source-unavailable`, `runner.create-failed`, `runner.copy-failed`, `runner.start-failed`, `runner.inspect-invalid`, `runner.cleanup-failed`, `runner.dependency-step-failed`, `runner.prepared-copy-too-large`, `materialize.fetch-failed`, `materialize.commit-mismatch`, `materialize.checkout-too-large`, `materialize.path-invalid`, and `materialize.overlay-rejected`; see [troubleshooting](troubleshooting.md#infrastructure-and-inference-proposed). Findings, including `uncertain` ones, stay in the report and evidence.
 
-GitHub access is read-only: GET requests to `api.github.com` only, nothing written, no check created. The repository and policy reads use at most 20 requests with at most 2 retries each; the submission reads use the policy's `limits.github.requests_per_run` and `limits.github.retries_per_request`. Authentication is as in [CLI conventions](#cli-conventions-available); without a token, the command warns `github.unauthenticated`; a missing or private repository fails with `screen.repository-unavailable` (exit `2`); a rejected token fails with `screen.token-rejected` (exit `2`); a set but unusable token variable fails with `auth.token-invalid` (exit `2`).
+GitHub access is read-only: GET requests to `api.github.com` only, plus the fetch of the head commit by id over HTTPS git; nothing written, no check created. The repository and policy reads use at most 20 requests with at most 2 retries each; the submission reads use the policy's `limits.github.requests_per_run` and `limits.github.retries_per_request`. Authentication is as in [CLI conventions](#cli-conventions-available); without a token, the command warns `github.unauthenticated`; a missing or private repository fails with `screen.repository-unavailable` (exit `2`); a rejected token fails with `screen.token-rejected` (exit `2`); a set but unusable token variable fails with `auth.token-invalid` (exit `2`).
+
+Host processes: `git` (read-only remote reads and the inert fetch), the selected container runtime binary, and `gh auth token --hostname github.com` for credential resolution (at most once, before any execution, and only when `GH_TOKEN` and `GITHUB_TOKEN` are unset or empty). A repository command never runs on the host.
 
 Evidence directory (store root): `--evidence-dir <dir>`, relative to the current directory and created when the run is written; otherwise the user data directory:
 
@@ -348,7 +448,7 @@ Evidence directory (store root): `--evidence-dir <dir>`, relative to the current
 | macOS    | `<home>/Library/Application Support/patch-steward/evidence`                                                                      |
 | other    | `$XDG_DATA_HOME/patch-steward/evidence` when XDG_DATA_HOME is absolute, else `<home>/.local/share/patch-steward/evidence`        |
 
-No home directory fails with `screen.evidence-dir-unavailable` (exit `2`). An `--evidence-dir` inside the git work tree of the current directory warns `screen.evidence-inside-checkout` (never commit run directories). The run directory is `<store root>/<owner>/<repo>/runs/<issue or pr>-<number>/<run id>/`, with run id `local-<YYYYMMDDTHHMMSSZ>-<8 lowercase hex>`; its files are described in [Evidence](configuration.md#evidence) (which covers redaction) and architecture [§11](../architecture.md#11-evidence-store-and-publication).
+No home directory fails with `screen.evidence-dir-unavailable` (exit `2`). An `--evidence-dir` inside the git work tree of the current directory warns `screen.evidence-inside-checkout` (never commit run directories). The run directory is `<store root>/<owner>/<repo>/runs/<issue or pr>-<number>/<run id>/`, with run id `local-<YYYYMMDDTHHMMSSZ>-<8 lowercase hex>`; its files are described in [Evidence](configuration.md#evidence) (which covers redaction) and architecture [§11](../architecture.md#11-evidence-store-and-publication). An executed run adds `executions/execution-NNNN.json` per execution record in plan order, `executions/execution-NNNN/output.txt` per record, stored result files `executions/execution-NNNN/result-<k>.xml`, and the Dockerfile build log `logs/image-build.txt`; the run record carries `runner_identity`, and the run budget counts `executions` and `container_seconds`. The report lists each executed command and its result and states the runtime and image in a `- Runner:` line.
 
 A publish failure (decision, rendering, redaction, re-validation, file write, rename) leaves no run directory and no report, exits `2`, and prints `screen.evidence-write-failed` followed by a second error naming the underlying code, for example `evidence.redaction-invalidated`, `evidence.too-large`, `evidence.write-failed`, or `redaction.timeout`. An unexpected failure gives `steward.internal-error` (exit `2`). Other pre-run codes keep their own names: `github.*`, `snapshot.*`, `git.*`, `intake.record-invalid`, `steward.version-unavailable`, `pipeline.phase-timeout`.
 
@@ -450,7 +550,7 @@ steward report <run-dir> [--json]
 
 One positional argument, a run directory relative to the current directory, and `--json`. Usage errors use `usage.unknown-option` and `usage.invalid-arguments` (a missing, extra, or empty run directory).
 
-Before anything is printed, the command verifies the stored run: `manifest.json` validates; every listed file exists with its recorded byte count and SHA-256; no unlisted file exists; every record file validates against its schema and matches its content hash; `report.md` equals the report record's rendered text; and the run's metrics file, found under the store root three levels above the run directory, matches when present. A missing metrics file gives the warning `report.metrics-missing` ("The metrics file of this run is missing."). A stored report or check summary containing a control or format character is refused. Any verification failure fails with `report.evidence-invalid` (exit `1`) and a detail error naming the file.
+Before anything is printed, the command verifies the stored run: `manifest.json` validates; every listed file exists with its recorded byte count and SHA-256; no unlisted file exists; every record file validates against its schema and matches its content hash; `report.md` equals the report record's rendered text; every execution output file and stored result file matches its record; a stored record of admissibility `claim` fails verification; and the run's metrics file, found under the store root three levels above the run directory, matches when present. A missing metrics file gives the warning `report.metrics-missing` ("The metrics file of this run is missing."). A stored report or check summary containing a control or format character is refused. Any verification failure fails with `report.evidence-invalid` (exit `1`) and a detail error naming the file.
 
 Text output (stdout): `report.md` printed byte for byte; warnings go to stderr.
 
@@ -488,7 +588,7 @@ These names appear in the design; the repository does not implement them.
 > **[NEEDS INPUT]** Positional arguments, flags, exit codes, output formats, and file-selection rules of `steward init`
 > and `steward replay` are not defined.
 > SP20 requires an explicit publication flag for `steward screen` but does not name it.
-> Options for the proposed mandatory-command and self-review steps of `steward preflight` are not defined either.
+> Options for the proposed self-review step of `steward preflight` are not defined either.
 
 Source: [architecture §6.5](../architecture.md#65-command-line-interface-packagescli).
 

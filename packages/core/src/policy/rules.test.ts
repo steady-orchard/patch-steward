@@ -312,4 +312,49 @@ describe('checkPolicyRules', () => {
     expect(isValidRepositoryPath('.')).toBe(true);
     expect(isValidRepositoryPath('..')).toBe(false);
   });
+
+  it('output head plus tail must fit output_bytes', () => {
+    const policy = structuredClone(loadBasePolicy());
+    policy.limits.execution.output_head_bytes = 786432;
+    policy.limits.execution.output_tail_bytes = 786432;
+    expect(codesAndPaths(policy)).toEqual([{ code: 'policy.invalid-value', path: 'limits.execution.output_bytes' }]);
+  });
+
+  it('head plus tail equal to output_bytes passes', () => {
+    const policy = structuredClone(loadBasePolicy());
+    expect(policy.limits.execution.output_head_bytes + policy.limits.execution.output_tail_bytes).toBe(
+      policy.limits.execution.output_bytes,
+    );
+    expect(codesAndPaths(policy)).toEqual([]);
+  });
+
+  it('the output stream bound must reach output_bytes', () => {
+    const policy = structuredClone(loadBasePolicy());
+    policy.limits.execution.output_stream_bytes = 65536;
+    expect(codesAndPaths(policy)).toEqual([{ code: 'policy.invalid-value', path: 'limits.execution.output_bytes' }]);
+  });
+
+  it('the prepared checkout bound must reach checkout_bytes', () => {
+    const policy = structuredClone(loadBasePolicy());
+    policy.limits.execution.checkout_bytes = 4294967296;
+    expect(codesAndPaths(policy)).toEqual([{ code: 'policy.invalid-value', path: 'limits.execution.checkout_bytes' }]);
+  });
+
+  it('result files per command must fit the limit', () => {
+    const policy = structuredClone(loadBasePolicy());
+    policy.limits.execution.result_files = 1;
+    const command = policy.execution.commands[0];
+    if (command === undefined) {
+      throw new Error('template has no command');
+    }
+    command.result_files = [
+      { path: 'reports/a.xml', format: 'junit-xml' },
+      { path: 'reports/b.xml', format: 'junit-xml' },
+    ];
+    expect(codesAndPaths(policy)).toEqual([{ code: 'policy.invalid-value', path: 'limits.execution.result_files' }]);
+  });
+
+  it('the template passes the execution cross-field rules', () => {
+    expect(checkPolicyRules(loadBasePolicy())).toEqual([]);
+  });
 });

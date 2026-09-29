@@ -1,0 +1,36 @@
+{
+  "description": "Resource-exhaustion probes for the container tier: a fork bomb, a memory hog, a sleeper, an output flood, an invalid UTF-8 output flood, and a scratch filler, each a shell script the sandbox limits must stop.",
+  "commit": { "message": "hostile limits", "time": 1700000000 },
+  "entries": [
+    {
+      "path": "fork.sh",
+      "mode": "100755",
+      "content": "while true; do\n  sleep 30 &\ndone\n"
+    },
+    {
+      "path": "memory.sh",
+      "mode": "100755",
+      "content": "tail /dev/zero\n"
+    },
+    {
+      "path": "sleep.sh",
+      "mode": "100755",
+      "content": "sleep 600\n"
+    },
+    {
+      "path": "flood.sh",
+      "mode": "100755",
+      "content": "yes 'flood line'\n"
+    },
+    {
+      "path": "flood-invalid.sh",
+      "mode": "100755",
+      "content": "tr '\\000' '\\377' < /dev/zero\n"
+    },
+    {
+      "path": "scratch.sh",
+      "mode": "100755",
+      "content": "dd if=/dev/zero of=/tmp/fill bs=1M count=32 2>&1\n"
+    }
+  ]
+}

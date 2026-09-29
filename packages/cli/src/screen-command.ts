@@ -2,7 +2,15 @@ import process from 'node:process';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import type { AttachmentResolver, AttachmentTransport, Clock, RandomSource, ScreenDeps, ScreenResult } from '@patch-steward/core';
+import type {
+  AttachmentResolver,
+  AttachmentTransport,
+  Clock,
+  RandomSource,
+  ScreenDeps,
+  ScreenExecutionOptions,
+  ScreenResult,
+} from '@patch-steward/core';
 import { screenSubmission } from '@patch-steward/core';
 
 import type { CliError, CliWarning, StewardExitCode } from './conventions.js';
@@ -38,6 +46,7 @@ export interface ScreenCommandContext extends PreflightCommandContext {
   readonly clock?: Clock;
   readonly random?: RandomSource;
   readonly sleep?: (ms: number) => Promise<void>;
+  readonly execution?: ScreenExecutionOptions;
   readonly screen?: (deps: ScreenDeps) => Promise<ScreenResult>;
 }
 
@@ -122,6 +131,7 @@ export async function runScreenCommand(argv: readonly string[], context: ScreenC
       policySource,
       token,
       evidenceDir: evidence.path,
+      execution: { ...context.execution, runtime: args.containerRuntime, hostEnv: env },
       ...(context.fetch !== undefined ? { fetch: context.fetch } : {}),
       ...(context.sleep !== undefined ? { sleep: context.sleep } : {}),
       ...(context.attachmentResolver !== undefined ? { attachmentResolver: context.attachmentResolver } : {}),

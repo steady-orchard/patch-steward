@@ -1,7 +1,10 @@
 import { prepareFindings, decisionFindings } from '../evidence/assemble.js';
 import { findingTemplateContext } from '../evidence/report-input.js';
+import { validateExecutionResults } from '../execution/transport.js';
+import type { ExecutionPlanTransport, ExecutionTransportBinding } from '../execution/transport.js';
+import type { PlanExecutionOutcome } from '../execution/executor.js';
 import { publishRunEvidence } from '../evidence/publish.js';
-import type { RunEvidenceOptions, RunEvidenceFailureCode, PublishedRun } from '../evidence/publish.js';
+import type { RunEvidenceOptions, RunEvidenceFailureCode, PublishedRun, RunExecutionEvidence } from '../evidence/publish.js';
 import { decideOutcome } from '../decision/table.js';
 import type { DecisionFinding, DecisionInput, DecisionResult } from '../decision/table.js';
 import type { RunPhaseLatency } from '../evidence/metrics.js';
@@ -41,6 +44,11 @@ export interface LocalPublishInput {
   readonly evidenceDir: string;
   readonly credentials: readonly string[];
   readonly finishedAt: string;
+  readonly executions?: {
+    readonly binding: ExecutionTransportBinding;
+    readonly plan: ExecutionPlanTransport;
+    readonly execution: PlanExecutionOutcome;
+  } | null;
 }
 
 export interface LocalPublishOptions {
@@ -89,9 +97,31 @@ export async function publishLocalRun(
     return prepared;
   }
 
+  let executionEvidence: RunExecutionEvidence | undefined;
+  const publishCauses: RecordCause[] = [];
+  if (input.executions != null) {
+    const { binding, plan, execution } = input.executions;
+    const validated = validateExecutionResults(execution.results, { binding, plan });
+    if (validated.ok) {
+      executionEvidence = {
+        results: validated.value,
+        runner: execution.runner,
+        buildLog: execution.buildLog,
+        containerSeconds: execution.containerSeconds,
+      };
+    } else {
+      publishCauses.push({
+        cause: 'steward-defect',
+        code: validated.failure.code,
+        message: validated.failure.message,
+        subjects: ['publish'],
+      });
+    }
+  }
+
   const decisionInput = localDecisionInput(
     input.handoff,
-    input.runnerCauses,
+    [...input.runnerCauses, ...publishCauses],
     context.requiredStages,
     decisionFindings(prepared.value),
   );
@@ -139,6 +169,7 @@ export async function publishLocalRun(
       logLines,
       credentials: input.credentials,
       localRun: true,
+      ...(executionEvidence !== undefined ? { executions: executionEvidence } : {}),
       createdAt: input.finishedAt,
     },
     options.evidence ?? {},

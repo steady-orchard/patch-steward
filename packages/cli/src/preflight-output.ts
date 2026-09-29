@@ -52,6 +52,47 @@ export interface PreflightError {
   readonly message: string;
 }
 
+export const PREFLIGHT_RUN_NOTICE = 'Commands ran on this machine without a sandbox; their results are claims, not evidence.';
+
+export interface PreflightRunJunit {
+  readonly tests: number;
+  readonly passed: number;
+  readonly failed: number;
+  readonly errored: number;
+  readonly skipped: number;
+}
+
+export interface PreflightRunExecution {
+  readonly id: string;
+  readonly argv: readonly string[];
+  readonly directory: string;
+  readonly via_cmd: boolean;
+  readonly status: 'completed' | 'refused' | 'environment-failure' | 'skipped';
+  readonly code: string | null;
+  readonly exit_code: number | null;
+  readonly signal: string | null;
+  readonly timed_out: boolean;
+  readonly output_limited: boolean;
+  readonly duration_ms: number | null;
+  readonly junit: PreflightRunJunit | null;
+  readonly output_tail: string | null;
+  readonly admissibility: 'claim';
+}
+
+export interface PreflightRunPreview {
+  readonly base: string;
+  readonly overlay_paths: readonly string[];
+  readonly before: readonly PreflightRunExecution[];
+  readonly after: readonly PreflightRunExecution[];
+}
+
+export interface PreflightRunReport {
+  readonly requested: true;
+  readonly notice: string;
+  readonly executions: readonly PreflightRunExecution[];
+  readonly preview: PreflightRunPreview | null;
+}
+
 export interface PreflightReport {
   readonly schema_version: 1;
   readonly unverified: true;
@@ -61,6 +102,7 @@ export interface PreflightReport {
   readonly policy: PreflightPolicySource | null;
   readonly contract: PreflightContractReport | null;
   readonly paths: PreflightPathsReport | null;
+  readonly run?: PreflightRunReport;
   readonly warnings: readonly PreflightWarning[];
   readonly errors: readonly PreflightError[];
 }
@@ -184,6 +226,65 @@ function renderPullRequestLines(contract: PreflightContractReport, paths: Prefli
   return lines;
 }
 
+export function preflightRunLine(id: string, argv: readonly string[], directory: string): string {
+  return `run ${escapeTerminalText(id)}: ${escapeTerminalText(JSON.stringify(argv))} in ${escapeTerminalText(directory)}`;
+}
+
+export function preflightResultLine(label: 'result' | 'before' | 'after', execution: PreflightRunExecution): string {
+  const head = `${label} ${escapeTerminalText(execution.id)}:`;
+  const code = escapeTerminalText(execution.code ?? '');
+  if (execution.status === 'refused') {
+    return `${head} refused ${code}`;
+  }
+  if (execution.status === 'environment-failure') {
+    return `${head} not started ${code}`;
+  }
+  if (execution.status === 'skipped') {
+    return `${head} skipped ${code}`;
+  }
+  const exit = execution.exit_code === null ? 'none' : String(execution.exit_code);
+  const seconds = ((execution.duration_ms ?? 0) / 1000).toFixed(1);
+  let line = `${head} exit ${exit}`;
+  if (execution.timed_out) line += ', timed out';
+  if (execution.output_limited) line += ', output limited';
+  line += `; ${seconds} s`;
+  if (execution.junit !== null) {
+    const j = execution.junit;
+    line += `; JUnit ${j.passed}/${j.tests} passed, ${j.failed} failed, ${j.errored} errors, ${j.skipped} skipped`;
+  }
+  if (execution.via_cmd) line += '; ran through cmd.exe';
+  return line;
+}
+
+function resultLines(label: 'result' | 'before' | 'after', execution: PreflightRunExecution, withTail: boolean): string[] {
+  const lines = [preflightResultLine(label, execution)];
+  if (withTail && execution.status === 'completed' && execution.output_tail !== null) {
+    const tail = execution.output_tail.split('\n');
+    if (tail.length > 0 && tail[tail.length - 1] === '') tail.pop();
+    for (const line of tail) {
+      lines.push(`  | ${escapeTerminalText(line)}`);
+    }
+  }
+  return lines;
+}
+
+function renderRunLines(run: PreflightRunReport): string[] {
+  const lines: string[] = [PREFLIGHT_RUN_NOTICE];
+  for (const execution of run.executions) {
+    lines.push(...resultLines('result', execution, true));
+  }
+  if (run.preview !== null) {
+    lines.push(`preview ${escapeTerminalText(run.preview.base)}: ${run.preview.overlay_paths.length} test paths applied`);
+    for (const execution of run.preview.before) {
+      lines.push(...resultLines('before', execution, true));
+    }
+    for (const execution of run.preview.after) {
+      lines.push(...resultLines('after', execution, false));
+    }
+  }
+  return lines;
+}
+
 function renderStdout(report: PreflightReport): string {
   if (report.contract === null) {
     return '';
@@ -213,6 +314,9 @@ function renderStdout(report: PreflightReport): string {
       `inconclusive ${inconclusive.cause} ${escapeTerminalText(inconclusive.code)}: ${escapeTerminalText(inconclusive.message)}`,
     );
     lines.push(...subjectLines(inconclusive.subjects));
+  }
+  if (report.run !== undefined) {
+    lines.push(...renderRunLines(report.run));
   }
   return lines.map((line) => `${line}\n`).join('');
 }

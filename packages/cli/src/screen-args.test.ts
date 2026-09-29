@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseScreenArgs } from './screen-args.js';
+import { parseScreenArgs, SCREEN_USAGE } from './screen-args.js';
 
 describe('parseScreenArgs', () => {
   it('screen arguments accept an issue or a pull request number', () => {
     const a = parseScreenArgs(['--issue', '29']);
     expect(a).toEqual({
       ok: true,
-      args: { submission: { type: 'issue', number: 29 }, repository: null, policyFile: null, evidenceDir: null, json: false },
+      args: {
+        submission: { type: 'issue', number: 29 },
+        repository: null,
+        policyFile: null,
+        evidenceDir: null,
+        containerRuntime: 'auto',
+        json: false,
+      },
     });
 
     const b = parseScreenArgs([
@@ -28,6 +35,7 @@ describe('parseScreenArgs', () => {
         repository: { owner: 'steady-orchard', name: 'patch-steward-testbed-public' },
         policyFile: 'p.yml',
         evidenceDir: 'ev',
+        containerRuntime: 'auto',
         json: true,
       },
     });
@@ -149,5 +157,43 @@ describe('parseScreenArgs', () => {
     if (!c.ok) {
       expect(c.json).toBe(false);
     }
+  });
+
+  it('defaults the container runtime to auto', () => {
+    const result = parseScreenArgs(['--pr', '1']);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.args.containerRuntime).toBe('auto');
+    }
+  });
+
+  it('accepts each container runtime value', () => {
+    for (const value of ['auto', 'docker', 'podman']) {
+      const result = parseScreenArgs(['--pr', '1', '--container-runtime', value]);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.args.containerRuntime).toBe(value);
+      }
+    }
+  });
+
+  it('rejects an unknown container runtime', () => {
+    for (const value of ['kubernetes', '', 'Docker']) {
+      for (const json of [false, true]) {
+        const argv = ['--pr', '1', '--container-runtime', value, ...(json ? ['--json'] : [])];
+        expect(parseScreenArgs(argv)).toEqual({
+          ok: false,
+          code: 'usage.invalid-arguments',
+          message: '--container-runtime must be auto, docker, or podman',
+          json,
+        });
+      }
+    }
+  });
+
+  it('usage line names the container runtime option', () => {
+    expect(SCREEN_USAGE).toBe(
+      'usage: steward screen (--issue <number> | --pr <number>) [--repo owner/name] [--policy-file <path>] [--evidence-dir <dir>] [--container-runtime auto|docker|podman] [--json]',
+    );
   });
 });

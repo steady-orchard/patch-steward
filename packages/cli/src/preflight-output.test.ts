@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { PREFLIGHT_NOTICE, escapeTerminalText, renderPreflightJson, renderPreflightText } from './preflight-output.js';
-import type { PreflightReport } from './preflight-output.js';
+import {
+  PREFLIGHT_NOTICE,
+  PREFLIGHT_RUN_NOTICE,
+  escapeTerminalText,
+  preflightResultLine,
+  preflightRunLine,
+  renderPreflightJson,
+  renderPreflightText,
+} from './preflight-output.js';
+import type { PreflightReport, PreflightRunExecution } from './preflight-output.js';
 
 const ZWSP = String.fromCharCode(0x200b);
 const RLO = String.fromCharCode(0x202e);
@@ -248,5 +256,139 @@ describe('renderPreflightJson', () => {
     });
     expect(hasRaw).toBe(false);
     expect(j).toContain('bogus\\u202e;');
+  });
+});
+
+function execution(overrides: Partial<PreflightRunExecution>): PreflightRunExecution {
+  return {
+    id: 'head-test',
+    argv: ['pnpm', 'test'],
+    directory: '.',
+    via_cmd: false,
+    status: 'completed',
+    code: null,
+    exit_code: 0,
+    signal: null,
+    timed_out: false,
+    output_limited: false,
+    duration_ms: 1234,
+    junit: null,
+    output_tail: null,
+    admissibility: 'claim',
+    ...overrides,
+  };
+}
+
+function withRun(run: NonNullable<PreflightReport['run']>): PreflightReport {
+  return { ...issueReport, run };
+}
+
+describe('preflight run output', () => {
+  it('formats a run line with the argument vector', () => {
+    expect(preflightRunLine('head-test', ['pnpm', 'test', 'a b'], '.')).toBe('run head-test: ["pnpm","test","a b"] in .');
+    expect(preflightRunLine('x', ['a'], `d${ESC}`)).toBe('run x: ["a"] in d\\u001b');
+  });
+
+  it('formats completed result lines', () => {
+    expect(preflightResultLine('result', execution({}))).toBe('result head-test: exit 0; 1.2 s');
+    const full = execution({
+      exit_code: null,
+      timed_out: true,
+      output_limited: true,
+      duration_ms: null,
+      via_cmd: true,
+      junit: { tests: 5, passed: 3, failed: 1, errored: 1, skipped: 0 },
+    });
+    expect(preflightResultLine('result', full)).toBe(
+      'result head-test: exit none, timed out, output limited; 0.0 s; JUnit 3/5 passed, 1 failed, 1 errors, 0 skipped; ran through cmd.exe',
+    );
+  });
+
+  it('formats refused, failed-start, and skipped result lines', () => {
+    expect(preflightResultLine('result', execution({ status: 'refused', code: 'run.refused-x' }))).toBe(
+      'result head-test: refused run.refused-x',
+    );
+    expect(preflightResultLine('before', execution({ status: 'environment-failure', code: 'run.spawn' }))).toBe(
+      'before head-test: not started run.spawn',
+    );
+    expect(preflightResultLine('after', execution({ status: 'skipped', code: 'run.skip' }))).toBe(
+      'after head-test: skipped run.skip',
+    );
+  });
+
+  it('renders the run section after the contract', () => {
+    const out = renderPreflightText(
+      withRun({
+        requested: true,
+        notice: PREFLIGHT_RUN_NOTICE,
+        executions: [execution({}), execution({ id: 'base-test', exit_code: 1, output_tail: 'one\ntwo\n' })],
+        preview: null,
+      }),
+    ).stdout;
+    const lines = out.split('\n');
+    const at = lines.indexOf(PREFLIGHT_RUN_NOTICE);
+    expect(at).toBeGreaterThan(0);
+    expect(lines[at - 1]).toBe('disposition: met');
+    expect(lines.slice(at)).toEqual([
+      PREFLIGHT_RUN_NOTICE,
+      'result head-test: exit 0; 1.2 s',
+      'result base-test: exit 1; 1.2 s',
+      '  | one',
+      '  | two',
+      '',
+    ]);
+  });
+
+  it('renders the preview before and after lines', () => {
+    const out = renderPreflightText(
+      withRun({
+        requested: true,
+        notice: PREFLIGHT_RUN_NOTICE,
+        executions: [],
+        preview: {
+          base: 'abc123',
+          overlay_paths: ['a.test.ts', 'b.test.ts'],
+          before: [execution({ id: 'b1', exit_code: 1, output_tail: 'bad' })],
+          after: [execution({ id: 'a1', exit_code: 1, output_tail: 'worse' })],
+        },
+      }),
+    ).stdout;
+    const lines = out.split('\n');
+    expect(lines.slice(lines.indexOf('preview abc123: 2 test paths applied'))).toEqual([
+      'preview abc123: 2 test paths applied',
+      'before b1: exit 1; 1.2 s',
+      '  | bad',
+      'after a1: exit 1; 1.2 s',
+      '',
+    ]);
+  });
+
+  it('escapes control characters in output tails', () => {
+    const out = renderPreflightText(
+      withRun({
+        requested: true,
+        notice: PREFLIGHT_RUN_NOTICE,
+        executions: [execution({ exit_code: 1, output_tail: `a${ESC}[2Jb` })],
+        preview: null,
+      }),
+    ).stdout;
+    expect(out).toContain('  | a\\u001b[2Jb');
+    expect(out).not.toContain(ESC);
+  });
+
+  it('omits the run section without a run', () => {
+    expect(renderPreflightText(issueReport).stdout).not.toContain(PREFLIGHT_RUN_NOTICE);
+  });
+
+  it('includes the run object in JSON', () => {
+    const report: PreflightReport = {
+      ...issueReport,
+      paths: null,
+      run: { requested: true, notice: PREFLIGHT_RUN_NOTICE, executions: [execution({})], preview: null },
+    };
+    const json = renderPreflightJson(report);
+    expect(json.trimEnd().split('\n')).toHaveLength(1);
+    const parsed = JSON.parse(json) as { run: { executions: { argv: string[] }[] } };
+    expect(parsed.run.executions[0]?.argv).toEqual(['pnpm', 'test']);
   });
 });

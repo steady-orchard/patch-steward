@@ -270,6 +270,91 @@ describe('package root exports', () => {
     'readBackEvidence',
     'writeEvidenceCommit',
     'prepareRunEvidence',
+    'OutputCaptureBuffer',
+    'decodeCapturedBytes',
+    'outputOmittedMarker',
+    'executedCommandItem',
+    'planScreenExecutions',
+    'decodeResultFile',
+    'redactResultFileText',
+    'formatRunnerIdentity',
+    'parseJunitXml',
+    'tarEntryHeader',
+    'tarPadding',
+    'tarEndOfArchive',
+    'buildTarArchive',
+    'tarHeaderChecksum',
+    'decodeTarOctal',
+    'checkCheckoutPath',
+    'checkSymlinkTarget',
+    'treeKindForMode',
+    'checkOverlay',
+    'outputTrimmedMarker',
+    'splitCapturedOutput',
+    'boundRedactedOutput',
+    'outputFileText',
+    'outputExcerpt',
+    'redactCapturedOutput',
+    'TarStreamParser',
+    'TarSingleFileReader',
+    'executionOutputFilePath',
+    'executionResultFilePath',
+    'executionFailureCause',
+    'validateExecutionPlan',
+    'validateExecutionResults',
+    'streamProcess',
+    'LsTreeRecordReader',
+    'CatFileBatchParser',
+    'commitObjectFields',
+    'runtimeCreateArgs',
+    'runtimeVolumeCreateArgs',
+    'runtimeCopyInArgs',
+    'runtimeStartArgs',
+    'runtimeInspectArgs',
+    'runtimeCopyOutArgs',
+    'runtimeKillArgs',
+    'runtimeWaitArgs',
+    'runtimeRemoveArgs',
+    'runtimeVolumeRemoveArgs',
+    'runtimeVersionArgs',
+    'runtimeInfoArgs',
+    'runtimePullArgs',
+    'runtimeImageInspectArgs',
+    'runtimeBuildArgs',
+    'runtimeCliEnvironment',
+    'forbiddenRuntimeArguments',
+    'buildCompletedExecution',
+    'commandForPlatform',
+    'quoteWindowsArgument',
+    'escapeForCmd',
+    'cmdShimCommandLine',
+    'findWindowsExecutable',
+    'guardOwnCheckout',
+    'commandDirectory',
+    'fetchCommit',
+    'materializeGitEnvironment',
+    'githubFetchUrl',
+    'readRunnerBuildContext',
+    'buildCheckoutArchive',
+    'prepareRunnerImage',
+    'imageLimitsFromPolicy',
+    'imageRepository',
+    'normalizeImageRepository',
+    'selectContainerRuntime',
+    'copyOutResultFile',
+    'exportPreparedCopy',
+    'containerResultPath',
+    'createUnsandboxedRunner',
+    'unsandboxedEnvironment',
+    'unsandboxedLimitsFromPolicy',
+    'runContainerExecution',
+    'containerEnvironment',
+    'containerLimitsFromPolicy',
+    'materializeCommit',
+    'materializeLimitsFromPolicy',
+    'createPreviewWorktree',
+    'checkoutTopLevel',
+    'workingTreeDirty',
   ] as const;
 
   it.each(functionExports)('exports %s as a function', (name) => {
@@ -352,6 +437,16 @@ describe('package root exports', () => {
     'STEWARD_WRAPPER_PATHS',
     'GITHUB_WRITE_FAILURE_CODES',
     'APP_AUTH_FAILURE_CODES',
+    'RESULT_FILE_STATUSES',
+    'STORED_OMITTED_REASONS',
+    'TEST_CASE_STATUSES',
+    'JUNIT_FAILURE_CODES',
+    'CHECKOUT_PATH_VIOLATIONS',
+    'OVERLAY_REJECTION_REASONS',
+    'EXECUTION_FAILURE_CODES',
+    'CONTAINER_RUNTIME_NAMES',
+    'RUNTIME_CLI_ENVIRONMENT_NAMES',
+    'RUNTIME_FORBIDDEN_FLAGS',
   ] as const;
 
   it.each(tupleExports)('exports %s as a tuple', (name) => {
@@ -448,6 +543,20 @@ describe('package root exports', () => {
     'githubContentsFileSchema',
     'githubGitObjectResponseSchema',
     'githubGitCommitResponseSchema',
+    'junitSummarySchema',
+    'executionResultFileSchema',
+    'runnerIdentitySchema',
+    'executionPlanEntrySchema',
+    'executionFailureCodeSchema',
+    'executionPlanTransportSchema',
+    'executionResultEntrySchema',
+    'executionResultsTransportSchema',
+    'dockerVersionSchema',
+    'podmanVersionSchema',
+    'dockerInfoSchema',
+    'podmanInfoSchema',
+    'imageInspectSchema',
+    'containerInspectSchema',
   ] as const;
 
   it.each(schemaExports)('exports %s as an object', (name) => {
@@ -494,10 +603,26 @@ describe('package root exports', () => {
     'WAITING_RUN_FILES',
     'APP_TOKEN_PERMISSION_SETS',
     'GITHUB_WRITE_FAILURE_CAUSES',
+    'EXECUTED_COMMAND_TEMPLATES',
   ] as const;
 
   it.each(recordExports)('exports %s as an object', (name) => {
     expect(typeof core[name]).toBe('object');
+  });
+
+  it('exports the execution constants', () => {
+    expect(core.TAR_BLOCK_BYTES).toBe(512);
+    expect(core.EXECUTION_TRANSPORT_VERSION).toBe(1);
+    expect(core.JUNIT_MAX_DEPTH).toBe(64);
+    expect(core.TEST_CASE_IDENTITY_MAX_LENGTH).toBe(4096);
+    expect(core.SANDBOX_UID).toBe(65532);
+    expect(core.SANDBOX_PLATFORM).toBe('linux/amd64');
+    expect(core.SANDBOX_CHECKOUT_PATH).toBe('/work/checkout');
+    expect(core.CHECKOUT_PATH_MAX_BYTES).toBe(4096);
+    expect(core.FETCH_DEPTH).toBe(1);
+    expect(core.ADMISSIBILITY_VALUES).toEqual(['evidence', 'signal', 'claim']);
+    expect(core.EXECUTION_FAILURE_CODES).toHaveLength(21);
+    expect(core.JUNIT_FAILURE_CODES).toHaveLength(9);
   });
 
   it('exports the strict yaml failure codes', () => {
@@ -510,7 +635,7 @@ describe('package root exports', () => {
 
   it('exports the policy constants', () => {
     expect(Array.isArray(core.POLICY_LIMITS)).toBe(true);
-    expect(core.POLICY_LIMITS).toHaveLength(41);
+    expect(core.POLICY_LIMITS).toHaveLength(58);
     expect(core.LLM_MODEL_PLACEHOLDER).toBe('replace-with-model-id');
     expect(Array.isArray(core.BUILT_IN_DETECTORS)).toBe(true);
     expect(core.POLICY_FILE_NAME).toBe('policy.yml');
@@ -569,7 +694,7 @@ describe('package root exports', () => {
     expect(core.BUILT_IN_DETECTORS).toHaveLength(23);
     expect(core.PIPELINE_STAGES).toHaveLength(6);
     expect(core.RECORD_SCHEMA_VERSION).toBe(1);
-    expect(core.POLICY_LIMITS).toHaveLength(41);
+    expect(core.POLICY_LIMITS).toHaveLength(58);
   });
 
   it('exports the pipeline and evidence constants', () => {
@@ -658,5 +783,17 @@ describe('package root exports', () => {
     expect(core.FRESHNESS_UNKNOWN_REASONS).toHaveLength(7);
     expect(core.HOSTED_APP_ID_VARIABLE).toBe('PATCH_STEWARD_APP_ID');
     expect(core.HOSTED_APP_KEY_VARIABLE).toBe('PATCH_STEWARD_APP_PRIVATE_KEY');
+  });
+
+  it('exports the runner constants', () => {
+    expect(core.RUNTIME_LABEL_MANAGED).toBe('org.patch-steward.managed');
+    expect(core.RUNTIME_LABEL_RUN).toBe('org.patch-steward.run');
+    expect(core.RUNTIME_LABEL_TEST).toBe('org.patch-steward.test');
+    expect(core.RUNTIME_LABEL_RUNNER_TREE).toBe('org.patch-steward.runner-tree');
+    expect(core.RUNNER_IMAGE_REPOSITORY).toBe('patch-steward-runner');
+    expect(core.CONTAINER_RUNTIME_NAMES).toEqual(['docker', 'podman']);
+    expect(core.RUNTIME_FORBIDDEN_FLAGS).toContain('--privileged');
+    expect(core.RUNTIME_CLI_ENVIRONMENT_NAMES).toContain('DOCKER_HOST');
+    expect(core.RUNTIME_CLI_ENVIRONMENT_NAMES).not.toContain('GH_TOKEN');
   });
 });

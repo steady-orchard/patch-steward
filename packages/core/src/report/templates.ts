@@ -168,7 +168,75 @@ export const PROVENANCE_TEMPLATES = Object.freeze({
   model: '- Model: no model call in this run',
   adapter: '- Adapter and runtime: none',
   runner: '- Runner: no execution in this run',
+  runnerExecuted: '- Runner: {runtime} {version}, image {reference} ({digest})',
 });
+
+export const EXECUTED_COMMAND_TEMPLATES = Object.freeze({
+  item: '{entry} at {commit}: {status}{flags}; {seconds} s{junit}',
+  exitStatus: 'exit {code}',
+  signalStatus: 'signal {signal}',
+  noStatus: 'no exit status',
+  timedOut: ', timed out',
+  outOfMemory: ', out of memory',
+  outputLimited: ', output limited',
+  junit: '; JUnit {passed}/{tests} passed',
+});
+
+export interface ExecutedCommandInput {
+  readonly entryId: string;
+  readonly commit: string;
+  readonly exitCode: number | null;
+  readonly signal: string | null;
+  readonly timedOut: boolean;
+  readonly oomKilled: boolean;
+  readonly outputLimited: boolean;
+  readonly durationMs: number;
+  readonly junit: { readonly passed: number; readonly tests: number } | null;
+}
+
+export function executedCommandItem(input: ExecutedCommandInput): string {
+  const status =
+    input.exitCode !== null
+      ? fillReportTemplate(EXECUTED_COMMAND_TEMPLATES.exitStatus, { code: reportCodeSpan(String(input.exitCode)) })
+      : input.signal !== null
+        ? fillReportTemplate(EXECUTED_COMMAND_TEMPLATES.signalStatus, { signal: reportCodeSpan(input.signal) })
+        : EXECUTED_COMMAND_TEMPLATES.noStatus;
+
+  let flags = '';
+  if (input.timedOut) {
+    flags += EXECUTED_COMMAND_TEMPLATES.timedOut;
+  }
+  if (input.oomKilled) {
+    flags += EXECUTED_COMMAND_TEMPLATES.outOfMemory;
+  }
+  if (input.outputLimited) {
+    flags += EXECUTED_COMMAND_TEMPLATES.outputLimited;
+  }
+
+  const junit =
+    input.junit === null
+      ? ''
+      : fillReportTemplate(EXECUTED_COMMAND_TEMPLATES.junit, {
+          passed: reportCodeSpan(String(input.junit.passed)),
+          tests: reportCodeSpan(String(input.junit.tests)),
+        });
+
+  return fillReportTemplate(EXECUTED_COMMAND_TEMPLATES.item, {
+    entry: reportCodeSpan(input.entryId),
+    commit: reportCodeSpan(input.commit.slice(0, 12)),
+    status,
+    flags,
+    seconds: reportCodeSpan((input.durationMs / 1000).toFixed(1)),
+    junit,
+  });
+}
+
+export interface RunnerProvenanceInput {
+  readonly runtime: string;
+  readonly serverVersion: string;
+  readonly reference: string;
+  readonly imageDigest: string;
+}
 
 export const CHECK_SUMMARY_TEMPLATES = Object.freeze({
   outcome: '**Outcome:** {outcome}',
@@ -301,8 +369,14 @@ export type ProvenanceInput =
       readonly ref: string;
       readonly commit: string;
       readonly stewardVersion: string;
+      readonly runner?: RunnerProvenanceInput;
     }
-  | { readonly source: 'local-file'; readonly policyRevision: string; readonly stewardVersion: string };
+  | {
+      readonly source: 'local-file';
+      readonly policyRevision: string;
+      readonly stewardVersion: string;
+      readonly runner?: RunnerProvenanceInput;
+    };
 
 export function provenanceLines(input: ProvenanceInput): readonly string[] {
   const policyLine =
@@ -314,11 +388,25 @@ export function provenanceLines(input: ProvenanceInput): readonly string[] {
         })
       : fillReportTemplate(PROVENANCE_TEMPLATES.localPolicy, { revision: reportCodeSpan(input.policyRevision) });
 
+  const runnerLine =
+    input.runner === undefined
+      ? PROVENANCE_TEMPLATES.runner
+      : fillReportTemplate(PROVENANCE_TEMPLATES.runnerExecuted, {
+          runtime: reportCodeSpan(input.runner.runtime),
+          version: reportCodeSpan(input.runner.serverVersion),
+          reference: reportCodeSpan(input.runner.reference),
+          digest: reportCodeSpan(
+            input.runner.imageDigest.startsWith('sha256:')
+              ? input.runner.imageDigest.slice(7, 19)
+              : input.runner.imageDigest.slice(0, 12),
+          ),
+        });
+
   return [
     policyLine,
     fillReportTemplate(PROVENANCE_TEMPLATES.stewardVersion, { version: reportCodeSpan(input.stewardVersion) }),
     PROVENANCE_TEMPLATES.model,
     PROVENANCE_TEMPLATES.adapter,
-    PROVENANCE_TEMPLATES.runner,
+    runnerLine,
   ];
 }

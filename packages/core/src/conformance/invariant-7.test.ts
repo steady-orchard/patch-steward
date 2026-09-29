@@ -6,8 +6,15 @@ import { describe, expect, it } from 'vitest';
 import {
   applyRedactionRules,
   BUILT_IN_DETECTORS,
+  CHECKOUT_PATH_MAX_BYTES,
+  FETCH_DEPTH,
+  findPolicyLimit,
   GIT_OUTPUT_MAX_BYTES,
   GIT_TIMEOUT_MS,
+  JUNIT_ATTRIBUTE_VALUE_MAX_LENGTH,
+  JUNIT_MAX_ATTRIBUTES,
+  JUNIT_MAX_DEPTH,
+  JUNIT_MAX_ELEMENTS,
   loadPolicy,
   parseStrictYaml,
   POLICY_FILE_MAX_BYTES,
@@ -15,12 +22,24 @@ import {
   policyEditorJsonSchema,
   redactionMarker,
   redactText,
+  RECORD_TEXT_MAX_LENGTH,
   REDACTION_INPUT_MAX_BYTES,
+  RUNTIME_CONTROL_OUTPUT_MAX_BYTES,
+  RUNTIME_CONTROL_TIMEOUT_MS,
+  RUNTIME_KILL_GRACE_MS,
+  SANDBOX_CHECKOUT_PATH,
+  SANDBOX_GID,
+  SANDBOX_PLATFORM,
+  SANDBOX_SCRATCH_PATH,
+  SANDBOX_UID,
+  SANDBOX_WORK_PATH,
+  TEST_CASE_IDENTITY_MAX_LENGTH,
   validatePolicy,
 } from '../index.js';
 import type { PolicyLimit } from '../index.js';
 import type { ProcessOutput, ProcessRunner } from '../index.js';
 import { fixedClock, fixedRandom } from '../clock.js';
+import { emptyPlanExecution } from '../execution/executor.js';
 import type { GitHubFetch } from '../github/client.js';
 import { screenSubmission } from '../pipeline/screen.js';
 import type { ScreenDeps } from '../pipeline/screen.js';
@@ -31,6 +50,10 @@ import { CHECK_SUMMARY_MAX_LENGTH, REPORT_MAX_LENGTH } from '../policy/bounds.js
 import { REPORT_TITLE } from '../report/templates.js';
 import { reportStaticBudget } from '../report/caps.js';
 import { err, ok } from '../result.js';
+import { OutputCaptureBuffer } from '../execution/output-capture.js';
+import { redactCapturedOutput, splitCapturedOutput } from '../evidence/output-file.js';
+import { decodeResultFile, redactResultFileText } from '../evidence/result-file.js';
+import type { EvidenceRedactionOptions } from '../evidence/redact-records.js';
 
 const templateBytes = readFileSync(fileURLToPath(new URL('../../../../templates/policy/policy.yml', import.meta.url)));
 
@@ -247,10 +270,19 @@ describe('invariant 7: bounds', () => {
     expect(numberPaths).toEqual(['llm.generation.temperature', 'version']);
   });
 
+  const MAXIMUM_COMPANIONS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+    'limits.execution.output_head_bytes': { 'limits.execution.output_bytes': 8388608 },
+    'limits.execution.output_tail_bytes': { 'limits.execution.output_bytes': 8388608 },
+    'limits.execution.checkout_bytes': { 'limits.execution.prepared_checkout_bytes': 8589934592 },
+  };
+
   it.each(POLICY_LIMITS.map((row) => row.path))('invariant 7: limit %s accepts the hard maximum', (path) => {
     const row = POLICY_LIMITS.find((candidate) => candidate.path === path) as PolicyLimit;
     const raw = baseFor(row.provider);
     setPath(raw, path, row.max);
+    for (const [companion, value] of Object.entries(MAXIMUM_COMPANIONS[path] ?? {})) {
+      setPath(raw, companion, value);
+    }
     const result = validatePolicy(raw);
     expect(result.ok).toBe(true);
   });
@@ -469,6 +501,7 @@ function makeInvariant7Deps(overrides: {
     attachmentResolver: async () => [{ address: '140.82.112.3', family: 4 }],
     attachmentTransport: async () => ({ kind: 'error', reason: 'network' }),
     clock: fixedClock('2026-09-27T10:15:00.000Z'),
+    execution: { executor: async ({ plan }) => emptyPlanExecution(plan) },
     random: fixedRandom('3f9a1c2e'),
     ...(overrides.evidence !== undefined ? { evidence: overrides.evidence } : {}),
   };
@@ -641,5 +674,237 @@ describe('invariant 7: stored evidence', { timeout: 60000 }, () => {
 
   it('invariant 7: the static report budget fits the report maximum', () => {
     expect(reportStaticBudget()).toBeLessThanOrEqual(REPORT_MAX_LENGTH);
+  });
+});
+
+const EXECUTION_LIMIT_PATHS: readonly string[] = [
+  'runner.resources.scratch_mb',
+  'limits.execution.output_head_bytes',
+  'limits.execution.output_tail_bytes',
+  'limits.execution.output_stream_bytes',
+  'limits.execution.result_files',
+  'limits.execution.result_test_cases',
+  'limits.execution.checkout_bytes',
+  'limits.execution.checkout_files',
+  'limits.execution.prepared_checkout_bytes',
+  'limits.execution.overlay_files',
+  'limits.execution.overlay_bytes',
+  'limits.execution.materialize_seconds',
+  'limits.execution.image_pull_seconds',
+  'limits.execution.image_build_seconds',
+  'limits.execution.image_bytes',
+  'limits.execution.build_context_bytes',
+  'limits.execution.container_start_seconds',
+];
+
+function getPath(obj: Record<string, unknown>, path: string): unknown {
+  let node: unknown = obj;
+  for (const segment of path.split('.')) {
+    node = (node as Record<string, unknown>)[segment];
+  }
+  return node;
+}
+
+function deletePath(obj: Record<string, unknown>, path: string): void {
+  const segments = path.split('.');
+  let node = obj;
+  for (const segment of segments.slice(0, -1)) {
+    node = node[segment] as Record<string, unknown>;
+  }
+  delete node[segments[segments.length - 1] as string];
+}
+
+function failureDetail(raw: Record<string, unknown>): { code: string; path: string } | null {
+  const result = validatePolicy(raw);
+  if (result.ok) return null;
+  const detail = result.failure.details[0] as unknown as { code: string; path: string } | undefined;
+  return detail === undefined ? null : { code: detail.code, path: detail.path };
+}
+
+function filled(length: number, byte: number): Uint8Array {
+  return Buffer.alloc(length, byte);
+}
+
+describe('invariant 7: execution bounds', { timeout: 60000 }, () => {
+  it('invariant 7: execution hard constants have their values', () => {
+    expect(JUNIT_MAX_DEPTH).toBe(64);
+    expect(JUNIT_MAX_ELEMENTS).toBe(200000);
+    expect(JUNIT_MAX_ATTRIBUTES).toBe(64);
+    expect(JUNIT_ATTRIBUTE_VALUE_MAX_LENGTH).toBe(65536);
+    expect(TEST_CASE_IDENTITY_MAX_LENGTH).toBe(4096);
+    expect(RUNTIME_CONTROL_TIMEOUT_MS).toBe(120000);
+    expect(RUNTIME_CONTROL_OUTPUT_MAX_BYTES).toBe(1048576);
+    expect(RUNTIME_KILL_GRACE_MS).toBe(30000);
+    expect(SANDBOX_UID).toBe(65532);
+    expect(SANDBOX_GID).toBe(65532);
+    expect(SANDBOX_PLATFORM).toBe('linux/amd64');
+    expect(SANDBOX_WORK_PATH).toBe('/work');
+    expect(SANDBOX_CHECKOUT_PATH).toBe('/work/checkout');
+    expect(SANDBOX_SCRATCH_PATH).toBe('/tmp');
+    expect(CHECKOUT_PATH_MAX_BYTES).toBe(4096);
+    expect(FETCH_DEPTH).toBe(1);
+  });
+
+  it('invariant 7: the execution limit keys are registered', () => {
+    expect(POLICY_LIMITS.length).toBe(58);
+    const raw = loadTemplateRaw();
+    for (const path of EXECUTION_LIMIT_PATHS) {
+      expect(findPolicyLimit(path), path).toBeDefined();
+      deletePath(raw, path);
+    }
+    const result = validatePolicy(raw);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      for (const path of EXECUTION_LIMIT_PATHS) {
+        expect(getPath(result.value as unknown as Record<string, unknown>, path), path).toBe(findPolicyLimit(path)?.templateValue);
+      }
+    }
+  });
+
+  it('invariant 7: cross-field execution limits are enforced', () => {
+    const headTail = baseFor(null);
+    setPath(headTail, 'limits.execution.output_head_bytes', 786432);
+    setPath(headTail, 'limits.execution.output_tail_bytes', 786432);
+    expect(failureDetail(headTail)).toEqual({ code: 'policy.invalid-value', path: 'limits.execution.output_bytes' });
+
+    const stream = baseFor(null);
+    setPath(stream, 'limits.execution.output_stream_bytes', 524288);
+    expect(failureDetail(stream)).toEqual({ code: 'policy.invalid-value', path: 'limits.execution.output_bytes' });
+
+    const prepared = baseFor(null);
+    setPath(prepared, 'limits.execution.prepared_checkout_bytes', 268435456);
+    expect(failureDetail(prepared)).toEqual({ code: 'policy.invalid-value', path: 'limits.execution.checkout_bytes' });
+
+    const files = baseFor(null);
+    const execution = files.execution as { commands: Record<string, unknown>[] };
+    const command = execution.commands[0] as Record<string, unknown>;
+    command.result_files = ['a', 'b', 'c', 'd', 'e', 'f'].map((name) => ({
+      path: 'reports/' + name + '.xml',
+      format: 'junit-xml',
+    }));
+    expect(failureDetail(files)).toEqual({ code: 'policy.invalid-value', path: 'limits.execution.result_files' });
+  });
+
+  it('invariant 7: output capture keeps head and tail bounds', () => {
+    const buffer = new OutputCaptureBuffer({ headBytes: 1024, tailBytes: 2048, streamBytes: 3145728 });
+    const chunk = filled(65536, 0x61);
+    let reached = false;
+    for (let index = 0; index < 100 && !reached; index += 1) {
+      reached = buffer.push(chunk);
+    }
+    const captured = buffer.result();
+    expect(reached).toBe(true);
+    expect(captured.head.length).toBeLessThanOrEqual(1024);
+    expect(captured.tail.length).toBeLessThanOrEqual(2048);
+    expect(captured.totalBytes).toBe(3145728);
+    expect(captured.limited).toBe(true);
+  });
+
+  it('invariant 7: no output redaction input exceeds the cap', async () => {
+    const lengths: number[] = [];
+    const redact: NonNullable<EvidenceRedactionOptions['redact']> = (inputs, options) => {
+      for (const input of inputs) lengths.push(Buffer.byteLength(input, 'utf8'));
+      return redactTexts(inputs, options);
+    };
+    const parts = splitCapturedOutput({
+      head: filled(4194304, 0xff),
+      tail: filled(4194304, 0xff),
+      totalBytes: 8388609,
+      omittedBytes: 1,
+      limited: true,
+    });
+    await redactCapturedOutput(parts, { headBytes: 4194304, tailBytes: 4194304 }, { credentials: [], policyPatterns: [], redact });
+    expect(lengths.length).toBeGreaterThan(0);
+    expect(Math.max(...lengths)).toBeLessThanOrEqual(8388608);
+  });
+
+  it('invariant 7: the output file stays within its bound', async () => {
+    const redact: NonNullable<EvidenceRedactionOptions['redact']> = async (inputs) =>
+      ok({ texts: inputs.map((input) => input.replaceAll('a', '[REDACTED:x]')), counts: [], exactValues: 0 });
+    const parts = splitCapturedOutput({
+      head: filled(2000, 0x61),
+      tail: filled(2000, 0x61),
+      totalBytes: 4000,
+      omittedBytes: 0,
+      limited: false,
+    });
+    const result = await redactCapturedOutput(
+      parts,
+      { headBytes: 1024, tailBytes: 1024 },
+      { credentials: [], policyPatterns: [], redact },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(Buffer.byteLength(result.value.fileText, 'utf8')).toBeLessThanOrEqual(1024 + 1024 + 128);
+    }
+  });
+
+  it('invariant 7: the output excerpt fits the record text bound', async () => {
+    const redact: NonNullable<EvidenceRedactionOptions['redact']> = async (inputs) =>
+      ok({ texts: [...inputs], counts: [], exactValues: 0 });
+    const result = await redactCapturedOutput(
+      { parts: ['a'.repeat(300000)], omittedBytes: 0, trimmedBytes: 0 },
+      { headBytes: 4194304, tailBytes: 4194304 },
+      { credentials: [], policyPatterns: [], redact },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.excerpt.head.length).toBeLessThanOrEqual(RECORD_TEXT_MAX_LENGTH);
+      expect(result.value.excerpt.tail.length).toBeLessThanOrEqual(RECORD_TEXT_MAX_LENGTH);
+    }
+  });
+
+  it('invariant 7: an oversize result file is never redacted', async () => {
+    const oversize = decodeResultFile(filled(2796203, 0xff));
+    expect(oversize.text).toBeNull();
+    expect(oversize.decodedBytes).toBe(8388609);
+
+    const exact = decodeResultFile(filled(8388608, 0x61));
+    expect(exact.text).not.toBeNull();
+    const lengths: number[] = [];
+    const redact: NonNullable<EvidenceRedactionOptions['redact']> = async (inputs) => {
+      for (const input of inputs) lengths.push(Buffer.byteLength(input, 'utf8'));
+      return ok({ texts: [...inputs], counts: [], exactValues: 0 });
+    };
+    await redactResultFileText(exact.text ?? '', { credentials: [], policyPatterns: [], redact });
+    expect(lengths).toEqual([8388608]);
+  });
+
+  it('invariant 7: output and result files redact a resolved token', async () => {
+    const token = 'tok' + 'en-value-' + '0123456789abcdef';
+    const github = DETECTOR_SAMPLES['github-token'] as string;
+    const text = 'x ' + token + ' ' + Buffer.from(token).toString('base64') + ' ' + github;
+    const options = { credentials: [token], policyPatterns: [] };
+    const forbidden = [token, Buffer.from(token).toString('base64'), github];
+
+    const parts = splitCapturedOutput({
+      head: Buffer.from(text),
+      tail: Buffer.alloc(0),
+      totalBytes: Buffer.byteLength(text),
+      omittedBytes: 0,
+      limited: false,
+    });
+    const output = await redactCapturedOutput(parts, { headBytes: 4096, tailBytes: 4096 }, options);
+    expect(output.ok).toBe(true);
+    if (output.ok) {
+      for (const value of forbidden) {
+        expect(output.value.fileText).not.toContain(value);
+        expect(output.value.excerpt.head).not.toContain(value);
+        expect(output.value.excerpt.tail).not.toContain(value);
+      }
+      expect(output.value.fileText).toContain('[REDACTED:');
+    }
+
+    const decoded = decodeResultFile(Buffer.from(text));
+    expect(decoded.text).not.toBeNull();
+    const file = await redactResultFileText(decoded.text ?? '', options);
+    expect(file.ok).toBe(true);
+    if (file.ok) {
+      const redacted = Buffer.from(file.value.bytes).toString('utf8');
+      for (const value of forbidden) {
+        expect(redacted).not.toContain(value);
+      }
+      expect(redacted).toContain('[REDACTED:');
+    }
   });
 });

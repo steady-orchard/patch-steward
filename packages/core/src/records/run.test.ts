@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { canonicalJsonHash } from '../hash.js';
 
-import { runRecordSchema } from './run.js';
+import { formatRunnerIdentity, runnerIdentitySchema, runRecordSchema } from './run.js';
 
 const validRun = {
   schema_version: 1,
@@ -81,5 +81,57 @@ describe('record run', () => {
       },
     };
     expect(runRecordSchema.safeParse(mergeGroup).success).toBe(true);
+  });
+
+  it('runner identity accepts single interior spaces', () => {
+    const value = 'docker 29.8.0 docker.io/library/debian:stable-slim@0123456789ab';
+    expect(runnerIdentitySchema.safeParse(value).success).toBe(true);
+    expect(runRecordSchema.safeParse({ ...validRun, runner_identity: value }).success).toBe(true);
+  });
+
+  it('runner identity rejects bad spacing, controls, and length', () => {
+    expect(runnerIdentitySchema.safeParse(' docker 1').success).toBe(false);
+    expect(runnerIdentitySchema.safeParse('docker 1 ').success).toBe(false);
+    expect(runnerIdentitySchema.safeParse('docker  1').success).toBe(false);
+    expect(runnerIdentitySchema.safeParse(`docker${String.fromCharCode(9)}1`).success).toBe(false);
+    expect(runnerIdentitySchema.safeParse('a'.repeat(257)).success).toBe(false);
+    expect(runnerIdentitySchema.safeParse('a'.repeat(256)).success).toBe(true);
+  });
+
+  it('formatRunnerIdentity cuts long references to 256 characters', () => {
+    const long = formatRunnerIdentity({
+      runtime: 'podman',
+      serverVersion: '5.6.1',
+      reference: 'r'.repeat(300),
+      imageDigest: `sha256:${'0123456789ab'}${'c'.repeat(52)}`,
+    });
+    expect(long.length).toBe(256);
+    expect(long.endsWith('...@0123456789ab')).toBe(true);
+    expect(long.startsWith('podman 5.6.1 rrr')).toBe(true);
+
+    const short = formatRunnerIdentity({
+      runtime: 'docker',
+      serverVersion: '29.8.0',
+      reference: 'docker.io/library/debian:stable-slim',
+      imageDigest: `sha256:${'0123456789ab'}${'c'.repeat(52)}`,
+    });
+    expect(short).toBe('docker 29.8.0 docker.io/library/debian:stable-slim@0123456789ab');
+  });
+
+  it('formatRunnerIdentity output validates', () => {
+    const long = formatRunnerIdentity({
+      runtime: 'podman',
+      serverVersion: '5.6.1',
+      reference: 'r'.repeat(300),
+      imageDigest: `sha256:${'0123456789ab'}${'c'.repeat(52)}`,
+    });
+    const short = formatRunnerIdentity({
+      runtime: 'docker',
+      serverVersion: '29.8.0',
+      reference: 'docker.io/library/debian:stable-slim',
+      imageDigest: `sha256:${'0123456789ab'}${'c'.repeat(52)}`,
+    });
+    expect(runnerIdentitySchema.safeParse(long).success).toBe(true);
+    expect(runnerIdentitySchema.safeParse(short).success).toBe(true);
   });
 });

@@ -49,6 +49,16 @@ describe('run metrics events', () => {
     expect(result.value[6]?.payload).toEqual({ from: 'screening', to: 'needs-changes' });
   });
 
+  it('records container seconds in the cost event', () => {
+    const result = buildRunMetricsEvents({ ...baseInput, containerSeconds: 4.25 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const cost = result.value.find((event) => event.kind === 'cost');
+    expect(cost?.payload).toEqual({ model_calls: 0, tokens: null, ai_credits: null, container_seconds: 4.25 });
+  });
+
   it('every run metrics event validates', () => {
     const result = buildRunMetricsEvents(baseInput);
     expect(result.ok).toBe(true);

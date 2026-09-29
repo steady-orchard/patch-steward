@@ -14,6 +14,14 @@ export const POLICY_LIMITS: readonly PolicyLimit[] = Object.freeze(
       { path: 'runner.resources.memory_mb', unit: 'MiB', templateValue: 4096, min: 512, max: 14336, provider: null },
       { path: 'runner.resources.pids', unit: 'processes', templateValue: 512, min: 32, max: 4096, provider: null },
       {
+        path: 'runner.resources.scratch_mb',
+        unit: 'MiB',
+        templateValue: 1024,
+        min: 64,
+        max: 8192,
+        provider: null,
+      },
+      {
         path: 'limits.execution.execution_seconds',
         unit: 's',
         templateValue: 1800,
@@ -59,6 +67,134 @@ export const POLICY_LIMITS: readonly PolicyLimit[] = Object.freeze(
         templateValue: 600,
         min: 10,
         max: 1800,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.output_head_bytes',
+        unit: 'bytes',
+        templateValue: 262144,
+        min: 1024,
+        max: 4194304,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.output_tail_bytes',
+        unit: 'bytes',
+        templateValue: 786432,
+        min: 1024,
+        max: 4194304,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.output_stream_bytes',
+        unit: 'bytes',
+        templateValue: 268435456,
+        min: 65536,
+        max: 4294967296,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.result_files',
+        unit: 'files per execution',
+        templateValue: 5,
+        min: 0,
+        max: 20,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.result_test_cases',
+        unit: 'test cases per result file in the record',
+        templateValue: 1000,
+        min: 1,
+        max: 1000,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.checkout_bytes',
+        unit: 'bytes',
+        templateValue: 536870912,
+        min: 1048576,
+        max: 4294967296,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.checkout_files',
+        unit: 'files',
+        templateValue: 100000,
+        min: 100,
+        max: 1000000,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.prepared_checkout_bytes',
+        unit: 'bytes',
+        templateValue: 2147483648,
+        min: 1048576,
+        max: 8589934592,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.overlay_files',
+        unit: 'files',
+        templateValue: 200,
+        min: 1,
+        max: 3000,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.overlay_bytes',
+        unit: 'bytes',
+        templateValue: 10485760,
+        min: 1024,
+        max: 104857600,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.materialize_seconds',
+        unit: 's',
+        templateValue: 300,
+        min: 10,
+        max: 1800,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.image_pull_seconds',
+        unit: 's',
+        templateValue: 600,
+        min: 30,
+        max: 3600,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.image_build_seconds',
+        unit: 's',
+        templateValue: 1800,
+        min: 60,
+        max: 3600,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.image_bytes',
+        unit: 'bytes',
+        templateValue: 4294967296,
+        min: 104857600,
+        max: 21474836480,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.build_context_bytes',
+        unit: 'bytes',
+        templateValue: 10485760,
+        min: 1024,
+        max: 104857600,
+        provider: null,
+      },
+      {
+        path: 'limits.execution.container_start_seconds',
+        unit: 's',
+        templateValue: 120,
+        min: 5,
+        max: 600,
         provider: null,
       },
       { path: 'stages.challenge_rounds', unit: 'round pairs', templateValue: 2, min: 0, max: 3, provider: null },
@@ -284,3 +420,19 @@ export const APP_JWT_LIFETIME_SECONDS = 540;
 export const APP_JWT_BACKDATE_SECONDS = 60;
 export const RUNTIME_ARCHIVE_MAX_BYTES = 52428800;
 export const SAME_RUN_ARTIFACT_RETENTION_DAYS = 1;
+export const JUNIT_MAX_DEPTH = 64;
+export const JUNIT_MAX_ELEMENTS = 200000;
+export const JUNIT_MAX_ATTRIBUTES = 64;
+export const JUNIT_ATTRIBUTE_VALUE_MAX_LENGTH = 65536;
+export const TEST_CASE_IDENTITY_MAX_LENGTH = 4096;
+export const RUNTIME_CONTROL_TIMEOUT_MS = 120000;
+export const RUNTIME_CONTROL_OUTPUT_MAX_BYTES = 1048576;
+export const RUNTIME_KILL_GRACE_MS = 30000;
+export const SANDBOX_UID = 65532;
+export const SANDBOX_GID = 65532;
+export const SANDBOX_PLATFORM = 'linux/amd64';
+export const SANDBOX_WORK_PATH = '/work';
+export const SANDBOX_CHECKOUT_PATH = '/work/checkout';
+export const SANDBOX_SCRATCH_PATH = '/tmp';
+export const CHECKOUT_PATH_MAX_BYTES = 4096;
+export const FETCH_DEPTH = 1;

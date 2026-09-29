@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Linux-c++" tests="3" failures="1" disabled="1" skipped="0" hostname="host" time="0.07" timestamp="2026-01-01T00:00:00">
+  <properties/>
+  <testcase name="unit_add" classname="unit_add" time="0.03" status="run">
+    <system-out>Test passed</system-out>
+  </testcase>
+  <testcase name="unit_fail" classname="unit_fail" time="0.04" status="fail">
+    <failure message="Failed"/>
+  </testcase>
+  <testcase name="unit_skip" classname="unit_skip" time="0" status="notrun">
+    <skipped message="Disabled"/>
+  </testcase>
+</testsuite>

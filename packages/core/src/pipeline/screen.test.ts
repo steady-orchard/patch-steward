@@ -13,6 +13,7 @@ import type {
   AttachmentTransportResponse,
 } from '../net/attachment-fetch.js';
 import { fixedClock, fixedRandom } from '../clock.js';
+import { emptyPlanExecution } from '../execution/executor.js';
 import { DEFAULT_CHECKLIST_POLICY } from '../submission/default-checklist.js';
 import type { LoadedPolicy } from '../policy/loader.js';
 import { localFileRevisionId } from '../hash.js';
@@ -141,6 +142,7 @@ function commonDeps(overrides: CommonDepsOverrides): Parameters<typeof screenSub
     token: null,
     evidenceDir: overrides.evidenceDir,
     clock: CLOCK,
+    execution: { executor: async ({ plan }) => emptyPlanExecution(plan) },
     random: RANDOM,
     sleep: noopSleep,
     attachmentResolver: fakeResolver(),

@@ -1,0 +1,21 @@
+{
+  "description": "A zero-dependency TypeScript project for the container tier: Node's built-in test runner runs one passing and one failing test by type stripping and writes a JUnit result file.",
+  "commit": { "message": "typescript sample", "time": 1700000000 },
+  "entries": [
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "content": "{ \"name\": \"typescript-sample\", \"private\": true, \"type\": \"module\" }\n"
+    },
+    {
+      "path": "src/math.ts",
+      "mode": "100644",
+      "content": "export function add(a: number, b: number): number {\n  return a + b;\n}\n"
+    },
+    {
+      "path": "test/math.test.ts",
+      "mode": "100644",
+      "content": "import assert from 'node:assert/strict';\nimport { test } from 'node:test';\nimport { add } from '../src/math.ts';\n\ntest('adds two numbers', () => {\n  assert.equal(add(2, 3), 5);\n});\n\ntest('fails on purpose', () => {\n  assert.equal(add(2, 2), 5);\n});\n"
+    }
+  ]
+}

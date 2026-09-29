@@ -1,4 +1,5 @@
 import type { Clock, RandomSource } from '../clock.js';
+import type { PlanExecutor } from '../execution/executor.js';
 import { systemClock, systemRandom } from '../clock.js';
 import { localRunId } from '../evidence/layout.js';
 import type { PublishedRun, RunEvidenceOptions } from '../evidence/publish.js';
@@ -7,9 +8,12 @@ import type { GitHubFetch } from '../github/client.js';
 import type { GitHubRepositoryRef } from '../github/reader.js';
 import type { AttachmentResolver, AttachmentTransport } from '../net/attachment-fetch.js';
 import { httpsAttachmentTransport, systemAttachmentResolver } from '../net/https-transport.js';
+import type { FetchSource } from '../materialize/fetch.js';
 import { findPolicyLimit } from '../policy/bounds.js';
 import type { LoadedPolicy } from '../policy/loader.js';
 import type { DecidedOutcome, DecisionInput, DecisionResult } from '../decision/table.js';
+import { hostPlanExecutor } from '../runner/plan-executor.js';
+import type { ContainerRuntimeChoice, ContainerRuntimeName } from '../runner/types.js';
 import type { Result, StewardFailure } from '../result.js';
 import { err } from '../result.js';
 import type { StewardVersionFailureCode } from '../version.js';
@@ -18,11 +22,21 @@ import type { SubmissionType } from '../vocabulary.js';
 
 import type { GateFailureStage, GateInput, GateResult, ScreenPolicySource } from './gate.js';
 import { runGate } from './gate.js';
+import { createScreenExecutionSession } from './execution-phases.js';
 import type { PhaseImplementations } from './phases.js';
 import { LOCAL_PHASES, runWithPhaseTimeout } from './phases.js';
 import { PIPELINE_FAILURE_MESSAGES, acceptGateHandoff, runPhaseSequence } from './sequence.js';
 import type { LocalDecision, LocalPublishInput } from './publish-phase.js';
 import { publishLocalRun } from './publish-phase.js';
+
+export interface ScreenExecutionOptions {
+  readonly runtime?: ContainerRuntimeChoice;
+  readonly hostEnv?: Readonly<Record<string, string | undefined>>;
+  readonly executor?: PlanExecutor;
+  readonly fetchSource?: FetchSource;
+  readonly testNonce?: string | null;
+  readonly binaries?: Partial<Record<ContainerRuntimeName, string>>;
+}
 
 export interface ScreenDeps {
   readonly repository: GitHubRepositoryRef;
@@ -42,6 +56,7 @@ export interface ScreenDeps {
   readonly evidence?: RunEvidenceOptions;
   readonly decide?: (input: DecisionInput) => DecisionResult;
   readonly version?: () => Result<string, StewardVersionFailureCode>;
+  readonly execution?: ScreenExecutionOptions;
 }
 
 export interface ScreenPolicyInfo {
@@ -218,6 +233,33 @@ export async function screenSubmission(deps: ScreenDeps): Promise<ScreenResult> 
 
     runExists = true;
 
+    const binding = {
+      run_id: runId,
+      run_attempt: runAttempt,
+      snapshot_hash: gate.submission.snapshot_hash,
+      policy_revision: gate.loadedPolicy.revision.id,
+    };
+    const options = deps.execution ?? {};
+    const session = createScreenExecutionSession({
+      binding,
+      submissionType: gate.submission.type,
+      headCommit: gate.submission.head_commit,
+      loadedPolicy: gate.loadedPolicy,
+      repository: deps.repository,
+      token: deps.token,
+      clock,
+      executor:
+        options.executor ??
+        hostPlanExecutor({
+          runtime: options.runtime ?? 'auto',
+          hostEnv: options.hostEnv ?? process.env,
+          ...(deps.fetch !== undefined ? { fetch: deps.fetch } : {}),
+          ...(options.fetchSource !== undefined ? { fetchSource: options.fetchSource } : {}),
+          ...(options.testNonce !== undefined ? { testNonce: options.testNonce } : {}),
+          ...(options.binaries !== undefined ? { binaries: options.binaries } : {}),
+        }),
+    });
+
     const gateEnded = clock.now();
     const gateLatency: RunPhaseLatency = {
       phase: 'gate',
@@ -232,13 +274,13 @@ export async function screenSubmission(deps: ScreenDeps): Promise<ScreenResult> 
       maxRounds,
       timeoutMs: deps.phaseTimeoutMs ?? gate.loadedPolicy.policy.limits.stage_seconds * 1000,
       policy: gate.loadedPolicy.policy,
-      phases: { ...LOCAL_PHASES, ...deps.phases },
+      phases: { ...LOCAL_PHASES, intake: session.intake, execute: session.execute, ...deps.phases },
       clock,
     });
 
     const finishedAt = clock.now().toISOString();
 
-    const publishInput: LocalPublishInput = {
+    let publishInput: LocalPublishInput = {
       context: {
         runId,
         runAttempt,
@@ -264,6 +306,10 @@ export async function screenSubmission(deps: ScreenDeps): Promise<ScreenResult> 
       credentials: deps.token === null ? [] : [deps.token],
       finishedAt,
     };
+    const executed = session.outcome();
+    if (executed !== null) {
+      publishInput = { ...publishInput, executions: { binding, plan: executed.plan, execution: executed.execution } };
+    }
 
     const result = await publishLocalRun(publishInput, {
       ...(deps.evidence !== undefined ? { evidence: deps.evidence } : {}),

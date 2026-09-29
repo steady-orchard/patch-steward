@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildIssueSnapshot, buildPullRequestSnapshot, snapshotHash } from '../index.js';
 import type { IssueSnapshotInput, PullRequestSnapshotInput } from '../index.js';
 import { fixedClock, fixedRandom } from '../clock.js';
+import { emptyPlanExecution } from '../execution/executor.js';
 import { decideOutcome } from '../decision/table.js';
 import type { GitHubFetch } from '../github/client.js';
 import type { GitHubRepositoryRef } from '../github/reader.js';
@@ -318,6 +319,7 @@ describe('invariant 8: local run binding', { timeout: 60000 }, () => {
       attachmentResolver: fakeResolver(),
       attachmentTransport: fakeTransport(),
       clock: CLOCK,
+      execution: { executor: async ({ plan }) => emptyPlanExecution(plan) },
       random: RANDOM,
     });
     expect(result.kind).toBe('completed');

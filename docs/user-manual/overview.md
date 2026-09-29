@@ -2,7 +2,7 @@
 
 [Manual contents](README.md) · [Installation](installation.md)
 
-**Status:** Product behavior on this page is proposed. The development scaffold, the policy module, the submission contract check, the `steward policy` command, and the deterministic part of `steward preflight` exist, along with `steward screen`, which screens an issue or pull request locally at contract level, `steward report`, which prints a stored run, and a GitHub-hosted skeleton that screens in observe mode at contract level on dedicated test-bed repositories only; full screening does not exist.
+**Status:** Product behavior on this page is proposed. The development scaffold, the policy module, the submission contract check, the `steward policy` command, and `steward preflight` exist, along with `steward screen`, which screens an issue or pull request locally and runs a pull request's mandatory commands in Docker or Podman containers, `steward report`, which prints a stored run, and a GitHub-hosted skeleton that screens in observe mode at contract level on dedicated test-bed repositories only; full screening does not exist.
 
 ## Purpose and scope
 
@@ -60,13 +60,13 @@ Sources: [process vocabulary](../processes.md#01-vocabulary),
 
 ## Execution options (Proposed)
 
-| Option                          | Intended use                                                                                                                  | Authority and output                                                                             |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| GitHub-hosted screening (T1)    | Continuous issue and PR screening through Actions. Submitted code runs in containers.                                         | Authoritative for admission; evidence plus mode-dependent checks and feedback.                   |
-| Contributor preflight (T2)      | Local checks on the contributor's own checkout, without a sandbox; optional self-review using their own inference credential. | Unverified advice. No GitHub writes.                                                             |
-| Maintainer local screening (T3) | On-demand screening with a local Docker or Podman container.                                                                  | Local evidence and an optional attributed comment; never the required check.                     |
-| Evaluation replay (T4)          | Evaluate historical submissions using frozen inputs and withheld outcome labels.                                              | Local evaluation report and optional evidence upload; no live submission changes.                |
-| Browser app                     | Static submission assistant and maintainer dashboard on GitHub Pages.                                                         | Reads published JSON and links to GitHub for writes. Holds no secrets and performs no inference. |
+| Option                          | Intended use                                                                                                                                                            | Authority and output                                                                             |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| GitHub-hosted screening (T1)    | Continuous issue and PR screening through Actions. Submitted code runs in containers.                                                                                   | Authoritative for admission; evidence plus mode-dependent checks and feedback.                   |
+| Contributor preflight (T2)      | Local checks, and with `--run` the mandatory commands, on the contributor's own checkout, without a sandbox; optional self-review using their own inference credential. | Unverified advice. No GitHub writes.                                                             |
+| Maintainer local screening (T3) | On-demand screening with a local Docker or Podman container.                                                                                                            | Local evidence and an optional attributed comment; never the required check.                     |
+| Evaluation replay (T4)          | Evaluate historical submissions using frozen inputs and withheld outcome labels.                                                                                        | Local evaluation report and optional evidence upload; no live submission changes.                |
+| Browser app                     | Static submission assistant and maintainer dashboard on GitHub Pages.                                                                                                   | Reads published JSON and links to GitHub for writes. Holds no secrets and performs no inference. |
 
 Submitted code and reproductions in T1, T3, and T4 must execute in disposable
 containers without credentials. Worktrees and ordinary subprocesses provide no
@@ -74,9 +74,7 @@ security isolation. Containers protect hosts and credentials; they do not make
 submitted tests or result files trustworthy. T2 is limited to the contributor's
 own code and labels all results as claims.
 
-Available today, `steward screen` runs the maintainer local screening option
-at contract level only, with no container or model, and writes local
-evidence; see [Local screening](usage.md#local-screening-available).
+Available today, `steward screen` runs the maintainer local screening option: it executes a pull request's head commit in local Docker or Podman containers, with no screening stage or model yet, and writes local evidence; see [Local screening](usage.md#local-screening-available). `steward preflight --run` runs the contributor's mandatory commands and the regression-test preview on the own checkout, without a sandbox, and labels the results as claims; see [Prepare a submission](usage.md#prepare-a-submission-available).
 
 GitHub-hosted screening (T1) exists only as a GitHub-hosted skeleton in observe mode at contract level, verified on dedicated test-bed repositories: wrapper workflows call the reusable workflow's `build`, `gate`, and `publish` jobs, which authenticate the event, deduplicate by snapshot, apply the run caps, commit ownership, and write evidence to the evidence branch or repository. It creates no check run, report comment, or label, runs no stage, container, or model call, and cannot be installed in a target repository yet (see [Target-repository installation](installation.md#target-repository-installation-proposed)).
 

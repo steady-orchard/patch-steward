@@ -41,6 +41,14 @@ function limit(path: string) {
   return z.int().min(row.min).max(row.max);
 }
 
+function limitWithDefault(path: string) {
+  const row = findPolicyLimit(path);
+  if (row === undefined) {
+    throw new Error(`policy limit ${path} is not registered`);
+  }
+  return limit(path).default(row.templateValue);
+}
+
 const supportedVersionSchema = z.strictObject({
   version: shortText,
   supported: z.boolean(),
@@ -172,6 +180,7 @@ const runnerSchema = z.strictObject({
     cpus: limit('runner.resources.cpus'),
     memory_mb: limit('runner.resources.memory_mb'),
     pids: limit('runner.resources.pids'),
+    scratch_mb: limitWithDefault('runner.resources.scratch_mb'),
   }),
 });
 
@@ -242,6 +251,22 @@ const limitsSchema = z.strictObject({
     output_bytes: limit('limits.execution.output_bytes'),
     result_file_bytes: limit('limits.execution.result_file_bytes'),
     dependency_step_seconds: limit('limits.execution.dependency_step_seconds'),
+    output_head_bytes: limitWithDefault('limits.execution.output_head_bytes'),
+    output_tail_bytes: limitWithDefault('limits.execution.output_tail_bytes'),
+    output_stream_bytes: limitWithDefault('limits.execution.output_stream_bytes'),
+    result_files: limitWithDefault('limits.execution.result_files'),
+    result_test_cases: limitWithDefault('limits.execution.result_test_cases'),
+    checkout_bytes: limitWithDefault('limits.execution.checkout_bytes'),
+    checkout_files: limitWithDefault('limits.execution.checkout_files'),
+    prepared_checkout_bytes: limitWithDefault('limits.execution.prepared_checkout_bytes'),
+    overlay_files: limitWithDefault('limits.execution.overlay_files'),
+    overlay_bytes: limitWithDefault('limits.execution.overlay_bytes'),
+    materialize_seconds: limitWithDefault('limits.execution.materialize_seconds'),
+    image_pull_seconds: limitWithDefault('limits.execution.image_pull_seconds'),
+    image_build_seconds: limitWithDefault('limits.execution.image_build_seconds'),
+    image_bytes: limitWithDefault('limits.execution.image_bytes'),
+    build_context_bytes: limitWithDefault('limits.execution.build_context_bytes'),
+    container_start_seconds: limitWithDefault('limits.execution.container_start_seconds'),
   }),
   attachments: z.strictObject({
     count: limit('limits.attachments.count'),

@@ -8,6 +8,22 @@ import { ok, FAILURE_CAUSES, loadPolicy, resolvedPolicySchema, policyRevisionRec
 
 const templateBytes = readFileSync(fileURLToPath(new URL('../../../../templates/policy/policy.yml', import.meta.url)));
 
+const binding = {
+  run_id: 'local-20260928T101500Z-3f9a1c2e',
+  run_attempt: 1,
+  snapshot_hash: 'sha256:' + '5'.repeat(64),
+  policy_revision: 'b'.repeat(40),
+};
+const plan: core.ExecutionPlanTransport = {
+  transport: 'execution-plan',
+  transport_version: 1,
+  run: { run_id: binding.run_id, run_attempt: 1 },
+  snapshot_hash: binding.snapshot_hash,
+  policy_revision: binding.policy_revision,
+  entries: [],
+  over_budget: false,
+};
+
 const commit = 'a'.repeat(40);
 const treeId = 'b'.repeat(40);
 const blobId = 'c'.repeat(40);
@@ -140,6 +156,8 @@ describe('invariant 5 conformance', () => {
       'loadPolicyRevision',
       'resolveCommit',
       'resolvePolicy',
+      'validateExecutionPlan',
+      'validateExecutionResults',
       'validateHandoff',
       'validatePolicy',
       'validatePolicyBytes',
@@ -172,6 +190,8 @@ describe('invariant 5 conformance', () => {
     const gitOptions = { repoDir: os.tmpdir(), timeoutMs: 1000, maxOutputBytes: 1000 };
     results.push(await core.resolveCommit(gitOptions, '-x'));
     results.push(core.validateHandoff(null, { previous: null, gate: null, maxRounds: 1 }));
+    results.push(core.validateExecutionPlan(null, binding));
+    results.push(core.validateExecutionResults(null, { binding, plan }));
 
     const versionRunner: ProcessRunner = async (_binary, args) => {
       if (args[0] === 'rev-parse' && args[1] === '--git-dir') {
@@ -230,13 +250,18 @@ describe('invariant 5 conformance', () => {
     expect(names).toEqual([
       'captureIssue',
       'capturePullRequest',
+      'checkCheckoutPath',
       'checkContract',
+      'checkOverlay',
       'checkPolicyRules',
       'checkRedactionPattern',
+      'checkSymlinkTarget',
+      'checkoutTopLevel',
       'loadPolicy',
       'loadPolicyRevision',
       'parseCategoryValue',
       'parseIssueBody',
+      'parseJunitXml',
       'parseLinkedIssueValue',
       'parsePullRequestBody',
       'parseRunName',
@@ -245,6 +270,8 @@ describe('invariant 5 conformance', () => {
       'parseStrictYamlDocument',
       'resolveCommit',
       'resolvePolicy',
+      'validateExecutionPlan',
+      'validateExecutionResults',
       'validateHandoff',
       'validatePolicy',
       'validatePolicyBytes',
@@ -286,6 +313,19 @@ describe('invariant 5 conformance', () => {
     expectResultRejection(await core.resolveCommit(gitOptions, '-x'));
     expectResultRejection(core.validateHandoff(null, { previous: null, gate: null, maxRounds: 1 }), 'pipeline.handoff-invalid');
     expectResultRejection(core.parseStewardVersion('not json'), 'steward.version-unavailable');
+    expectResultRejection(core.validateExecutionPlan(null, binding), 'pipeline.transport-invalid');
+    expectResultRejection(core.validateExecutionResults(null, { binding, plan }), 'pipeline.transport-invalid');
+    expectResultRejection(
+      core.checkOverlay(new Map(), [{ path: '../x', delete: true }], { maxFiles: 1, maxBytes: 1 }),
+      'materialize.overlay-rejected',
+    );
+    expect(core.checkCheckoutPath('../x')).toBe('segment');
+    expect(core.checkSymlinkTarget('')).toBe('length');
+    expect(await core.checkoutTopLevel('/does-not-exist/patch-steward')).toBeNull();
+    expect(core.parseJunitXml(Buffer.from('<!DOCTYPE t><testsuites/>'), { maxCases: 1 })).toEqual({
+      status: 'malformed',
+      error_code: 'junit.doctype-forbidden',
+    });
 
     // parseCategoryValue / parseLinkedIssueValue: invalid status, not a Result.
     expect(core.parseCategoryValue('bugfix feature')).toEqual({ status: 'invalid' });

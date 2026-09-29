@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="pkg.Suite" tests="4" failures="1" errors="1" skipped="1" time="2.0">
+    <testcase classname="pkg.Suite" name="passes" time="1.5"/>
+    <testcase classname="pkg.Suite" name="errors" time="0.25">
+      <error message="unexpected" type="RuntimeError">trace</error>
+    </testcase>
+    <testcase classname="pkg.Suite" name="fails" time="0.25">
+      <failure message="assert"/>
+    </testcase>
+    <testcase classname="pkg.Suite" name="skips">
+      <skipped/>
+    </testcase>
+  </testsuite>
+</testsuites>

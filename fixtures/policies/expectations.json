@@ -22,5 +22,9 @@
   "valid/copilot.yml": { "valid": true, "codes": [] },
   "valid/injection-text.yml": { "valid": true, "codes": [] },
   "valid/minimal-no-llm.yml": { "valid": true, "codes": [] },
-  "valid/openai-compatible.yml": { "valid": true, "codes": [] }
+  "valid/openai-compatible.yml": { "valid": true, "codes": [] },
+  "invalid/output-parts-above-output-bytes.txt": { "valid": false, "codes": ["policy.invalid-value"] },
+  "invalid/output-stream-below-output-bytes.txt": { "valid": false, "codes": ["policy.invalid-value"] },
+  "invalid/prepared-checkout-below-checkout.txt": { "valid": false, "codes": ["policy.invalid-value"] },
+  "invalid/result-files-above-limit.txt": { "valid": false, "codes": ["policy.invalid-value"] }
 }

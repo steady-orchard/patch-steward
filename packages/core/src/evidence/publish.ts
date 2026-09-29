@@ -1,4 +1,12 @@
-import { RUN_FILES, repositoryStoreRoot, repositoryStorePath, runStorePath, stagingStorePath, metricsStorePath } from './layout.js';
+import {
+  RUN_FILES,
+  repositoryStoreRoot,
+  repositoryStorePath,
+  runStorePath,
+  stagingStorePath,
+  metricsStorePath,
+  executionFilePath,
+} from './layout.js';
 import type { EvidenceLayoutFailureCode } from './layout.js';
 import { assembleRunRecords } from './assemble.js';
 import type { RunAssemblyInput, RunAssemblyFailureCode } from './assemble.js';
@@ -17,15 +25,27 @@ import type { EvidenceFs, LocalStoreFailureCode } from './local-store.js';
 import { buildReportInput, buildCheckSummaryInput } from './report-input.js';
 import type { ReportRecordSources, ReportInputFailureCode } from './report-input.js';
 import { prettyJson } from './pretty-json.js';
+import { prepareExecutionEvidence, dropLastStoredResultFile } from './execution-evidence.js';
+import type { PreparedExecutionEvidence } from './execution-evidence.js';
+import { redactCapturedOutput, splitCapturedOutput } from './output-file.js';
 import { renderReport } from '../report/render.js';
 import type { ReportRenderFailureCode } from '../report/render.js';
 import { renderCheckSummary } from '../report/summary.js';
 import type { CheckSummaryFailureCode } from '../report/summary.js';
 import type { ClassificationInput } from '../report/templates.js';
 import { BUILT_IN_DETECTORS } from '../redaction/detectors.js';
-import { REPORT_MAX_LENGTH, CHECK_SUMMARY_MAX_LENGTH, EVIDENCE_LOG_FILE_MAX_BYTES } from '../policy/bounds.js';
-import { runRecordSchema } from '../records/run.js';
-import type { RunRecord } from '../records/run.js';
+import {
+  REPORT_MAX_LENGTH,
+  CHECK_SUMMARY_MAX_LENGTH,
+  EVIDENCE_LOG_FILE_MAX_BYTES,
+  EVIDENCE_RUN_FILES_MAX,
+} from '../policy/bounds.js';
+import type { ExecutionResultsTransport } from '../execution/transport.js';
+import type { CapturedOutput } from '../execution/output-capture.js';
+import { executionRecordSchema } from '../records/execution-record.js';
+import type { ExecutionRecord } from '../records/execution-record.js';
+import { runRecordSchema, formatRunnerIdentity } from '../records/run.js';
+import type { RunRecord, RunnerIdentityInput } from '../records/run.js';
 import { submissionRecordSchema } from '../records/submission.js';
 import type { SubmissionRecord } from '../records/submission.js';
 import { findingRecordSchema } from '../records/finding.js';
@@ -41,6 +61,13 @@ import type { PolicyRevisionRecord } from '../policy/revision-record.js';
 import { err, ok } from '../result.js';
 import type { Result } from '../result.js';
 
+export interface RunExecutionEvidence {
+  readonly results: ExecutionResultsTransport;
+  readonly runner: RunnerIdentityInput | null;
+  readonly buildLog: CapturedOutput | null;
+  readonly containerSeconds: number;
+}
+
 export interface RunEvidencePreparation {
   readonly assembly: RunAssemblyInput;
   readonly classification: ClassificationInput;
@@ -50,6 +77,7 @@ export interface RunEvidencePreparation {
   readonly localRun: boolean;
   readonly createdAt: string;
   readonly evidenceLocation?: string;
+  readonly executions?: RunExecutionEvidence;
 }
 
 export interface RunEvidenceInput extends RunEvidencePreparation {
@@ -95,7 +123,8 @@ export type RunEvidenceFailureCode =
   | CheckSummaryFailureCode
   | EvidenceManifestFailureCode
   | LocalStoreFailureCode
-  | 'evidence.too-large';
+  | 'evidence.too-large'
+  | 'evidence.too-many-files';
 
 interface SerializedFile {
   readonly path: string;
@@ -128,12 +157,20 @@ export async function prepareRunEvidence(
     }
     const metricsPath = metricsStorePath(startedAt, runId, runAttempt);
 
-    const assembled = assembleRunRecords(input.assembly);
-    if (!assembled.ok) {
-      return assembled;
+    const executions = input.executions;
+    if (executions !== undefined) {
+      // Checked before any redaction work so a run that cannot be stored costs nothing.
+      let count = 7 + input.assembly.findings.length;
+      for (const entry of executions.results.results) {
+        if (entry.kind !== 'completed') continue;
+        count += 2 + entry.result_texts.filter((item) => item.text !== null).length;
+      }
+      if (executions.buildLog !== null) count += 1;
+      if (count + 1 > EVIDENCE_RUN_FILES_MAX) {
+        return err('evidence.too-many-files', 'budget-exhausted', 'The run directory has too many files.');
+      }
     }
 
-    const logText = renderLogText(input.logLines);
     const policy = loadedPolicy.policy;
     const policyPatterns = policy.evidence.redaction_patterns.map((p) => ({ id: p.id, pattern: p.pattern }));
     const redactionOptions: EvidenceRedactionOptions = {
@@ -141,6 +178,36 @@ export async function prepareRunEvidence(
       policyPatterns,
       ...(options.redact !== undefined ? { redact: options.redact } : {}),
     };
+
+    let preparedExecutions: PreparedExecutionEvidence | null = null;
+    if (executions !== undefined) {
+      const prepared = await prepareExecutionEvidence(executions.results, redactionOptions);
+      if (!prepared.ok) {
+        return prepared;
+      }
+      preparedExecutions = prepared.value;
+    }
+
+    const assembled = assembleRunRecords({
+      ...input.assembly,
+      ...(executions !== undefined && preparedExecutions !== null
+        ? {
+            execution: {
+              runnerIdentity:
+                executions.runner === null || preparedExecutions.records.length === 0
+                  ? null
+                  : formatRunnerIdentity(executions.runner),
+              executions: preparedExecutions.records.length,
+              containerSeconds: executions.containerSeconds,
+            },
+          }
+        : {}),
+    });
+    if (!assembled.ok) {
+      return assembled;
+    }
+
+    const logText = renderLogText(input.logLines);
 
     const findingsCount = assembled.value.findings.length;
     const decisionIndex = 3 + findingsCount;
@@ -153,6 +220,7 @@ export async function prepareRunEvidence(
       ...assembled.value.findings.map((f) => ({ value: f, schema: findingRecordSchema })),
       { value: assembled.value.decision, schema: decisionRecordSchema },
       ...assembled.value.metricsEvents.map((m) => ({ value: m, schema: metricsEventRecordSchema })),
+      ...(preparedExecutions?.records ?? []).map((r) => ({ value: r, schema: executionRecordSchema })),
     ];
 
     const pass1 = await redactEvidenceStrings(recordsForPass1, [logText, input.defaultBranch], redactionOptions);
@@ -165,7 +233,29 @@ export async function prepareRunEvidence(
     const policyRevision = pass1.value.records[2] as PolicyRevisionRecord;
     const findings = pass1.value.records.slice(3, decisionIndex) as FindingRecord[];
     const decision = pass1.value.records[decisionIndex] as DecisionRecord;
-    const metricsEvents = pass1.value.records.slice(metricsStart) as MetricsEventRecord[];
+    const metricsEnd = metricsStart + assembled.value.metricsEvents.length;
+    const metricsEvents = pass1.value.records.slice(metricsStart, metricsEnd) as MetricsEventRecord[];
+    const redactedExecutions: PreparedExecutionEvidence | null =
+      preparedExecutions === null
+        ? null
+        : { ...preparedExecutions, records: pass1.value.records.slice(metricsEnd) as ExecutionRecord[] };
+
+    let buildLogText: string | null = null;
+    let buildLogCounts: PreparedExecutionEvidence['counts'] = [];
+    let buildLogExact = 0;
+    if (executions?.buildLog != null) {
+      const redactedLog = await redactCapturedOutput(
+        splitCapturedOutput(executions.buildLog),
+        { headBytes: 262144, tailBytes: 786432 },
+        redactionOptions,
+      );
+      if (!redactedLog.ok) {
+        return redactedLog;
+      }
+      buildLogText = truncateLogText(redactedLog.value.fileText, EVIDENCE_LOG_FILE_MAX_BYTES);
+      buildLogCounts = redactedLog.value.counts;
+      buildLogExact = redactedLog.value.exactValues;
+    }
 
     const sources: ReportRecordSources = {
       run,
@@ -178,6 +268,14 @@ export async function prepareRunEvidence(
       subjectTotals: input.assembly.findings.map((p) => p.finding.subjects.length),
       localRun: input.localRun,
       storePath: input.evidenceLocation ?? storePath,
+      ...(redactedExecutions !== null && executions !== undefined
+        ? {
+            executions: {
+              records: redactedExecutions.records,
+              runner: redactedExecutions.records.length === 0 ? null : executions.runner,
+            },
+          }
+        : {}),
     };
 
     const reportInput = buildReportInput(sources);
@@ -245,7 +343,7 @@ export async function prepareRunEvidence(
       findingFiles.push({ path: `findings/${finding.finding_id}.json`, bytes: bytesResult.value });
     }
 
-    const files: SerializedFile[] = [
+    const baseFiles: SerializedFile[] = [
       { path: RUN_FILES.run, bytes: runBytes.value },
       { path: RUN_FILES.submission, bytes: submissionBytes.value },
       { path: RUN_FILES.policyRevision, bytes: policyRevisionBytes.value },
@@ -254,6 +352,23 @@ export async function prepareRunEvidence(
       { path: RUN_FILES.reportMarkdown, bytes: reportMarkdownBytes },
       ...findingFiles,
     ];
+
+    const buildFiles = (prepared: PreparedExecutionEvidence | null): Result<SerializedFile[], RunEvidenceFailureCode> => {
+      if (prepared === null) return ok(baseFiles);
+      const recordFiles: SerializedFile[] = [];
+      for (let index = 0; index < prepared.records.length; index += 1) {
+        const bytesResult = serializeRecord(prepared.records[index]);
+        if (!bytesResult.ok) return bytesResult;
+        recordFiles.push({ path: executionFilePath(index + 1), bytes: bytesResult.value });
+      }
+      return ok([
+        ...baseFiles,
+        ...recordFiles,
+        ...prepared.outputFiles,
+        ...prepared.resultFiles.map((f) => ({ path: f.path, bytes: f.bytes })),
+        ...(buildLogText === null ? [] : [{ path: 'logs/image-build.txt', bytes: Buffer.from(buildLogText, 'utf8') }]),
+      ]);
+    };
 
     const metricsTextResult = prettyJson(metricsEvents);
     if (!metricsTextResult.ok) {
@@ -266,30 +381,50 @@ export async function prepareRunEvidence(
     const redaction = {
       detectors: detectorIds,
       policyPatterns: patternIds,
-      exactValues: pass1.value.exactValues,
-      replacements: mergeRedactionCounts([pass1.value.counts, pass2.value.counts], ['known-secret', ...detectorIds, ...patternIds]),
+      exactValues: pass1.value.exactValues + (preparedExecutions?.exactValues ?? 0) + buildLogExact,
+      replacements: mergeRedactionCounts(
+        [pass1.value.counts, pass2.value.counts, preparedExecutions?.counts ?? [], buildLogCounts],
+        ['known-secret', ...detectorIds, ...patternIds],
+      ),
     };
 
     const limit = policy.limits.evidence.run_bytes;
     const logCapped = Buffer.from(truncateLogText(pass1.value.texts[0] as string, EVIDENCE_LOG_FILE_MAX_BYTES), 'utf8');
 
-    const upper = buildEvidenceManifest({
-      runId,
-      runAttempt,
-      storePath,
-      createdAt: input.createdAt,
-      files: [...files, { path: RUN_FILES.log, bytes: logCapped }],
-      metrics: { path: metricsPath, bytes: metricsBytes },
-      redaction,
-    });
-    if (!upper.ok) {
-      return upper;
+    let currentExecutions = redactedExecutions;
+    let files: SerializedFile[];
+    let upperBytes: number;
+    for (;;) {
+      const built = buildFiles(currentExecutions);
+      if (!built.ok) return built;
+      files = built.value;
+      const upper = buildEvidenceManifest({
+        runId,
+        runAttempt,
+        storePath,
+        createdAt: input.createdAt,
+        files: [...files, { path: RUN_FILES.log, bytes: logCapped }],
+        metrics: { path: metricsPath, bytes: metricsBytes },
+        redaction,
+      });
+      if (!upper.ok) {
+        return upper;
+      }
+      const upperTextResult = prettyJson(upper.value);
+      if (!upperTextResult.ok) {
+        return err('evidence.record-invalid', 'steward-defect', 'The evidence manifest could not be serialized.');
+      }
+      upperBytes = Buffer.byteLength(upperTextResult.value, 'utf8');
+      const total = files.reduce((sum, file) => sum + file.bytes.length, 0) + logCapped.length + metricsBytes.length + upperBytes;
+      if (total <= limit || currentExecutions === null) break;
+      const dropped = dropLastStoredResultFile(currentExecutions);
+      if (dropped === null) break;
+      // Only constant omission fields changed on an already redacted record; it must still be a valid record.
+      if (!dropped.records.every((r) => executionRecordSchema.safeParse(r).success)) {
+        return err('evidence.record-invalid', 'steward-defect', 'An execution record could not be prepared as evidence.');
+      }
+      currentExecutions = dropped;
     }
-    const upperTextResult = prettyJson(upper.value);
-    if (!upperTextResult.ok) {
-      return err('evidence.record-invalid', 'steward-defect', 'The evidence manifest could not be serialized.');
-    }
-    const upperBytes = Buffer.byteLength(upperTextResult.value, 'utf8');
 
     const filesSum = files.reduce((sum, file) => sum + file.bytes.length, 0);
     const logBudget = limit - filesSum - metricsBytes.length - upperBytes;

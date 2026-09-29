@@ -1,0 +1,11 @@
+{
+  "description": "A shell project for the container tier: prints a line and the user id, writes one JUnit result file, and exits with status 3.",
+  "commit": { "message": "shell sample", "time": 1700000000 },
+  "entries": [
+    {
+      "path": "run.sh",
+      "mode": "100755",
+      "content": "echo 'hello from the sandbox'\nid -u\nmkdir -p reports\nprintf '%s' '<testsuites><testsuite name=\"sample\"><testcase classname=\"sample\" name=\"passes\"/></testsuite></testsuites>' > reports/junit.xml\nexit 3\n"
+    }
+  ]
+}

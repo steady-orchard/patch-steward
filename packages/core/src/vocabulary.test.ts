@@ -127,7 +127,12 @@ const vocabularies: ReadonlyArray<{
     schema: maintainerActionKindSchema,
     expected: ['override', 'guidance', 'waiver', 'acceptance', 'resolution', 'inference-admission'],
   },
-  { name: 'ADMISSIBILITY_VALUES', tuple: ADMISSIBILITY_VALUES, schema: admissibilitySchema, expected: ['evidence', 'signal'] },
+  {
+    name: 'ADMISSIBILITY_VALUES',
+    tuple: ADMISSIBILITY_VALUES,
+    schema: admissibilitySchema,
+    expected: ['evidence', 'signal', 'claim'],
+  },
   {
     name: 'REFERENCE_STATUSES',
     tuple: REFERENCE_STATUSES,

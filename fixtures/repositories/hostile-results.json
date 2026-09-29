@@ -1,0 +1,18 @@
+{
+  "description": "Result-file and injection probes for the container tier: a test script that writes a JUnit file whose test names and output carry shell, Markdown, mention, and workflow-expression text, a committed symlink to a system file, a result path that is a directory, a small binary result file, and a 2796203-byte 0xFF result file generated at run time; one declared result file is never written.",
+  "commit": {
+    "message": "hostile results",
+    "time": 1700000000
+  },
+  "entries": [
+    {
+      "path": "results.sh",
+      "mode": "100755",
+      "content": "echo '$(touch /tmp/pwned) `id` ; rm -rf / && echo owned'\necho '**bold** [link](https://example.invalid) <img src=x>'\necho '@octocat #1 owner/repo#2'\necho '${{ secrets.GITHUB_TOKEN }}'\nmkdir -p reports\nprintf '%s' '<testsuites><testsuite name=\"hostile\"><testcase classname=\"$(touch /tmp/pwned) `id` ; rm -rf / &amp;&amp; echo owned | **bold** [link](https://example.invalid) &lt;img src=x&gt; | @octocat #1 owner/repo#2 | ${{ secrets.GITHUB_TOKEN }}\" name=\"$(touch /tmp/pwned) `id` ; rm -rf / &amp;&amp; echo owned | **bold** [link](https://example.invalid) &lt;img src=x&gt; | @octocat #1 owner/repo#2 | ${{ secrets.GITHUB_TOKEN }}\"/></testsuite></testsuites>' > reports/injection.xml\nmkdir -p reports/dir.xml\nprintf 'a\\000b\\377c' > reports/binary.xml\nhead -c 2796203 /dev/zero | tr '\\000' '\\377' > reports/ff.xml\nexit 0\n"
+    },
+    {
+      "path": "reports/link.xml",
+      "symlink": "/etc/passwd"
+    }
+  ]
+}

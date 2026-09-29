@@ -1,0 +1,19 @@
+{
+  "description": "Repository content that materialization must leave inert: an attribute filter and line-ending rules, export-subst, CRLF line endings, an LFS pointer, a submodule declaration with its gitlink, and escaping symlinks.",
+  "commit": { "message": "hostile materialization fixture", "time": 1700000000 },
+  "entries": [
+    { "path": ".gitattributes", "mode": "100644", "content": "* filter=hostile text eol=crlf\n*.sh export-subst\n" },
+    { "path": ".gitmodules", "mode": "100644", "content": "[submodule \"vendor/evil\"]\n\tpath = vendor/evil\n\turl = ../evil\n" },
+    { "path": "README.md", "mode": "100644", "content": "line one\r\nline two\r\n" },
+    { "path": "bin/tool.sh", "mode": "100755", "content": "#!/bin/sh\necho '$Format:%H$'\n" },
+    {
+      "path": "data/lfs-object.bin",
+      "mode": "100644",
+      "content": "version https://git-lfs.github.com/spec/v1\noid sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393\nsize 12345\n"
+    },
+    { "path": "escape", "symlink": "../../../../etc/passwd" },
+    { "path": "absolute", "symlink": "/etc/shadow" },
+    { "path": "nested/dir/file.txt", "mode": "100644", "content": "nested\n" },
+    { "path": "vendor/evil", "gitlink": "1111111111111111111111111111111111111111" }
+  ]
+}
