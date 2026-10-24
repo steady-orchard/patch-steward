@@ -51,7 +51,8 @@ export async function checkoutTopLevel(cwd: string, options?: PreviewGitOptions)
     if (text.length === 0) {
       return null;
     }
-    return fs.realpathSync(text);
+    // native: JS realpath leaves Windows 8.3 short names (RUNNER~1) unexpanded
+    return fs.realpathSync.native(text);
   } catch {
     return null;
   }
@@ -242,7 +243,7 @@ export async function createPreviewWorktree(
 
   let root: string;
   try {
-    root = fs.realpathSync(worktreePath);
+    root = fs.realpathSync.native(worktreePath);
   } catch {
     return fail(unavailable('worktree path could not be resolved'));
   }

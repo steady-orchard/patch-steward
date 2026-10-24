@@ -72,7 +72,7 @@ describe('preview worktree', { timeout: 120000 }, () => {
     const repo = newRepo();
     write(repo, 'sub/deep/file.txt', 'x');
     commitAll(repo, 'init');
-    expect(await checkoutTopLevel(path.join(repo, 'sub', 'deep'))).toBe(fs.realpathSync(repo));
+    expect(await checkoutTopLevel(path.join(repo, 'sub', 'deep'))).toBe(fs.realpathSync.native(repo));
     expect(await checkoutTopLevel(path.join(base, 'missing'))).toBeNull();
   });
 

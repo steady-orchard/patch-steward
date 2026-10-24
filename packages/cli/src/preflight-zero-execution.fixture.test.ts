@@ -377,6 +377,15 @@ function isInside(root: string, candidate: string): boolean {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
+// Windows runners expose the temp dir as an 8.3 short name (RUNNER~1) in one place and the long name in another; the
+// candidate may no longer exist, so rewrite its temp prefix instead of calling realpath on it.
+function canonTemp(candidate: string): string {
+  const tmp = path.resolve(os.tmpdir());
+  const relative = path.relative(tmp, candidate);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return candidate;
+  return path.join(fs.realpathSync.native(tmp), relative);
+}
+
 function isNodeExecutable(file: string): boolean {
   if (path.resolve(file) === path.resolve(process.execPath)) return true;
   const name = path.basename(file).toLowerCase();
@@ -420,7 +429,7 @@ describe('preflight with run spawns', () => {
   }
 
   beforeAll(() => {
-    checkoutDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'patch-steward-zero-run-')));
+    checkoutDir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'patch-steward-zero-run-')));
     configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'patch-steward-zero-run-cfg-'));
     globalConfigPath = path.join(configDir, 'gitconfig');
     fs.writeFileSync(globalConfigPath, '');
@@ -470,11 +479,11 @@ describe('preflight with run spawns', () => {
       const report = JSON.parse(capture.text()) as { run?: { preview: unknown } };
       expect(report.run?.preview).not.toBeNull();
 
-      const temps = [os.tmpdir(), fs.realpathSync(os.tmpdir())];
+      const temps = [os.tmpdir(), fs.realpathSync(os.tmpdir()), fs.realpathSync.native(os.tmpdir())];
       const inTemp = (candidate: string): boolean => temps.some((root) => isInside(root, path.resolve(candidate)));
       const worktrees = new Set<string>();
       for (const call of spy.calls) {
-        if (call.args[0] === '-c' && call.args[3] === 'add') worktrees.add(path.resolve(call.args[5] ?? ''));
+        if (call.args[0] === '-c' && call.args[3] === 'add') worktrees.add(canonTemp(path.resolve(call.args[5] ?? '')));
       }
       let adds = 0;
       let removes = 0;
@@ -485,9 +494,10 @@ describe('preflight with run spawns', () => {
       for (const call of spy.calls) {
         const name = spawnedName(call);
         const a = call.args;
-        expect(isInside(checkoutDir, path.resolve(call.file))).toBe(false);
+        const file = canonTemp(path.resolve(call.file));
+        expect(isInside(checkoutDir, file)).toBe(false);
         for (const root of worktrees) {
-          expect(isInside(root, path.resolve(call.file))).toBe(false);
+          expect(isInside(root, file)).toBe(false);
         }
         if (name === 'git') {
           if (a[0] === '-c') {
@@ -519,7 +529,7 @@ describe('preflight with run spawns', () => {
           expect(index, `unexpected node argv ${JSON.stringify(a)}`).toBeGreaterThanOrEqual(0);
           policySeen[index] = (policySeen[index] ?? 0) + 1;
           expect(call.cwd, 'policy command cwd').not.toBeNull();
-          const cwd = path.resolve(call.cwd as string);
+          const cwd = canonTemp(path.resolve(call.cwd as string));
           expect(isInside(checkoutDir, cwd) || [...worktrees].some((root) => isInside(root, cwd))).toBe(true);
         } else if (process.platform === 'win32' && name === 'cmd') {
           expect(a.slice(0, 3)).toEqual(['/d', '/s', '/c']);
